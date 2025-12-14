@@ -60,6 +60,8 @@ public class JGLCanvas extends Canvas {
     private long windowHandle = 0;
     private int mMouseX = 0;
     private int mMouseY = 0;
+    
+    private static final int MAX_MOUSE_BUTTONS = 8;
 
     public JGLCanvas() {
         this.mNewCanvasSize = new AtomicReference<>();
@@ -231,23 +233,26 @@ public class JGLCanvas extends Canvas {
             
             // Setup mouse button callback
             glfwSetMouseButtonCallback(windowHandle, (window, button, action, mods) -> {
+                // Validate button index
+                if (button < 0 || button >= MAX_MOUSE_BUTTONS) {
+                    return;
+                }
+                
                 int jButton = (button == GLFW_MOUSE_BUTTON_LEFT) ? MouseEvent.BUTTON1 
                             : (button == GLFW_MOUSE_BUTTON_RIGHT) ? MouseEvent.BUTTON2 
                             : MouseEvent.BUTTON3;
                 boolean buttonState = (action == GLFW_PRESS);
                 
-                if (button >= 0 && button < mMouseState.length) {
-                    if (mMouseState[button] != buttonState) {
-                        long nanoseconds = System.nanoTime();
-                        if (buttonState) {
-                            MouseEvent event = new MouseEvent(this, MouseEvent.MOUSE_PRESSED, nanoseconds, 0, mMouseX, mMouseY, 1, false, jButton);
-                            fireMouseEvent(event);
-                        } else {
-                            MouseEvent event = new MouseEvent(this, MouseEvent.MOUSE_RELEASED, nanoseconds, 0, mMouseX, mMouseY, 1, false, jButton);
-                            fireMouseEvent(event);
-                        }
-                        mMouseState[button] = buttonState;
+                if (mMouseState[button] != buttonState) {
+                    long nanoseconds = System.nanoTime();
+                    if (buttonState) {
+                        MouseEvent event = new MouseEvent(this, MouseEvent.MOUSE_PRESSED, nanoseconds, 0, mMouseX, mMouseY, 1, false, jButton);
+                        fireMouseEvent(event);
+                    } else {
+                        MouseEvent event = new MouseEvent(this, MouseEvent.MOUSE_RELEASED, nanoseconds, 0, mMouseX, mMouseY, 1, false, jButton);
+                        fireMouseEvent(event);
                     }
+                    mMouseState[button] = buttonState;
                 }
             });
             
@@ -258,13 +263,13 @@ public class JGLCanvas extends Canvas {
                 
                 long nanoseconds = System.nanoTime();
                 int jButton = 0;
-                if (mMouseState[GLFW_MOUSE_BUTTON_LEFT]) {
+                if (GLFW_MOUSE_BUTTON_LEFT < MAX_MOUSE_BUTTONS && mMouseState[GLFW_MOUSE_BUTTON_LEFT]) {
                     jButton |= MouseEvent.BUTTON1;
                 }
-                if (mMouseState[GLFW_MOUSE_BUTTON_RIGHT]) {
+                if (GLFW_MOUSE_BUTTON_RIGHT < MAX_MOUSE_BUTTONS && mMouseState[GLFW_MOUSE_BUTTON_RIGHT]) {
                     jButton |= MouseEvent.BUTTON2;
                 }
-                if (mMouseState[GLFW_MOUSE_BUTTON_MIDDLE]) {
+                if (GLFW_MOUSE_BUTTON_MIDDLE < MAX_MOUSE_BUTTONS && mMouseState[GLFW_MOUSE_BUTTON_MIDDLE]) {
                     jButton |= MouseEvent.BUTTON3;
                 }
                 
@@ -339,7 +344,7 @@ public class JGLCanvas extends Canvas {
             GL.createCapabilities();
             
             // Initialize mouse state
-            mMouseState = new boolean[8]; // Support up to 8 mouse buttons
+            mMouseState = new boolean[MAX_MOUSE_BUTTONS];
             for (int i = 0; i < mMouseState.length; i++) {
                 mMouseState[i] = false;
             }

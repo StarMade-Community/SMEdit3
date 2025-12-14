@@ -135,10 +135,12 @@ public class GLUHelper {
 
     private static void multMatrices(FloatBuffer a, FloatBuffer b, float[] result) {
         for (int i = 0; i < 4; i++) {
+            int iOffset = i * 4;
             for (int j = 0; j < 4; j++) {
-                result[i * 4 + j] = 0.0f;
+                int idx = iOffset + j;
+                result[idx] = 0.0f;
                 for (int k = 0; k < 4; k++) {
-                    result[i * 4 + j] += a.get(i * 4 + k) * b.get(k * 4 + j);
+                    result[idx] += a.get(iOffset + k) * b.get(k * 4 + j);
                 }
             }
         }
