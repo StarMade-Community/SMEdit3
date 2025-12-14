@@ -1,4 +1,4 @@
-Main-Class: jo.Boot
+Main-Class: jo.sm.edit.SMEdit
 
 Name: jo/smedit
 Sealed: true

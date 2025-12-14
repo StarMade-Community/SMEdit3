@@ -53,7 +53,7 @@ public class Matrix4iLogic extends MathUtils {
         Matrix4i m = new Matrix4i();
         m.setIdentity();
         rotX(m, x);
-        rotY(m, y);;
+        rotY(m, y);
         rotZ(m, z);
         return m;
     }

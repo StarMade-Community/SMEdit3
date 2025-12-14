@@ -544,7 +544,7 @@ public abstract class Tuple4f implements java.io.Serializable, Cloneable {
         if (t.w > max) {
             w = max;
         } else {
-            w = t.z;
+            w = t.w;
         }
 
     }
