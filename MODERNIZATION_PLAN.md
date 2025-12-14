@@ -83,35 +83,50 @@ SMEdit is a Java GUI-based editor for editing entities for the game StarMade. Th
 ./gradlew run            # Run the application
 ```
 
+### ✅ Task 4: Migrate from LWJGL 2.9.1 to LWJGL 3.x
+
+**Status**: COMPLETED
+
+**What was done**:
+- Updated `build.gradle` to use LWJGL 3.3.6 from Maven Central with BOM
+- Added LWJGL 3.3.6 dependencies: lwjgl, lwjgl-glfw, lwjgl-opengl, lwjgl-stb
+- Included native libraries for Linux, Windows, and macOS
+- Removed old LWJGL 2.9.1 file dependencies from `jo_sm/lwjgl-2.9.1/`
+- Created `GLUHelper.java` to replace deprecated GLU functions (gluPerspective, gluProject, gluUnProject)
+- Updated `JGLCanvas.java`:
+  - Replaced `Display` with GLFW window management
+  - Replaced `Keyboard` polling with GLFW key callbacks
+  - Replaced `Mouse` polling with GLFW mouse callbacks
+  - Updated OpenGL context creation using GLFW
+- Updated all OpenGL API calls to use LWJGL 3 signatures:
+  - `glLight` → `glLightfv`
+  - `glMaterial` → `glMaterialfv`
+  - `glLightModel` → `glLightModelfv`
+  - `glGetFloat` → `glGetFloatv`
+  - `glGetInteger` → `glGetIntegerv`
+  - `glMultMatrix` → `glMultMatrixf`
+  - `glLoadMatrix` → `glLoadMatrixf`
+  - `glFog` → `glFogfv`
+  - Pointer functions now include type parameter (e.g., `glVertexPointer(3, GL_FLOAT, 0, buffer)`)
+- Updated 9 files total:
+  - `JGLCanvas.java` - Major refactoring for GLFW
+  - `DrawLogic.java` - Use GLUHelper
+  - `NodeDrawHandler.java` - Use GLUHelper and updated API calls
+  - `LightDrawHandler.java` - Fixed glLight calls
+  - `ObjDrawHandler.java` - Fixed pointer function signatures
+  - `ParticleDrawHandler.java` - Fixed matrix operations
+  - `JGLTextureCache.java` - No changes needed
+  - `PointsDrawHandler.java` - No changes needed
+  - `RectDrawHandler.java` - No changes needed
+- Build verified: `BUILD SUCCESSFUL`
+
+**Benefits**:
+- Matches StarMade game's LWJGL 3 version for compatibility
+- Access to modern OpenGL features and better performance
+- Active development and support from LWJGL 3
+- Multi-platform support (Linux, Windows, macOS) via Maven
+
 ## Pending Tasks
-
-### 🔲 Task 4: Migrate from LWJGL 2.9.1 to LWJGL 3.x
-
-**Priority**: HIGH
-
-**Reason**: StarMade game has already been upgraded to use LWJGL 3, so the editor should match.
-
-**Current State**:
-- Code uses LWJGL 2.9.1 APIs from `lwjgl-2.9.1/jar/` directory
-- LWJGL 2.x uses different APIs than 3.x (breaking changes)
-
-**Changes Required**:
-1. Update dependencies in `jo_sm/build.gradle` to use LWJGL 3.x from Maven Central
-2. Update all LWJGL API calls:
-   - `org.lwjgl.opengl.Display` → GLFW window management
-   - `org.lwjgl.input.Keyboard` → GLFW input callbacks
-   - `org.lwjgl.input.Mouse` → GLFW mouse callbacks
-   - `org.lwjgl.util.glu.GLU` → Use modern equivalents or include GLU separately
-3. Update canvas integration (`JGLCanvas.java`) for LWJGL 3's different threading model
-4. Test rendering and input handling thoroughly
-
-**Affected Files**:
-- `jo_sm/src/jo/util/lwjgl/win/JGLCanvas.java`
-- `jo_sm/src/jo/util/lwjgl/win/DrawLogic.java`
-- `jo_sm/src/jo/util/lwjgl/win/NodeDrawHandler.java`
-- Any other files using LWJGL APIs
-
-**Estimated Effort**: Medium to Large (API changes are extensive)
 
 ### 🔲 Task 4: Code Modernization - Use Diamond Operator and Type Inference
 
