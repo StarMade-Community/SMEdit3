@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'jo.sm'
-version = '1.3.67'
+version = '3.0.0'
 
 repositories {
     mavenCentral()
