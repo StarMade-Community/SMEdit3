@@ -28,12 +28,13 @@ import jo.vecmath.logic.Color4fLogic;
 import jo.vecmath.logic.Matrix4fLogic;
 
 import org.lwjgl.BufferUtils;
-import org.lwjgl.LWJGLException;
-import org.lwjgl.input.Keyboard;
-import org.lwjgl.input.Mouse;
-import org.lwjgl.opengl.Display;
+import org.lwjgl.glfw.*;
+import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.util.glu.GLU;
+import org.lwjgl.system.MemoryStack;
+
+import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.system.MemoryUtil.*;
 
 @SuppressWarnings("serial")
 public class JGLCanvas extends Canvas {
@@ -55,6 +56,12 @@ public class JGLCanvas extends Canvas {
     private final List<MouseMotionListener> mMouseMotionListeners;
     private final List<MouseWheelListener> mMouseWheelListeners;
     private final List<KeyListener> mKeyListeners;
+    
+    private long windowHandle = 0;
+    private int mMouseX = 0;
+    private int mMouseY = 0;
+    
+    private static final int MAX_MOUSE_BUTTONS = 8;
 
     public JGLCanvas() {
         this.mNewCanvasSize = new AtomicReference<>();
@@ -89,7 +96,7 @@ public class JGLCanvas extends Canvas {
      */
     public void syncViewportSize() {
         mIB16.clear();
-        GL11.glGetInteger(GL11.GL_VIEWPORT, mIB16);
+        GL11.glGetIntegerv(GL11.GL_VIEWPORT, mIB16);
         //mViewportX = mIB16.get(0);
         mWidth = mIB16.get(2);
         mHeight = mIB16.get(3);
@@ -122,7 +129,7 @@ public class JGLCanvas extends Canvas {
             GL11.glFogf(GL11.GL_FOG_INDEX, mScene.getFogIndex());
         }
         if (mScene.getFogColor() != null) {
-            GL11.glFog(GL11.GL_FOG_COLOR, Color4fLogic.toFloatBuffer(mScene.getFogColor()));
+            GL11.glFogfv(GL11.GL_FOG_COLOR, Color4fLogic.toFloatBuffer(mScene.getFogColor()));
         }
     }
 
@@ -133,16 +140,16 @@ public class JGLCanvas extends Canvas {
             GL11.glColorMaterial(face, conv(mScene.getColorMaterialMode()));
         }
         if (mScene.getMaterialAmbient() != null) {
-            GL11.glMaterial(face, GL11.GL_AMBIENT, Color4fLogic.toFloatBuffer(mScene.getMaterialAmbient()));
+            GL11.glMaterialfv(face, GL11.GL_AMBIENT, Color4fLogic.toFloatBuffer(mScene.getMaterialAmbient()));
         }
         if (mScene.getMaterialDiffuse() != null) {
-            GL11.glMaterial(face, GL11.GL_DIFFUSE, Color4fLogic.toFloatBuffer(mScene.getMaterialDiffuse()));
+            GL11.glMaterialfv(face, GL11.GL_DIFFUSE, Color4fLogic.toFloatBuffer(mScene.getMaterialDiffuse()));
         }
         if (mScene.getMaterialSpecular() != null) {
-            GL11.glMaterial(face, GL11.GL_SPECULAR, Color4fLogic.toFloatBuffer(mScene.getMaterialSpecular()));
+            GL11.glMaterialfv(face, GL11.GL_SPECULAR, Color4fLogic.toFloatBuffer(mScene.getMaterialSpecular()));
         }
         if (mScene.getMaterialEmission() != null) {
-            GL11.glMaterial(face, GL11.GL_EMISSION, Color4fLogic.toFloatBuffer(mScene.getMaterialEmission()));
+            GL11.glMaterialfv(face, GL11.GL_EMISSION, Color4fLogic.toFloatBuffer(mScene.getMaterialEmission()));
         }
         if (mScene.getMaterialShininess() >= 0) {
             GL11.glMaterialf(face, GL11.GL_SHININESS, mScene.getMaterialShininess());
@@ -200,24 +207,157 @@ public class JGLCanvas extends Canvas {
             while (!isDisplayable()) {
                 Thread.sleep(50);
             }
-            Display.setParent(this);
-            Display.setVSyncEnabled(true);
-            Display.create();
-            mMouseState = new boolean[Mouse.getButtonCount()];
+            
+            // Initialize GLFW
+            GLFWErrorCallback.createPrint(System.err).set();
+            if (!glfwInit()) {
+                throw new IllegalStateException("Unable to initialize GLFW");
+            }
+            
+            // Configure GLFW
+            glfwDefaultWindowHints();
+            glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+            glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+            
+            // Get the initial canvas size
+            Dimension size = getSize();
+            if (size.width <= 0 || size.height <= 0) {
+                size = new Dimension(800, 600); // Default size
+            }
+            
+            // Create the window
+            windowHandle = glfwCreateWindow(size.width, size.height, "SMEdit3", NULL, NULL);
+            if (windowHandle == NULL) {
+                throw new RuntimeException("Failed to create the GLFW window");
+            }
+            
+            // Setup mouse button callback
+            glfwSetMouseButtonCallback(windowHandle, (window, button, action, mods) -> {
+                // Validate button index
+                if (button < 0 || button >= MAX_MOUSE_BUTTONS) {
+                    return;
+                }
+                
+                int jButton = (button == GLFW_MOUSE_BUTTON_LEFT) ? MouseEvent.BUTTON1 
+                            : (button == GLFW_MOUSE_BUTTON_RIGHT) ? MouseEvent.BUTTON2 
+                            : MouseEvent.BUTTON3;
+                boolean buttonState = (action == GLFW_PRESS);
+                
+                if (mMouseState[button] != buttonState) {
+                    long nanoseconds = System.nanoTime();
+                    if (buttonState) {
+                        MouseEvent event = new MouseEvent(this, MouseEvent.MOUSE_PRESSED, nanoseconds, 0, mMouseX, mMouseY, 1, false, jButton);
+                        fireMouseEvent(event);
+                    } else {
+                        MouseEvent event = new MouseEvent(this, MouseEvent.MOUSE_RELEASED, nanoseconds, 0, mMouseX, mMouseY, 1, false, jButton);
+                        fireMouseEvent(event);
+                    }
+                    mMouseState[button] = buttonState;
+                }
+            });
+            
+            // Setup cursor position callback
+            glfwSetCursorPosCallback(windowHandle, (window, xpos, ypos) -> {
+                mMouseX = (int) xpos;
+                mMouseY = (int) ypos;
+                
+                long nanoseconds = System.nanoTime();
+                int jButton = 0;
+                if (GLFW_MOUSE_BUTTON_LEFT < MAX_MOUSE_BUTTONS && mMouseState[GLFW_MOUSE_BUTTON_LEFT]) {
+                    jButton |= MouseEvent.BUTTON1;
+                }
+                if (GLFW_MOUSE_BUTTON_RIGHT < MAX_MOUSE_BUTTONS && mMouseState[GLFW_MOUSE_BUTTON_RIGHT]) {
+                    jButton |= MouseEvent.BUTTON2;
+                }
+                if (GLFW_MOUSE_BUTTON_MIDDLE < MAX_MOUSE_BUTTONS && mMouseState[GLFW_MOUSE_BUTTON_MIDDLE]) {
+                    jButton |= MouseEvent.BUTTON3;
+                }
+                
+                if (jButton != 0) {
+                    MouseEvent event = new MouseEvent(this, MouseEvent.MOUSE_DRAGGED, nanoseconds, 0, mMouseX, mMouseY, 1, false, jButton);
+                    fireMouseMoveEvent(event);
+                } else {
+                    MouseEvent event = new MouseEvent(this, MouseEvent.MOUSE_MOVED, nanoseconds, 0, mMouseX, mMouseY, 1, false, jButton);
+                    fireMouseMoveEvent(event);
+                }
+            });
+            
+            // Setup scroll callback
+            glfwSetScrollCallback(windowHandle, (window, xoffset, yoffset) -> {
+                long nanoseconds = System.nanoTime();
+                int dWheel = (int) (yoffset * 120);
+                MouseWheelEvent event = new MouseWheelEvent(this, MouseEvent.MOUSE_WHEEL, nanoseconds, 0,
+                        mMouseX, mMouseY, 1, false, MouseWheelEvent.WHEEL_UNIT_SCROLL, dWheel, (int) yoffset);
+                fireMouseWheelEvent(event);
+            });
+            
+            // Setup key callback
+            glfwSetKeyCallback(windowHandle, (window, key, scancode, action, mods) -> {
+                if (action == GLFW_REPEAT) {
+                    return; // Skip repeat events for simplicity
+                }
+                
+                boolean eventState = (action == GLFW_PRESS);
+                long eventTick = System.nanoTime();
+                
+                // Update modifiers
+                if (key == GLFW_KEY_LEFT_SHIFT || key == GLFW_KEY_RIGHT_SHIFT) {
+                    if (eventState) {
+                        mModifiers |= KeyEvent.VK_SHIFT;
+                    } else {
+                        mModifiers &= ~KeyEvent.VK_SHIFT;
+                    }
+                } else if (key == GLFW_KEY_LEFT_CONTROL || key == GLFW_KEY_RIGHT_CONTROL) {
+                    if (eventState) {
+                        mModifiers |= KeyEvent.VK_CONTROL;
+                    } else {
+                        mModifiers &= ~KeyEvent.VK_CONTROL;
+                    }
+                } else if (key == GLFW_KEY_LEFT_ALT || key == GLFW_KEY_RIGHT_ALT) {
+                    if (eventState) {
+                        mModifiers |= KeyEvent.VK_ALT;
+                    } else {
+                        mModifiers &= ~KeyEvent.VK_ALT;
+                    }
+                }
+                
+                int awtKey = key;
+                if (KEY_GLFW_TO_AWT.containsKey(key)) {
+                    awtKey = KEY_GLFW_TO_AWT.get(key);
+                }
+                
+                KeyEvent e = new KeyEvent(this, eventState ? KeyEvent.KEY_PRESSED : KeyEvent.KEY_RELEASED,
+                        eventTick, mModifiers, awtKey, KeyEvent.CHAR_UNDEFINED);
+                fireKeyEvent(e);
+            });
+            
+            // Make the OpenGL context current
+            glfwMakeContextCurrent(windowHandle);
+            // Enable v-sync
+            glfwSwapInterval(1);
+            
+            // This line is critical for LWJGL's interoperation with GLFW's
+            // OpenGL context, or any context that is managed externally.
+            // LWJGL detects the context that is current in the current thread,
+            // creates the GLCapabilities instance and makes the OpenGL
+            // bindings available for use.
+            GL.createCapabilities();
+            
+            // Initialize mouse state
+            mMouseState = new boolean[MAX_MOUSE_BUTTONS];
             for (int i = 0; i < mMouseState.length; i++) {
-                mMouseState[i] = Mouse.isButtonDown(i);
+                mMouseState[i] = false;
             }
 
-            //GL11.glsetSwapInterval(1);
+            // Initialize OpenGL
             GL11.glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-            //gl11.glColor3f(1.0f, 0.0f, 0.0f);
             GL11.glHint(GL11.GL_PERSPECTIVE_CORRECTION_HINT, GL11.GL_NICEST);
             GL11.glClearDepth(1.0);
             GL11.glLineWidth(2);
             GL11.glEnable(GL11.GL_DEPTH_TEST);
             if (mScene.getAmbientLight() != null) {
                 GL11.glEnable(GL11.GL_LIGHTING);
-                GL11.glLightModel(GL11.GL_LIGHT_MODEL_AMBIENT, Color4fLogic.toFloatBuffer(mScene.getAmbientLight()));
+                GL11.glLightModelfv(GL11.GL_LIGHT_MODEL_AMBIENT, Color4fLogic.toFloatBuffer(mScene.getAmbientLight()));
             }
             if (mScene.getColorMaterialFace() != JGLColorMaterialFace.UNSET) {
                 initMaterial();
@@ -228,190 +368,91 @@ public class JGLCanvas extends Canvas {
 
             Dimension newDim;
 
-            while (!Display.isCloseRequested() && !mCloseRequested) {
+            // Run the rendering loop until the user closes the window or close is requested
+            while (!glfwWindowShouldClose(windowHandle) && !mCloseRequested) {
                 newDim = mNewCanvasSize.getAndSet(null);
                 if (newDim != null) {
+                    glfwSetWindowSize(windowHandle, newDim.width, newDim.height);
                     GL11.glViewport(0, 0, newDim.width, newDim.height);
                     syncViewportSize();
                 }
+                
                 doRender();
-                doMouse();
-                doKeys();
                 doEye();
-                Display.update();
+                
+                glfwSwapBuffers(windowHandle);
+                glfwPollEvents();
             }
 
-            Display.destroy();
-        } catch (InterruptedException | LWJGLException e) {
+            // Free the window callbacks and destroy the window
+            glfwDestroyWindow(windowHandle);
+            
+            // Terminate GLFW and free the error callback
+            glfwTerminate();
+            glfwSetErrorCallback(null).free();
+        } catch (InterruptedException e) {
             e.printStackTrace();
         }
     }
 
-    private static final Map<Integer, Integer> KEY_LWJGL_TO_AWT = new HashMap<>();
+    private static final Map<Integer, Integer> KEY_GLFW_TO_AWT = new HashMap<>();
 
     static {
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_0, KeyEvent.VK_0);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_1, KeyEvent.VK_1);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_2, KeyEvent.VK_2);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_3, KeyEvent.VK_3);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_4, KeyEvent.VK_4);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_5, KeyEvent.VK_5);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_6, KeyEvent.VK_6);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_7, KeyEvent.VK_7);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_8, KeyEvent.VK_8);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_9, KeyEvent.VK_9);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_A, KeyEvent.VK_A);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_B, KeyEvent.VK_B);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_C, KeyEvent.VK_C);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_D, KeyEvent.VK_D);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_E, KeyEvent.VK_E);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_F, KeyEvent.VK_F);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_G, KeyEvent.VK_G);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_H, KeyEvent.VK_H);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_I, KeyEvent.VK_I);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_J, KeyEvent.VK_J);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_K, KeyEvent.VK_K);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_L, KeyEvent.VK_L);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_M, KeyEvent.VK_M);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_N, KeyEvent.VK_N);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_O, KeyEvent.VK_O);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_P, KeyEvent.VK_P);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_Q, KeyEvent.VK_Q);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_R, KeyEvent.VK_R);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_S, KeyEvent.VK_S);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_T, KeyEvent.VK_T);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_U, KeyEvent.VK_U);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_V, KeyEvent.VK_V);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_W, KeyEvent.VK_W);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_X, KeyEvent.VK_X);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_Y, KeyEvent.VK_Y);
-        KEY_LWJGL_TO_AWT.put(Keyboard.KEY_Z, KeyEvent.VK_Z);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_0, KeyEvent.VK_0);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_1, KeyEvent.VK_1);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_2, KeyEvent.VK_2);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_3, KeyEvent.VK_3);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_4, KeyEvent.VK_4);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_5, KeyEvent.VK_5);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_6, KeyEvent.VK_6);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_7, KeyEvent.VK_7);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_8, KeyEvent.VK_8);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_9, KeyEvent.VK_9);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_A, KeyEvent.VK_A);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_B, KeyEvent.VK_B);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_C, KeyEvent.VK_C);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_D, KeyEvent.VK_D);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_E, KeyEvent.VK_E);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_F, KeyEvent.VK_F);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_G, KeyEvent.VK_G);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_H, KeyEvent.VK_H);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_I, KeyEvent.VK_I);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_J, KeyEvent.VK_J);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_K, KeyEvent.VK_K);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_L, KeyEvent.VK_L);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_M, KeyEvent.VK_M);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_N, KeyEvent.VK_N);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_O, KeyEvent.VK_O);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_P, KeyEvent.VK_P);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_Q, KeyEvent.VK_Q);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_R, KeyEvent.VK_R);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_S, KeyEvent.VK_S);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_T, KeyEvent.VK_T);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_U, KeyEvent.VK_U);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_V, KeyEvent.VK_V);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_W, KeyEvent.VK_W);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_X, KeyEvent.VK_X);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_Y, KeyEvent.VK_Y);
+        KEY_GLFW_TO_AWT.put(GLFW_KEY_Z, KeyEvent.VK_Z);
     }
 
     private int mModifiers = 0;
 
-    private void doKeys() {
-        while (Keyboard.next()) {
-            char eventChar = Keyboard.getEventCharacter();
-            int eventKey = Keyboard.getEventKey();
-            long eventTick = Keyboard.getEventNanoseconds();
-            boolean eventState = Keyboard.getEventKeyState();
-            //System.out.println("doKeys("+eventKey+")");
-            if (eventKey == Keyboard.KEY_LSHIFT) {
-                if (eventState) {
-                    mModifiers |= KeyEvent.VK_SHIFT;
-                } else {
-                    mModifiers &= ~KeyEvent.VK_SHIFT;
-                }
-            } else if (eventKey == Keyboard.KEY_RSHIFT) {
-                if (eventState) {
-                    mModifiers |= KeyEvent.VK_SHIFT;
-                } else {
-                    mModifiers &= ~KeyEvent.VK_SHIFT;
-                }
-            } else if (eventKey == Keyboard.KEY_LCONTROL) {
-                if (eventState) {
-                    mModifiers |= KeyEvent.VK_CONTROL;
-                } else {
-                    mModifiers &= ~KeyEvent.VK_CONTROL;
-                }
-            } else if (eventKey == Keyboard.KEY_RCONTROL) {
-                if (eventState) {
-                    mModifiers |= KeyEvent.VK_CONTROL;
-                } else {
-                    mModifiers &= ~KeyEvent.VK_CONTROL;
-                }
-            } else if (eventKey == Keyboard.KEY_LMENU) {
-                if (eventState) {
-                    mModifiers |= KeyEvent.VK_ALT;
-                } else {
-                    mModifiers &= ~KeyEvent.VK_ALT;
-                }
-            } else if (eventKey == Keyboard.KEY_RMENU) {
-                if (eventState) {
-                    mModifiers |= KeyEvent.VK_ALT;
-                } else {
-                    mModifiers &= ~KeyEvent.VK_ALT;
-                }
-            }
-            if (KEY_LWJGL_TO_AWT.containsKey(eventKey)) {
-                eventKey = KEY_LWJGL_TO_AWT.get(eventKey);
-            }
-            KeyEvent e = new KeyEvent(this, eventState ? KeyEvent.KEY_PRESSED : KeyEvent.KEY_RELEASED,
-                    eventTick, mModifiers, eventKey, eventChar);
-            fireKeyEvent(e);
-        }
-    }
-
     private void doEye() {
-        int mouseX = Mouse.getX();
-        int mouseY = Mouse.getY();
         FloatBuffer modelview = BufferUtils.createFloatBuffer(16);
-        GL11.glGetFloat(GL11.GL_MODELVIEW_MATRIX, modelview);
+        GL11.glGetFloatv(GL11.GL_MODELVIEW_MATRIX, modelview);
         FloatBuffer projection = BufferUtils.createFloatBuffer(16);
-        GL11.glGetFloat(GL11.GL_PROJECTION_MATRIX, projection);
+        GL11.glGetFloatv(GL11.GL_PROJECTION_MATRIX, projection);
         IntBuffer viewport = BufferUtils.createIntBuffer(16);
-        GL11.glGetInteger(GL11.GL_VIEWPORT, viewport);
-        float winX = mouseX;
-        float winY = viewport.get(3) - mouseY;
+        GL11.glGetIntegerv(GL11.GL_VIEWPORT, viewport);
+        float winX = mMouseX;
+        float winY = viewport.get(3) - mMouseY;
         FloatBuffer winZBuffer = BufferUtils.createFloatBuffer(1);
-        GL11.glReadPixels(mouseX, mouseY, 1, 1, GL11.GL_DEPTH_COMPONENT, GL11.GL_FLOAT, winZBuffer);
+        GL11.glReadPixels(mMouseX, mMouseY, 1, 1, GL11.GL_DEPTH_COMPONENT, GL11.GL_FLOAT, winZBuffer);
         float winZ = winZBuffer.get(0);
         FloatBuffer pos = BufferUtils.createFloatBuffer(3);
-        GLU.gluUnProject(winX, winY, winZ, modelview, projection, viewport, pos);
+        GLUHelper.gluUnProject(winX, winY, winZ, modelview, projection, viewport, pos);
         mEyeRay = new Point3f(pos.get(0), pos.get(1), pos.get(2));
-    }
-
-    private void doMouse() {
-        while (Mouse.next()) {
-            int button = Mouse.getEventButton();
-            boolean buttonState = Mouse.getEventButtonState();
-            int dWheel = Mouse.getDWheel();
-            int dX = Mouse.getEventDX();
-            int dY = Mouse.getEventDY();
-            long nanoseconds = Mouse.getEventNanoseconds();
-            int x = Mouse.getEventX();
-            int y = Mouse.getEventY();
-            int modifiers = 0;
-            if (button >= 0) {
-                int jButton = (button == 0) ? MouseEvent.BUTTON1 : (button == 1) ? MouseEvent.BUTTON2 : MouseEvent.BUTTON3;
-                if (mMouseState[button] != buttonState) {
-                    //System.out.println("Button="+button+", state="+buttonState+", x="+x+", y="+y);
-                    if (buttonState) {
-                        MouseEvent event = new MouseEvent(this, MouseEvent.MOUSE_PRESSED, nanoseconds, modifiers, x, y, 1, false, jButton);
-                        fireMouseEvent(event);
-                    } else {
-                        MouseEvent event = new MouseEvent(this, MouseEvent.MOUSE_RELEASED, nanoseconds, modifiers, x, y, 1, false, jButton);
-                        fireMouseEvent(event);
-                    }
-                    mMouseState[button] = buttonState;
-                }
-            }
-            if ((dX > 0) || (dY > 0)) {
-                int jButton = 0;
-                if (mMouseState[0]) {
-                    jButton |= MouseEvent.BUTTON1;
-                }
-                if (mMouseState[1]) {
-                    jButton |= MouseEvent.BUTTON2;
-                }
-                if (mMouseState[2]) {
-                    jButton |= MouseEvent.BUTTON3;
-                }
-                if (jButton != 0) {
-                    MouseEvent event = new MouseEvent(this, MouseEvent.MOUSE_DRAGGED, nanoseconds, modifiers, x, y, 1, false, jButton);
-                    fireMouseMoveEvent(event);
-                } else {
-                    MouseEvent event = new MouseEvent(this, MouseEvent.MOUSE_MOVED, nanoseconds, modifiers, x, y, 1, false, jButton);
-                    fireMouseMoveEvent(event);
-                }
-            }
-            if (dWheel != 0) {
-                MouseWheelEvent event = new MouseWheelEvent(this, MouseEvent.MOUSE_WHEEL, nanoseconds, modifiers,
-                        x, y, 1, false, MouseWheelEvent.WHEEL_UNIT_SCROLL, dWheel, dWheel / 120);
-                fireMouseWheelEvent(event);
-            }
-        }
     }
 
     private void doRender() {

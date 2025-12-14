@@ -12,7 +12,7 @@ repositories {
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
@@ -21,11 +21,28 @@ tasks.withType(JavaCompile) {
 }
 
 dependencies {
-    // TODO: Migrate to LWJGL 3.x from Maven Central (HIGH PRIORITY)
-    // StarMade game now uses LWJGL 3, so this editor should match
-    // See MODERNIZATION_PLAN.md Task 3 for detailed migration guide
-    // Current workaround: Using LWJGL 2.9.1 file dependencies for compatibility
-    implementation fileTree(dir: 'jo_sm/lwjgl-2.9.1/jar', include: ['lwjgl.jar', 'lwjgl_util.jar'])
+    // LWJGL 3.3.6 - Modern OpenGL library matching StarMade game version
+    def lwjglVersion = '3.3.6'
+    
+    implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
+    implementation "org.lwjgl:lwjgl"
+    implementation "org.lwjgl:lwjgl-glfw"
+    implementation "org.lwjgl:lwjgl-opengl"
+    implementation "org.lwjgl:lwjgl-stb"
+    
+    // Native libraries for multiple platforms
+    runtimeOnly "org.lwjgl:lwjgl::natives-linux"
+    runtimeOnly "org.lwjgl:lwjgl::natives-windows"
+    runtimeOnly "org.lwjgl:lwjgl::natives-macos"
+    runtimeOnly "org.lwjgl:lwjgl-glfw::natives-linux"
+    runtimeOnly "org.lwjgl:lwjgl-glfw::natives-windows"
+    runtimeOnly "org.lwjgl:lwjgl-glfw::natives-macos"
+    runtimeOnly "org.lwjgl:lwjgl-opengl::natives-linux"
+    runtimeOnly "org.lwjgl:lwjgl-opengl::natives-windows"
+    runtimeOnly "org.lwjgl:lwjgl-opengl::natives-macos"
+    runtimeOnly "org.lwjgl:lwjgl-stb::natives-linux"
+    runtimeOnly "org.lwjgl:lwjgl-stb::natives-windows"
+    runtimeOnly "org.lwjgl:lwjgl-stb::natives-macos"
 }
 
 application {

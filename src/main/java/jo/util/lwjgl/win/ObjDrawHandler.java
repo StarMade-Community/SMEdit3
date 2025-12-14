@@ -40,14 +40,14 @@ public class ObjDrawHandler extends NodeDrawHandler {
                 GL11.glEnableClientState(GL11.GL_COLOR_ARRAY);
             }
             GL11.glFrontFace(GL11.GL_CW);
-            GL11.glVertexPointer(3, 0, obj.getVertexBuffer());
+            GL11.glVertexPointer(3, GL11.GL_FLOAT, 0, obj.getVertexBuffer());
             if (obj.getNormalBuffer() != null) {
-                GL11.glNormalPointer(0, obj.getNormalBuffer());
+                GL11.glNormalPointer(GL11.GL_FLOAT, 0, obj.getNormalBuffer());
             }
             if (obj.isTextured()) {
-                GL11.glTexCoordPointer(2, 0, obj.getTexturesBuffer());
+                GL11.glTexCoordPointer(2, GL11.GL_FLOAT, 0, obj.getTexturesBuffer());
             } else if (obj.getColorBuffer() != null) {
-                GL11.glColorPointer(4, 0, obj.getColorBuffer());
+                GL11.glColorPointer(4, GL11.GL_FLOAT, 0, obj.getColorBuffer());
             }
             if (obj.getMode() == JGLObj.TRIANGLES) {
                 if (obj.getIndexShortBuffer() != null) {
