@@ -1,0 +1,8 @@
+Main-Class: jo.sm.edit.SMEdit
+
+Name: jo/smedit
+Sealed: true
+Specification-Title: "SMedit"
+Specification-Vendor:  "org.lazygamerz"
+Implementation-Title: "SMEdit"
+Implementation-Vendor: "org.lazygamerz"

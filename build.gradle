@@ -1,26 +1,40 @@
 plugins {
     id 'java'
+    id 'application'
 }
 
 group = 'jo.sm'
 version = '1.3.67'
 
-allprojects {
-    repositories {
-        mavenCentral()
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
 
-subprojects {
-    apply plugin: 'java'
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
 
-    java {
-        toolchain {
-            languageVersion = JavaLanguageVersion.of(25)
-        }
-    }
+dependencies {
+    // TODO: Migrate to LWJGL 3.x from Maven Central (HIGH PRIORITY)
+    // StarMade game now uses LWJGL 3, so this editor should match
+    // See MODERNIZATION_PLAN.md Task 3 for detailed migration guide
+    // Current workaround: Using LWJGL 2.9.1 file dependencies for compatibility
+    implementation fileTree(dir: 'jo_sm/lwjgl-2.9.1/jar', include: ['lwjgl.jar', 'lwjgl_util.jar'])
+}
 
-    tasks.withType(JavaCompile) {
-        options.encoding = 'UTF-8'
+application {
+    mainClass = 'jo.sm.edit.SMEdit'
+}
+
+jar {
+    archiveBaseName = 'SMEdit'
+    manifest {
+        attributes 'Main-Class': 'jo.sm.edit.SMEdit'
     }
 }

@@ -5,11 +5,11 @@ This document outlines the modernization strategy for migrating SMEdit from Java
 ## Project Overview
 
 SMEdit is a Java GUI-based editor for editing entities for the game StarMade. The codebase consists of:
-- **471 Java source files** across 3 modules
-- **3 modules**: jo_sm (core library), jo_plugin/JoFileMods (plugins), SMEdit (main application)
-- **Original build system**: Apache Ant with NetBeans
-- **Original Java version**: Java 1.7 (Java 7)
-- **Key dependency**: LWJGL 2.9.1 for OpenGL rendering
+- **464 Java source files** in a single consolidated module
+- **Current structure**: Standard Gradle layout with `src/main/java/` and `src/main/resources/`
+- **Original build system**: Apache Ant with NetBeans (migrated to Gradle)
+- **Original Java version**: Java 1.7 (Java 7) (upgraded to Java 25)
+- **Key dependency**: LWJGL 2.9.1 for OpenGL rendering (pending migration to LWJGL 3.x)
 
 ## Completed Tasks
 
@@ -29,7 +29,7 @@ SMEdit is a Java GUI-based editor for editing entities for the game StarMade. Th
 - Successfully tested build: `BUILD SUCCESSFUL`
 - Verified bytecode is Java 25 (major version 69)
 
-**Build Commands**:
+**Build Commands** (original):
 ```bash
 ./gradlew build          # Build all modules
 ./gradlew clean          # Clean build artifacts  
@@ -37,9 +37,9 @@ SMEdit is a Java GUI-based editor for editing entities for the game StarMade. Th
 ```
 
 **Notes**:
-- Old Ant `build.xml` files are still present for backward compatibility
-- NetBeans project files (`nbproject/`) are still present
-- Can be removed once team confirms Gradle migration is complete
+- Old Ant `build.xml` files were removed during consolidation
+- Old NetBeans project files were removed during consolidation
+- Project now uses standard Gradle structure
 
 ### ✅ Task 2: Upgrade Java Version from 7 to 25
 
@@ -55,9 +55,37 @@ SMEdit is a Java GUI-based editor for editing entities for the game StarMade. Th
 - Better performance and security
 - Long-term support and updates
 
+### ✅ Task 3: Consolidate to Standard Gradle Structure
+
+**Status**: COMPLETED
+
+**What was done**:
+- Consolidated 3 modules (jo_sm, jo_plugin/JoFileMods, SMEdit) into a single module
+- Migrated all source code to standard Gradle structure: `src/main/java/` and `src/main/resources/`
+- Merged duplicate utility classes from different modules (URLs, GlobalConfiguration, Paths, etc.)
+- Updated `build.gradle` to single-module configuration
+- Updated `settings.gradle` to remove subproject references
+- Removed old module source directories and NetBeans build files
+- All 464 Java files now in unified structure under `src/main/java/jo/`
+- Build verified: `BUILD SUCCESSFUL`
+
+**Benefits**:
+- Standard Gradle project structure that follows Java conventions
+- Reduced code duplication
+- Simpler build configuration
+- Easier maintenance and navigation
+- Clear separation between source and resources
+
+**Build Commands** (updated):
+```bash
+./gradlew build          # Build the project
+./gradlew clean          # Clean build artifacts  
+./gradlew run            # Run the application
+```
+
 ## Pending Tasks
 
-### 🔲 Task 3: Migrate from LWJGL 2.9.1 to LWJGL 3.x
+### 🔲 Task 4: Migrate from LWJGL 2.9.1 to LWJGL 3.x
 
 **Priority**: HIGH
 

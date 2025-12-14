@@ -1,5 +1,1 @@
 rootProject.name = 'SMEdit3'
-
-include 'jo_sm'
-include 'jo_plugin:JoFileMods'
-include 'SMEdit'
