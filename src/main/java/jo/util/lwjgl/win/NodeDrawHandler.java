@@ -11,7 +11,6 @@ import jo.vecmath.logic.Matrix4fLogic;
 
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.util.glu.GLU;
 
 public class NodeDrawHandler implements IDrawHandler {
 
@@ -22,7 +21,7 @@ public class NodeDrawHandler implements IDrawHandler {
         Matrix4f t = obj.calcTransform(tick);
         GL11.glMatrixMode(GL11.GL_MODELVIEW);
         GL11.glPushMatrix();
-        GL11.glMultMatrix(Matrix4fLogic.toFloatBuffer(t));
+        GL11.glMultMatrixf(Matrix4fLogic.toFloatBuffer(t));
         return t;
     }
 
@@ -45,18 +44,18 @@ public class NodeDrawHandler implements IDrawHandler {
         FloatBuffer projection = BufferUtils.createFloatBuffer(16);
         FloatBuffer dviewport = BufferUtils.createFloatBuffer(16);
 
-        GL11.glGetFloat(GL11.GL_MODELVIEW_MATRIX, modelView);
-        GL11.glGetFloat(GL11.GL_PROJECTION_MATRIX, projection);
-        GL11.glGetFloat(GL11.GL_VIEWPORT, dviewport);
+        GL11.glGetFloatv(GL11.GL_MODELVIEW_MATRIX, modelView);
+        GL11.glGetFloatv(GL11.GL_PROJECTION_MATRIX, projection);
+        GL11.glGetFloatv(GL11.GL_VIEWPORT, dviewport);
 
         IntBuffer viewport = BufferLogic.create((int) dviewport.get(0), (int) dviewport.get(1), (int) dviewport.get(2), (int) dviewport.get(3));
         if ((obj.getLowBounds() != null) && (obj.getHighBounds() != null)) {
             FloatBuffer low = BufferLogic.createFloatBuffer(3);
-            GLU.gluProject(obj.getLowBounds().x, obj.getLowBounds().y, obj.getLowBounds().z, modelView, projection, viewport, low);
+            GLUHelper.gluProject(obj.getLowBounds().x, obj.getLowBounds().y, obj.getLowBounds().z, modelView, projection, viewport, low);
             FloatBuffer high = BufferLogic.createFloatBuffer(3);
-            GLU.gluProject(obj.getHighBounds().x, obj.getHighBounds().y, obj.getHighBounds().z, modelView, projection, viewport, high);
+            GLUHelper.gluProject(obj.getHighBounds().x, obj.getHighBounds().y, obj.getHighBounds().z, modelView, projection, viewport, high);
             FloatBuffer mid = BufferLogic.createFloatBuffer(3);
-            GLU.gluProject(0, 0, 0, modelView, projection, viewport, mid);
+            GLUHelper.gluProject(0, 0, 0, modelView, projection, viewport, mid);
             obj.setScreen(new Point3f(mid.get(0), mid.get(1), mid.get(2)));
             obj.setScreenLowBounds(new Point3f(Math.min(low.get(0), high.get(0)), Math.min(low.get(1), high.get(1)), Math.min(low.get(2), high.get(2))));
             obj.setScreenHighBounds(new Point3f(Math.max(low.get(0), high.get(0)), Math.max(low.get(1), high.get(1)), Math.max(low.get(2), high.get(2))));
@@ -68,7 +67,7 @@ public class NodeDrawHandler implements IDrawHandler {
         Point3f pointMap = (Point3f) obj.getData("pointMap");
         if (pointMap != null) {
             FloatBuffer pointMapped = BufferLogic.createFloatBuffer(3);
-            GLU.gluUnProject(pointMap.x, pointMap.y, pointMap.z, modelView, projection, viewport, pointMapped);
+            GLUHelper.gluUnProject(pointMap.x, pointMap.y, pointMap.z, modelView, projection, viewport, pointMapped);
             Point3f pMapped = new Point3f(pointMapped.get(0), pointMapped.get(1), pointMapped.get(2));
             obj.setData("pointMap", null);
             obj.setData("pointMapped", pMapped);

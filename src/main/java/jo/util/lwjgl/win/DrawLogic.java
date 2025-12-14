@@ -15,7 +15,6 @@ import jo.util.jgl.obj.tri.JGLObj;
 import jo.util.jgl.obj.txt.JGLTextGroup;
 
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.util.glu.GLU;
 
 public class DrawLogic {
 
@@ -78,7 +77,7 @@ public class DrawLogic {
             GL11.glLoadIdentity();
             float aspect;
             aspect = x / (float) y;
-            GLU.gluPerspective(scene.getFieldOfView(), aspect, scene.getMinZ(), scene.getMaxZ());
+            GLUHelper.gluPerspective(scene.getFieldOfView(), aspect, scene.getMinZ(), scene.getMaxZ());
 
             GL11.glMatrixMode(GL11.GL_MODELVIEW);
             GL11.glLoadIdentity();

@@ -39,22 +39,19 @@ public class LightDrawHandler extends NodeDrawHandler {
         int l = LIGHT_NUM[mLightCount];
         GL11.glEnable(l);
         if (light.getAmbient() != null) {
-            GL11.glLight(l, GL11.GL_AMBIENT, Color4fLogic.toFloatBuffer(light.getAmbient()));
+            GL11.glLightfv(l, GL11.GL_AMBIENT, Color4fLogic.toFloatBuffer(light.getAmbient()));
         }
         if (light.getDiffuse() != null) {
-            GL11.glLight(l, GL11.GL_DIFFUSE, Color4fLogic.toFloatBuffer(light.getDiffuse()));
+            GL11.glLightfv(l, GL11.GL_DIFFUSE, Color4fLogic.toFloatBuffer(light.getDiffuse()));
         }
         if (light.getSpecular() != null) {
-            GL11.glLight(l, GL11.GL_SPECULAR, Color4fLogic.toFloatBuffer(light.getSpecular()));
+            GL11.glLightfv(l, GL11.GL_SPECULAR, Color4fLogic.toFloatBuffer(light.getSpecular()));
         }
         if (light.getPosition() != null) {
-            GL11.glLight(l, GL11.GL_POSITION, Color4fLogic.toFloatBuffer(light.getPosition()));
+            GL11.glLightfv(l, GL11.GL_POSITION, Color4fLogic.toFloatBuffer(light.getPosition()));
         }
         if (light.getSpotDirection() != null) {
-            GL11.glLight(l, GL11.GL_SPOT_DIRECTION, Point3fLogic.toFloatBuffer(light.getSpotDirection()));
-        }
-        if (light.getSpotDirection() != null) {
-            GL11.glLight(l, GL11.GL_SPOT_DIRECTION, Point3fLogic.toFloatBuffer(light.getSpotDirection()));
+            GL11.glLightfv(l, GL11.GL_SPOT_DIRECTION, Point3fLogic.toFloatBuffer(light.getSpotDirection()));
         }
         if (light.getSpotExponent() != 0) {
             GL11.glLightf(l, GL11.GL_SPOT_EXPONENT, light.getSpotExponent());
