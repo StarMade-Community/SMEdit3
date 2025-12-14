@@ -1,0 +1,24 @@
+plugins {
+    id 'java-library'
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir 'src'
+        }
+    }
+}
+
+dependencies {
+    // Using LWJGL 2.x for now - the codebase needs to be updated to work with LWJGL 3.x
+    // This is kept as 2.9.1 to maintain compatibility with existing code
+    implementation fileTree(dir: 'lwjgl-2.9.1/jar', include: ['lwjgl.jar', 'lwjgl_util.jar'])
+}
+
+jar {
+    archiveBaseName = 'jo_sm'
+    manifest {
+        attributes 'Main-Class': 'Boot'
+    }
+}

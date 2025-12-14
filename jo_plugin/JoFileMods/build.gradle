@@ -1,0 +1,19 @@
+plugins {
+    id 'java-library'
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir 'src'
+        }
+    }
+}
+
+dependencies {
+    implementation project(':jo_sm')
+}
+
+jar {
+    archiveBaseName = 'JoFileMods'
+}

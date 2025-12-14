@@ -7,3 +7,17 @@
 /jo_plugin/JoFileMods/dist/
 /SMEdit/dist/
 /SMEdit/build/
+
+# Gradle
+.gradle/
+build/
+!gradle-wrapper.jar
+*.sw?
+.#*
+*#
+*~
+.classpath
+.project
+.settings
+bin
+target
