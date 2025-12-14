@@ -11,8 +11,10 @@ sourceSets {
 }
 
 dependencies {
-    // Using LWJGL 2.x for now - the codebase needs to be updated to work with LWJGL 3.x
-    // This is kept as 2.9.1 to maintain compatibility with existing code
+    // TODO: Migrate to LWJGL 3.x from Maven Central (HIGH PRIORITY)
+    // StarMade game now uses LWJGL 3, so this editor should match
+    // See MODERNIZATION_PLAN.md Task 3 for detailed migration guide
+    // Current workaround: Using LWJGL 2.9.1 file dependencies for compatibility
     implementation fileTree(dir: 'lwjgl-2.9.1/jar', include: ['lwjgl.jar', 'lwjgl_util.jar'])
 }
 
