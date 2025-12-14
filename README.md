@@ -9,7 +9,7 @@ A Java-based GUI editor for editing entities (ships, stations, planets) for the 
 ### ✅ Modernization (December 2025)
 - **Build System**: Migrated from Apache Ant to Gradle
 - **Java Version**: Upgraded from Java 7 to Java 25
-- **Multi-module Build**: Properly configured 3-module Gradle project
+- **Project Structure**: Consolidated to standard Gradle structure with single module
 - **Gradle Wrapper**: Added for consistent builds across environments
 
 ## Requirements
@@ -23,33 +23,40 @@ A Java-based GUI editor for editing entities (ships, stations, planets) for the 
 ./gradlew build
 ```
 
-This will build all three modules:
-- `jo_sm` - Core library with LWJGL support
-- `jo_plugin/JoFileMods` - Plugin system
-- `SMEdit` - Main application
-
 ## Running
 
 ```bash
-./gradlew :SMEdit:run
+./gradlew run
 ```
 
 ## Project Structure
 
+The project now uses a standard Gradle structure with all code consolidated into a single module:
+
 ```
 SMEdit3/
-├── jo_sm/              # Core library (322 Java files)
-│   ├── src/           # Source code
-│   └── build.gradle   # Module build configuration
-├── jo_plugin/
-│   └── JoFileMods/    # Plugin module (139 Java files)
-│       ├── src/       # Plugin source code
-│       └── build.gradle
-├── SMEdit/            # Main application (10 Java files)
-│   ├── src/           # Application source
-│   └── build.gradle   # Application build configuration
-├── build.gradle       # Root build configuration
-└── settings.gradle    # Multi-module settings
+├── src/
+│   └── main/
+│       ├── java/          # All Java source code (464 files)
+│       │   └── jo/
+│       │       ├── log/       # Logging framework
+│       │       ├── sm/        # StarMade core functionality
+│       │       │   ├── data/      # Data structures
+│       │       │   ├── edit/      # Main application entry
+│       │       │   ├── ent/       # Entity handling
+│       │       │   ├── factories/ # Plugin factories
+│       │       │   ├── logic/     # Business logic
+│       │       │   ├── mods/      # Plugin system
+│       │       │   ├── plugins/   # Built-in plugins
+│       │       │   ├── ship/      # Ship-specific code
+│       │       │   └── ui/        # User interface
+│       │       ├── util/      # Utilities
+│       │       └── vecmath/   # Vector math library
+│       └── resources/     # Resources (images, config files)
+├── jo_sm/
+│   └── lwjgl-2.9.1/   # LWJGL 2 library (legacy, to be migrated)
+├── build.gradle       # Build configuration
+└── settings.gradle    # Project settings
 ```
 
 ## Modernization Plan
@@ -59,6 +66,7 @@ We are actively modernizing this codebase. See [MODERNIZATION_PLAN.md](MODERNIZA
 ### Completed
 - ✅ Gradle build system
 - ✅ Java 25 upgrade
+- ✅ Consolidated to standard Gradle structure (single module)
 
 ### In Progress / Planned
 - 🔴 Migrate to LWJGL 3.x (HIGH - StarMade now uses LWJGL 3)
@@ -66,7 +74,7 @@ We are actively modernizing this codebase. See [MODERNIZATION_PLAN.md](MODERNIZA
 - 🔴 Setup CI/CD pipeline (HIGH)
 - 🟡 Code modernization (use modern Java features)
 - 🟡 Improve documentation
-- 🟡 Refactor and consolidate codebase
+- 🟡 Further refactoring and code quality improvements
 
 Issue templates are available in [.github/ISSUE_TEMPLATES/modernization_issues.md](.github/ISSUE_TEMPLATES/modernization_issues.md)
 
