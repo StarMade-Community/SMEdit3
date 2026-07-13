@@ -96,12 +96,15 @@ public class RenderFrame extends JFrame {
         Properties props = StarMadeLogic.getProps();
         String home = props.getProperty("starmade.home", "");
         if (!StarMadeLogic.isStarMadeDirectory(home)) {
-            home = System.getProperty("user.dir");
-            if (!StarMadeLogic.isStarMadeDirectory(home)) {
-                home = JOptionPane.showInputDialog(null, "Enter in the home directory for StarMade", home);
-                if (home == null) {
+            if (StarMadeLogic.isStarMadeDirectory(System.getProperty("user.dir"))) {
+                home = System.getProperty("user.dir");
+            } else {
+                java.io.File chosen = StarMadeDirChooser.choose(null,
+                        home.isEmpty() ? null : new java.io.File(home));
+                if (chosen == null) {
                     System.exit(0);
                 }
+                home = chosen.getAbsolutePath();
             }
             props.put("starmade.home", home);
             StarMadeLogic.saveProps();

@@ -53,6 +53,7 @@ import javax.swing.SwingConstants;
 import javax.swing.WindowConstants;
 
 import smc.smedit.ui.RenderFrame;
+import smc.smedit.ui.StarMadeDirChooser;
 
 public class OptionScreen extends JFrame {
 
@@ -67,6 +68,7 @@ public class OptionScreen extends JFrame {
     private JButton jButton1;
     private JButton jButton2;
     private JButton jButton3;
+    private JButton jButtonBrowse;
     private JComboBox jComboBox2;
     private JLabel jLabel1;
     private JLabel jLabel3;
@@ -309,6 +311,19 @@ public class OptionScreen extends JFrame {
         jTextField1 = new JTextField(mProps.getProperty("starmade.home", ""));
         mStarMadeDir = new File(jTextField1.getText());
 
+        jButtonBrowse = new JButton("Browse…");
+        jButtonBrowse.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                File initial = (mStarMadeDir != null && mStarMadeDir.isDirectory()) ? mStarMadeDir : null;
+                File chosen = StarMadeDirChooser.choose(OptionScreen.this, initial);
+                if (chosen != null) {
+                    jTextField1.setText(chosen.getAbsolutePath());
+                    mStarMadeDir = chosen;
+                }
+            }
+        });
+
         javax.swing.GroupLayout jPanel3Layout = new GroupLayout(jPanel3);
         jPanel3.setLayout(jPanel3Layout);
         jPanel3Layout.setHorizontalGroup(
@@ -320,7 +335,10 @@ public class OptionScreen extends JFrame {
                                 .addComponent(jLabel5, DEFAULT_SIZE, DEFAULT_SIZE, Short.MAX_VALUE))
                         .addPreferredGap(RELATED)
                         .addGroup(jPanel3Layout.createParallelGroup(TRAILING, false)
-                                .addComponent(jTextField1, DEFAULT_SIZE, 169, Short.MAX_VALUE)
+                                .addGroup(jPanel3Layout.createSequentialGroup()
+                                        .addComponent(jTextField1, DEFAULT_SIZE, 169, Short.MAX_VALUE)
+                                        .addPreferredGap(RELATED)
+                                        .addComponent(jButtonBrowse))
                                 .addComponent(jComboBox2, 0, DEFAULT_SIZE, Short.MAX_VALUE))
                         .addContainerGap())
         );
@@ -334,6 +352,7 @@ public class OptionScreen extends JFrame {
                         .addPreferredGap(RELATED)
                         .addGroup(jPanel3Layout.createParallelGroup(LEADING, false)
                                 .addComponent(jTextField1)
+                                .addComponent(jButtonBrowse)
                                 .addComponent(jLabel6, DEFAULT_SIZE, DEFAULT_SIZE, Short.MAX_VALUE))
                         .addContainerGap(DEFAULT_SIZE, Short.MAX_VALUE))
         );

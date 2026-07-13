@@ -18,6 +18,7 @@
 package smc.smedit.factories.planet.comp;
 
 import java.io.File;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
@@ -63,13 +64,19 @@ public class MaterialFactory implements IStarMadePluginFactory {
     }
 
     private void loadDefinitions() {
-        File plugins = new File(Paths.getPluginsDirectory());
-        File viewFilters = new File(plugins, "MaterialComposition.xml");
-        Document xml;
-        if (viewFilters.exists()) {
-            xml = XMLUtils.readFile(viewFilters);
+        File file = new File(Paths.getPluginsDirectory(), "MaterialComposition.xml");
+        Document xml = null;
+        if (file.exists()) {
+            xml = XMLUtils.readFile(file);
         } else {
-            xml = XMLUtils.readStream(ResourceUtils.loadSystemResourceStream("MaterialComposition.xml", MaterialFactory.class));
+            InputStream is = ResourceUtils.loadSystemResourceStream("MaterialComposition.xml", MaterialFactory.class);
+            if (is != null) {
+                xml = XMLUtils.readStream(is);
+            }
+        }
+        if (xml == null) {
+            log.log(Level.WARNING, "MaterialComposition.xml not found; no material-composition plugins loaded");
+            return;
         }
         loadDefinitions(xml);
     }

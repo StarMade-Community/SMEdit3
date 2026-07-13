@@ -18,10 +18,13 @@
 package smc.smedit.factories.ship.filter;
 
 import java.io.File;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import smc.smedit.logic.StarMadeLogic;
 import smc.smedit.logic.utils.IntegerUtils;
@@ -41,6 +44,8 @@ import org.w3c.dom.Node;
  * @Auther Jo Jaquinta for SMEdit Classic - version 1.0
  **/
 public class ViewFilterFactory implements IStarMadePluginFactory {
+
+    private static final Logger log = Logger.getLogger(ViewFilterFactory.class.getName());
 
     private final List<FilterDefinition> mDefs;
     private final List<IStarMadePlugin> mPlugins;
@@ -64,13 +69,19 @@ public class ViewFilterFactory implements IStarMadePluginFactory {
     }
 
     private void loadDefinitions() {
-        File plugins = new File(Paths.getPluginsDirectory());
-        File viewFilters = new File(plugins, "ViewFilters.xml");
-        Document xml;
-        if (viewFilters.exists()) {
-            xml = XMLUtils.readFile(viewFilters);
+        File file = new File(Paths.getPluginsDirectory(), "ViewFilters.xml");
+        Document xml = null;
+        if (file.exists()) {
+            xml = XMLUtils.readFile(file);
         } else {
-            xml = XMLUtils.readStream(ResourceUtils.loadSystemResourceStream("ViewFilters.xml", ViewFilterFactory.class));
+            InputStream is = ResourceUtils.loadSystemResourceStream("ViewFilters.xml", ViewFilterFactory.class);
+            if (is != null) {
+                xml = XMLUtils.readStream(is);
+            }
+        }
+        if (xml == null) {
+            log.log(Level.WARNING, "ViewFilters.xml not found; no view-filter plugins loaded");
+            return;
         }
         loadDefinitions(xml);
     }

@@ -25,8 +25,10 @@ import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -39,6 +41,7 @@ import javax.swing.ImageIcon;
 
 import smc.smedit.data.BlockTypes;
 import smc.smedit.logic.StarMadeLogic;
+import smc.smedit.util.Paths;
 import smc.smedit.logic.utils.IntegerUtils;
 import smc.smedit.logic.utils.ShortUtils;
 import smc.smedit.logic.utils.StringUtils;
@@ -622,11 +625,186 @@ public class BlockTypeColors {
         return Color.white;
     }
 
+    /**
+     * Returns a representative fill color for a block. The color is
+     * <em>approximated</em> by averaging the block's StarMade texture (see
+     * {@link #ensureApproxColors()}) rather than hand-assigned, and the result
+     * is cached to disk so textures are only sampled once per install/config.
+     * Falls back to the small set of hand-tuned entries in {@link #BLOCK_FILL}
+     * (e.g. the translucent selection overlays, which are not real blocks and
+     * have no texture) and finally to gray.
+     */
     public static Color getFillColor(short blockType) {
+        if (!mApproxColorsLoaded) {
+            ensureApproxColors();
+        }
+        Color approx = APPROX_FILL.get(blockType);
+        if (approx != null) {
+            return approx;
+        }
         if (BLOCK_FILL.containsKey(blockType)) {
             return BLOCK_FILL.get(blockType);
         }
         return Color.gray;
+    }
+
+    // ---- Texture-derived fill colors (approximated once, cached to disk) ----
+
+    /** Bump to invalidate every on-disk color cache after a logic change. */
+    private static final int COLOR_CACHE_VERSION = 1;
+    private static final String COLOR_CACHE_FILE = "block-colors.properties";
+    private static final Map<Short, Color> APPROX_FILL = new HashMap<>();
+    private static volatile boolean mApproxColorsLoaded = false;
+
+    /**
+     * Populates {@link #APPROX_FILL} with a per-block color sampled from the
+     * StarMade block textures. Loads from the on-disk cache when its fingerprint
+     * (config + texture pack) still matches; otherwise samples every texture,
+     * then writes the cache. Best-effort: on any failure it leaves
+     * {@link #APPROX_FILL} partial and lets {@link #getFillColor} fall back.
+     */
+    private static synchronized void ensureApproxColors() {
+        if (mApproxColorsLoaded) {
+            return;
+        }
+        try {
+            loadBlockIcons(); // populates BLOCK_TEXTURE_IDS + texture maps
+            if (!BLOCK_TEXTURE_IDS.isEmpty() && !mTextureMaps.isEmpty()) {
+                String fingerprint = computeColorCacheFingerprint();
+                File cacheFile = new File(Paths.getCacheDirectory(), COLOR_CACHE_FILE);
+                if (!loadColorCache(cacheFile, fingerprint)) {
+                    computeApproxColors();
+                    saveColorCache(cacheFile, fingerprint);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Block color approximation failed: " + e);
+        } finally {
+            // Publish results and avoid recomputing on every getFillColor call,
+            // even if sampling failed (fallback colors then cover the gaps).
+            mApproxColorsLoaded = true;
+        }
+    }
+
+    /** Samples every block's texture into {@link #APPROX_FILL}, memoized per texture id. */
+    private static void computeApproxColors() {
+        Map<Integer, Color> perTexture = new HashMap<>();
+        for (Map.Entry<Short, Integer> e : BLOCK_TEXTURE_IDS.entrySet()) {
+            int textureID = e.getValue();
+            Color c = perTexture.get(textureID);
+            if (c == null) {
+                c = averageTextureColor(textureID);
+                if (c == null) {
+                    continue; // no/blank texture — leave it to the fallback
+                }
+                perTexture.put(textureID, c);
+            }
+            APPROX_FILL.put(e.getKey(), c);
+        }
+    }
+
+    /**
+     * Returns the alpha-weighted average color of a texture tile, or
+     * {@code null} if the id is out of range or the tile is fully transparent.
+     * Alpha weighting keeps edge/transparent pixels (e.g. glass, sprites) from
+     * washing the result toward black.
+     */
+    private static Color averageTextureColor(int textureID) {
+        int sheet = textureID / 256;
+        if (sheet < 0 || sheet >= mTextureMaps.size()) {
+            return null;
+        }
+        BufferedImage tile;
+        try {
+            tile = getTextureImage(textureID);
+        } catch (RuntimeException ex) {
+            return null;
+        }
+        long r = 0, g = 0, b = 0, aSum = 0;
+        int w = tile.getWidth(), h = tile.getHeight();
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int argb = tile.getRGB(x, y);
+                int a = (argb >>> 24) & 0xFF;
+                if (a == 0) {
+                    continue;
+                }
+                r += (long) ((argb >> 16) & 0xFF) * a;
+                g += (long) ((argb >> 8) & 0xFF) * a;
+                b += (long) (argb & 0xFF) * a;
+                aSum += a;
+            }
+        }
+        if (aSum == 0) {
+            return null;
+        }
+        return new Color((int) (r / aSum), (int) (g / aSum), (int) (b / aSum));
+    }
+
+    /** Cache is keyed to the block config + active texture pack, so a StarMade update rebuilds it. */
+    private static String computeColorCacheFingerprint() {
+        File base = StarMadeLogic.getInstance().getBaseDir();
+        File xml = new File(base, "data/config/BlockConfig.xml");
+        StringBuilder sb = new StringBuilder();
+        sb.append("v").append(COLOR_CACHE_VERSION);
+        sb.append(";xml=").append(xml.length()).append('@').append(xml.lastModified());
+        sb.append(";pack=").append(mProps != null ? mProps.getProperty("texture", "") : "");
+        sb.append(";maps=").append(mTextureMaps.size());
+        sb.append(";blocks=").append(BLOCK_TEXTURE_IDS.size());
+        return sb.toString();
+    }
+
+    /** Test hook: the approximated colors after {@link #getFillColor} has triggered loading. */
+    static Map<Short, Color> approximatedFillColors() {
+        return APPROX_FILL;
+    }
+
+    /** Loads cached colors when the fingerprint matches; returns false to force a rebuild. */
+    static boolean loadColorCache(File file, String fingerprint) {
+        if (!file.isFile()) {
+            return false;
+        }
+        Properties p = new Properties();
+        try (InputStream is = new FileInputStream(file)) {
+            p.load(is);
+        } catch (IOException e) {
+            return false;
+        }
+        if (!fingerprint.equals(p.getProperty("fingerprint"))) {
+            return false;
+        }
+        for (String key : p.stringPropertyNames()) {
+            if ("fingerprint".equals(key)) {
+                continue;
+            }
+            try {
+                short id = Short.parseShort(key);
+                int rgb = Integer.parseInt(p.getProperty(key), 16);
+                APPROX_FILL.put(id, new Color(rgb));
+            } catch (NumberFormatException nfe) {
+                // skip a malformed line rather than discarding the whole cache
+            }
+        }
+        return !APPROX_FILL.isEmpty();
+    }
+
+    /** Persists the approximated colors (best-effort; a failed write just means we recompute next run). */
+    static void saveColorCache(File file, String fingerprint) {
+        Properties p = new Properties();
+        p.setProperty("fingerprint", fingerprint);
+        for (Map.Entry<Short, Color> e : APPROX_FILL.entrySet()) {
+            p.setProperty(Short.toString(e.getKey()),
+                    String.format("%06x", e.getValue().getRGB() & 0xFFFFFF));
+        }
+        File dir = file.getParentFile();
+        if (dir != null && !dir.isDirectory()) {
+            dir.mkdirs();
+        }
+        try (OutputStream os = new FileOutputStream(file)) {
+            p.store(os, "SMEdit approximated block fill colors (auto-generated; delete to rebuild)");
+        } catch (IOException e) {
+            // best-effort cache
+        }
     }
 
     public static final Map<Short, Short> BLOCK_HITPOINTS = new HashMap<>();
@@ -706,7 +884,13 @@ public class BlockTypeColors {
                 }
                 short id = ShortUtils.parseShort(mBlockTypes.get(type));
                 //int icon = IntegerUtils.parseInt(XMLUtils.getAttribute(n, "icon"));
-                int textureID = IntegerUtils.parseInt(XMLUtils.getAttribute(n, "textureId"));
+                // Modern BlockConfig.xml lists six comma-separated per-face
+                // textures (e.g. "33, 33, 33, 33, 33, 33"); use the first face.
+                String textureAttr = XMLUtils.getAttribute(n, "textureId");
+                int textureID = 0;
+                if (textureAttr != null && !textureAttr.isEmpty()) {
+                    textureID = IntegerUtils.parseInt(textureAttr.split(",")[0].trim());
+                }
                 short hitPoints = ShortUtils.parseShort(XMLUtils.getTextTag(n, "Hitpoints"));
 
                 BlockTypes.BLOCK_NAMES.put(id, name);
@@ -728,13 +912,17 @@ public class BlockTypeColors {
 
     private static void loadTextureMaps() throws IOException {
         loadProps();
+        // Modern StarMade ships texture packs under data/textures/block/<pack>/64/.
+        // Default to the stock "Default" pack when the user hasn't chosen one,
+        // otherwise the path collapses to an unresolvable "block//64" and no
+        // textures (or approximated colors) load at all.
+        String pack = mProps.getProperty("texture", "");
+        if (pack.isEmpty()) {
+            pack = "Default";
+        }
         for (int i = 0; i < 256; i++) {
-            File f = new File(
-                    /* Change the commented out lines to change the game version to loaf textures */
-                    /* 0.094 and below */
-                    //StarMadeLogic.getInstance().getBaseDir(), "data/textures/block/t" + StringUtils.zeroPrefix(i, 3) + ".png");
-                    /* 0.14 */
-                    StarMadeLogic.getInstance().getBaseDir(), "data/textures/block/" + mProps.getProperty("texture", "") + "/64/t" + StringUtils.zeroPrefix(i, 3) + ".png");
+            File f = new File(StarMadeLogic.getInstance().getBaseDir(),
+                    "data/textures/block/" + pack + "/64/t" + StringUtils.zeroPrefix(i, 3) + ".png");
 
             if (!f.exists()) {
                 break;

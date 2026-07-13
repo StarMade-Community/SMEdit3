@@ -1,8 +1,15 @@
 # SMEdit3 — Architecture & Code-Health Map
 
-> Status: analysis snapshot, 2026-07. Reflects the codebase at branch `master`
-> (post Ant→Gradle / Java 21 consolidation). Companion doc:
+> Status: 2026-07. Reflects the codebase at branch `master` (post Ant→Gradle /
+> Java 21 consolidation). Companion doc:
 > [STARMADE_COMPATIBILITY.md](STARMADE_COMPATIBILITY.md).
+>
+> **Progress:** Phases 0, 2, 3, and 4 of the roadmap (§8) are done — the editor
+> builds and runs on Java 21, opens **and saves** the modern `.smd3` format, the
+> in-tree plugins are wired into the menus, block colors are sampled from the
+> game's textures, and there is a JUnit suite + CI. The main deferred item is the
+> `smc.smedit.vecmath` trim (Phase 1), kept as-is for now because it is pure
+> LOC cleanup with no functional payoff (see §5.4).
 
 SMEdit3 is a legacy Java **Swing + LWJGL 2** desktop editor for StarMade
 blueprints (ships, stations, planets). It reads/writes StarMade's on-disk
@@ -27,13 +34,13 @@ transforms (smooth, hull, fill, import/export, etc.).
 | `smc.smedit.logic` | 11+ | App logic: `StarMadeLogic` (app-state singleton), `BlueprintLogic`, `IOLogic`, `RenderLogic`, `RenderPolyLogic` |
 | `smc.smedit.ui` + `smc.smedit.ui.act` | ~90 | Swing UI: `RenderFrame` (main window), render panels, ~50 `AbstractAction`s, JavaBeans property-editor framework for plugin dialogs |
 | `smc.smedit.ui.lwjgl` | 5 | Hardware render panel bridging to `smc.smedit.util.jgl` |
-| `smc.smedit.plugins` | 121 | 45 `IBlocksPlugin` transforms (import/export/edit/select/paint/terrain) |
-| `smc.smedit.factories` | 18 | 4 data-driven plugin factories |
+| `smc.smedit.plugins` | 121 | 45 `IBlocksPlugin` transforms (import/export/edit/select/paint/terrain), registered by `BuiltinPlugins` |
+| `smc.smedit.factories` | 18 | 4 data-driven plugin factories (definition XMLs packaged as resources) |
 | `smc.smedit.mods` | 5 | Plugin interfaces (`IBlocksPlugin`, `IStarMadePluginFactory`, …) |
 | `smc.smedit.util.jgl` | 34 | Bespoke OpenGL-agnostic scene-graph library |
 | `smc.smedit.util.lwjgl` | 13 | LWJGL 2 canvas/render thread — the only code touching `org.lwjgl.*` |
 | `smc.smedit.util` | ~10 | `Paths`, `GlobalConfiguration`, `Update`/`HttpClient` (self-update), `OptionScreen` |
-| `smc.smedit.vecmath` | 85 | **Vendored copy of Sun `javax.vecmath` (Java 3D 1.2)** — ~30k LOC |
+| `smc.smedit.vecmath` | 41 | **Vendored copy of Sun `javax.vecmath` (Java 3D 1.2)** — ~30k LOC (Phase-1 dead-file trim done; deeper trim deferred, §5.4) |
 | `smc.smedit.log` | 5 | Custom `java.util.logging` handlers (routes logs to the Swing log tab) |
 
 ---
@@ -45,29 +52,34 @@ The boot path was simplified in **Phase 0**. The old flow downloaded
 inside it; that remote-download bootstrap was removed and the in-tree editor is
 now launched directly:
 
-1. `smc.smedit.SMEdit.main()` → `GlobalConfiguration.createDirectories()` →
-   opens `OptionScreen`.
+1. `smc.smedit.SMEdit.main()` → `GpuOffload.preferDiscreteGpu()` (Linux dGPU
+   re-exec, see §3) → `GlobalConfiguration.createDirectories()` → opens
+   `OptionScreen`.
 2. `smc.smedit.util.OptionScreen` — Swing config dialog (memory, texture pack,
    StarMade game folder), persisted to `~/.josm`. Its **"Start SMEdit"** button
    launches the editor directly.
 3. `smc.smedit.ui.RenderFrame` — the actual main editor window. `RenderFrame.main`
    → `preLoad()` (`StarMadeLogic.setBaseDir()`: resolves the install, points LWJGL
-   at the install's natives via `org.lwjgl.librarypath`, discovers plugins) →
+   at the install's natives via `org.lwjgl.librarypath`, registers the built-in
+   plugins and discovers any external plugin jars) →
    `startup()` builds the UI. The renderer defaults to OpenGL, with a software
    fallback (see §3). Auto-loads a hardcoded default blueprint `"Omen-Navy-Class"`
    ([RenderFrame.java:141](../src/main/java/smc/smedit/ui/RenderFrame.java)).
 
 **Path conventions** (`smc.smedit.util.Paths`): everything hangs off
 `<starmade.home>/third-party/SMEdit/` (`Plugins/`, `Logs/`, `Cache/`,
-`Settings/`, `resources/`, `Screenshots/`); config file is `~/.josm`. Note
-`validateCurrentDirectory()` will **recursively scan the entire user home
-directory** for a StarMade install (on first run, when `starmade.home` is unset)
-— slow and surprising; an open Phase-0 follow-up.
+`Settings/`, `resources/`, `Screenshots/`); config file is `~/.josm`.
 
-> ⚠️ There are **two parallel, inconsistent install-discovery mechanisms**: the
-> `smc.smedit.data.StarMade` singleton (`getBaseDir()`, validates on `StarMade.jar`)
-> and `smc.smedit.util.Paths` (`~/.josm`, validates on `StarMade.jar` **and**
-> `CrashAndBugReport.jar`). These should be unified.
+**StarMade-dir discovery (Phase 0):** `validateCurrentDirectory()` resolves the
+install in order — saved `starmade.home` → current dir → a bounded list of
+common install locations → a **folder picker**
+([StarMadeDirChooser](../src/main/java/smc/smedit/ui/StarMadeDirChooser.java),
+with a "use anyway" override). The old unbounded recursive `$HOME` scan was
+removed. Validation is now consistent (`StarMade.jar` present, dropping the
+extra `CrashAndBugReport.jar` requirement that modern StarMade may not ship). The
+OptionScreen also has a **Browse…** button for manual selection. (Minor
+follow-up: the resolver still exists in two places — `Paths` and
+`StarMadeLogic`/`RenderFrame.preLoad` — worth consolidating into one.)
 
 ---
 
@@ -95,29 +107,50 @@ rebuilds its LWJGL natives for Java 9+, whereas the stock LWJGL 2.x natives
 `SUNWprivate_1.1` symbol and fail to load on Java 21. So the editor's GL
 renderer always matches the game's, and no natives are vendored.
 
+**Discrete-GPU offload:** on Linux hybrid-graphics ("Optimus") systems the
+editor re-execs itself onto the dedicated GPU at startup
+([GpuOffload.java](../src/main/java/smc/smedit/util/GpuOffload.java)) — NVIDIA
+via `__NV_PRIME_RENDER_OFFLOAD`/`__GLX_VENDOR_LIBRARY_NAME=nvidia`, AMD via
+`DRI_PRIME=1` — because those GLX vars must be set before the GL context is
+created (a running JVM can't change its own environment for native libs). It
+detects GPUs from `/sys/bus/pci/devices` (no external commands). macOS switches
+automatically; Windows uses the driver profile. Opt out with `-igpu` or
+`SMEDIT_NO_GPU_OFFLOAD=1`. Verified: this routes LWJGL onto the NVIDIA driver
+(`GL_RENDERER: NVIDIA …`) instead of the Intel iGPU.
+
 Maintaining two renderers roughly doubles the rendering surface area
 (consolidation is a later cleanup).
 
 ---
 
-## 4. Plugin system (the primary modernization target)
+## 4. Plugin system
 
 - **Interfaces** (`smc.smedit.mods`): `IStarMadePlugin` (metadata, `newParameterBean()`,
   `getClassifications()` → untyped `int[][]` type/subtype pairs),
   `IBlocksPlugin` (adds `modify(SparseMatrix<Block>, params, StarMade, callback)`),
   `IStarMadePluginFactory` (`getPlugins()`).
-- **Discovery** (`StarMadeLogic.discoverPlugins`): scans `<home>/Plugins/*.jar`,
-  reads two comma-separated `MANIFEST.MF` attributes — `BlocksPlugins` and
-  `PluginFactories` — loads those classes via `URLClassLoader`, instantiates
-  via the deprecated `Class.newInstance()`. Not `ServiceLoader`, not
-  annotations, not a hardcoded registry.
-- **⚠️ The in-tree plugins are orphaned.** The 121 plugin + 18 factory files
-  compile, but **nothing registers them** in this build — there is no
-  `MANIFEST.MF` with `BlocksPlugins`/`PluginFactories`, and `build.gradle`
-  declares only `Main-Class`. Historically they were compiled into a separate
-  `JoFileMods.jar` **downloaded at runtime** and picked up by the manifest
-  scanner. In the current single-module build they are dead weight unless that
-  jar is fetched.
+- **✅ In-tree plugins are now registered (Phase 2).** A new
+  [`smc.smedit.plugins.BuiltinPlugins`](../src/main/java/smc/smedit/plugins/BuiltinPlugins.java)`.register()`
+  instantiates all **45 built-in `IBlocksPlugin`s + 4 factories** directly from
+  the application classpath (via method-reference `Supplier`s, so the compiler
+  verifies each has a no-arg constructor), each isolated in `try/catch` so one
+  bad plugin can't stop the rest. It is called from `StarMadeLogic.setBaseDir`
+  **after** the base dir is set (the factories parse the block config in their
+  constructors) and is idempotent. This replaces the old model where the plugins
+  lived in a separate `JoFileMods.jar` **downloaded at runtime**.
+- **External discovery still supported** (`StarMadeLogic.discoverPlugins`): also
+  scans `<home>/Plugins/*.jar` for `MANIFEST.MF` `BlocksPlugins`/`PluginFactories`
+  attributes and loads them via `URLClassLoader`, so third-party plugin jars keep
+  working alongside the built-ins.
+- **Factory data files are now packaged.** The three data-driven factories
+  (material/vegetation/view-filter) parse an XML that used to live under
+  `src/main/java` (never packaged); `build.gradle` now ships `**/*.xml`/`**/*.dae`
+  from the source tree as classpath resources, and each factory degrades
+  gracefully (empty, no throw) if its definitions file is missing.
+- **Remaining modernization (optional, not MVP):** the discovery is still
+  stringly-typed — `int[][]` classifications rather than enums, `Class.newInstance()`,
+  manifest attributes rather than `ServiceLoader`/annotations. Fine for a release;
+  a nice later cleanup.
 
 **Plugin inventory** (45 `IBlocksPlugin` + 4 factories): macro record/run;
 selection ops (all/none/copy/cut/paste/delete); ship edit (harden/smooth/soften);
@@ -141,9 +174,17 @@ an auto-generated Swing dialog).
    LWJGL natives now load from the StarMade install via `org.lwjgl.librarypath`
    (read lazily by LWJGL, so runtime-settable). Verified: LWJGL 2.9.3 + the
    install's Java-9+-compatible natives create a GL 4.6 context on Java 21.
-3. **Orphaned, stringly-typed plugin system** (see §4) — the central rework.
-4. **~30k LOC of vendored `javax.vecmath`** (`smc.smedit.vecmath`, 85 files — the 7
-   largest files in the repo). Replaceable wholesale by a JOML/vecmath Maven dep.
+3. ✅ **RESOLVED (Phase 2) — plugin registration.** The in-tree plugins are now
+   wired into the menus via `BuiltinPlugins.register()` (see §4). The stringly-typed
+   discovery (`int[][]`, `Class.newInstance()`, manifest attrs) remains as an
+   optional later cleanup, but is no longer a functional gap.
+4. **~30k LOC of vendored `javax.vecmath`** (`smc.smedit.vecmath`, 41 files after the
+   Phase-1 dead-file trim). **Deferred:** re-analysis showed no zero-risk deletions
+   remain — every class is cross-referenced, and the double-precision cluster is
+   reachable from the externally-used float classes, so trimming it means the same
+   cross-type-method surgery that previously produced 182 compile errors. It's pure
+   LOC cleanup with no functional payoff, so it's parked until after the initial
+   release.
 5. **Swing EDT violations.** Only 2 `invokeLater` in ~94k LOC;
    `RenderFrame.startup()` builds and `setVisible(true)`s the main frame off the
    EDT, alongside a separate LWJGL render thread. Latent UI/render races.
@@ -168,15 +209,29 @@ an auto-generated Swing dialog).
     download in `Paths.validateCurrentDirectory()` was removed. (The `Update`
     self-updater class remains in-tree but unused — dead code to delete in a
     later phase.)
-12. **No tests, no CI.** Zero JUnit; nothing beyond LWJGL on the classpath.
+12. ✅ **RESOLVED (Phase 4) — tests + CI.** A JUnit 5 suite now covers the format
+    round-trips (`.smd3` read/write, v5 header/logic/meta), blueprint loading,
+    block-color approximation, and plugin registration; GitHub Actions builds the
+    jar on every push (`.github/workflows/build.yml`) and publishes the docs site
+    (`docs.yml`). See §6.
 
 ---
 
-## 6. Zero test coverage / no CI
+## 6. Test coverage & CI ✅
 
-There is no test source set, no JUnit dependency, and no CI configuration. Given
-the format-parsing core (bit-packing, chunk offsets), this is the highest-risk
-gap for a modernization: format changes cannot be validated without a harness.
+Addressed in Phase 4. `src/test/java` holds a JUnit 5 suite focused on the
+highest-risk core — the format bit-packing/chunk-offset code — plus the new
+subsystems:
+
+- `ship/logic/Smd3LogicTest`, `Smbp5LogicTest` — `.smd3` and v5 header/logic/meta
+  round-trips (including a real Isanth fixture, guarded by `assumeTrue`).
+- `logic/BlueprintLoadTest` — end-to-end load of a modern blueprint directory.
+- `ui/BlockColorApproxTest` — texture color sampling + on-disk cache invalidation.
+- `plugins/BuiltinPluginsTest` — plugin/factory registration and menu queries.
+
+CI runs `./gradlew build` on every push via `.github/workflows/build.yml`. The
+install-dependent tests self-skip when no StarMade install is present, so CI
+stays green while local runs exercise the full path.
 
 ---
 
@@ -185,7 +240,10 @@ gap for a modernization: format changes cannot be validated without a harness.
 - `build.gradle`: `java` + `application` plugins, Java 21 toolchain, group
   `smc.smedit`, version `3.0.0`. **Dependencies** = `org.lwjgl.lwjgl:lwjgl:2.9.3`
   + `:lwjgl_util:2.9.3` from Maven Central (Java classes only; the LWJGL natives
-  are loaded at runtime from the StarMade install — see §3).
+  are loaded at runtime from the StarMade install — see §3), `com.formdev:flatlaf`
+  (look-and-feel), and JUnit 5 for tests. A `sourceSets` rule also packages the
+  plugin/factory data files (`**/*.xml`, `**/*.dae`) that live under
+  `src/main/java` so they resolve as classpath resources at runtime.
 - `mainClass` / manifest → `smc.smedit.SMEdit` (the real entry class after the
   Phase-0 rename). `./gradlew run` launches the editor on the Java 21 toolchain.
 - Build/run needs a JDK 21 (there may be no `java` on `PATH`; e.g. IntelliJ's
@@ -209,33 +267,46 @@ working build.
 - ✅ Removed the `sys_paths` reflection hack; LWJGL natives load from the install
   via `org.lwjgl.librarypath`.
 - ✅ LWJGL 2.9.1 → 2.9.3 (Maven) and **OpenGL is now the default renderer** (with
-  software fallback). `./gradlew run` works on the Java 21 toolchain.
-- ⏳ Follow-up: first-run StarMade-dir discovery still recursively scans `$HOME`
-  and requires both `StarMade.jar` **and** `CrashAndBugReport.jar` (the latter
-  may be gone in modern StarMade) — tighten this next.
+  software fallback), rendering on the **discrete GPU** on Linux hybrid systems
+  (`GpuOffload`). `./gradlew run` works on the Java 21 toolchain.
+- ✅ StarMade-dir discovery: removed the recursive `$HOME` scan (saved → cwd →
+  common locations → folder picker), relaxed validation to `StarMade.jar` only,
+  and added a **Browse…** button + folder chooser for manual selection.
 
-**Phase 1 — dependencies & structure**
+**Phase 1 — dependencies & structure (partial)**
 - ✅ LWJGL: vendored 2.9.1 replaced by 2.9.3 from Maven Central + install natives
   (done with the Phase-0 OpenGL work). A future LWJGL 3 migration (GLFW
   window/input, affecting `JGLCanvas`/`DrawLogic`/`NodeDrawHandler`) is optional.
-- Replace vendored `smc.smedit.vecmath` with JOML (or `org.jogamp.vecmath`);
-  delete ~30k LOC. (Do this behind a thin adapter to limit blast radius.)
-- Delete dead code (`SparseMatrix{New,Old}`, `*Action1` dupes, commented blocks,
-  the unused `Update`/`getDownloadCaches` remnants); move `ent.cmd` tools out of
-  the GUI jar.
+- ⏸️ **Deferred: shrink vendored `smc.smedit.vecmath`.** Step 1 done (deleted 21
+  dead files, 85→41 files); steps 2-3 (strip double overloads / rewrite
+  `TransformInteger`) are parked — re-analysis found no zero-risk deletions left
+  and the remaining trim is high-risk cross-type surgery with no functional value
+  (see §5.4). Not a release blocker.
+- Follow-up: delete remaining dead code (`SparseMatrix{New,Old}`, `*Action1`
+  dupes, commented blocks, the unused `Update`/`getDownloadCaches` remnants);
+  move `ent.cmd` tools out of the GUI jar.
 
-**Phase 2 — plugin system rework**
-- Compile plugins into the app (or discover on the module path) instead of the
-  download-a-jar model; migrate manifest-attribute discovery to `ServiceLoader`
-  or annotations; replace `int[][]` classifications with enums; decouple from
-  concrete `SparseMatrix<Block>`.
+**Phase 2 — plugin system rework — ✅ DONE**
+- ✅ Built-in plugins are compiled into the app and registered directly via
+  `BuiltinPlugins.register()` (see §4), replacing the download-a-jar model;
+  external plugin jars are still discovered. Factory data files are now packaged.
+- Optional later polish: migrate manifest discovery to `ServiceLoader`/annotations,
+  replace `int[][]` classifications with enums, decouple from concrete
+  `SparseMatrix<Block>`.
 
-**Phase 3 — correctness & format** (see [STARMADE_COMPATIBILITY.md](STARMADE_COMPATIBILITY.md))
-- Support the current `.smd3` / 32³ / v6 segment format and the corrected
-  per-block bit layout; drive block metadata from `BlockConfig.xml` at runtime.
+**Phase 3 — correctness & format — ✅ DONE** (see [STARMADE_COMPATIBILITY.md](STARMADE_COMPATIBILITY.md))
+- ✅ Reads **and writes** the current `.smd3` / 32³ / v6 segment format with the
+  corrected per-block bit layout, plus v5 `header`/`meta` and v0 `logic`.
+- ✅ Block metadata is driven from `BlockConfig.xml` at runtime, and render colors
+  are sampled from the game's block textures (cached to disk — see the
+  compatibility doc).
+- Remaining fidelity work: preserve real logic connections on save (currently an
+  empty control-element map).
 
-**Phase 4 — quality & UX**
-- Add a JUnit test set (start with round-trip format tests) + CI.
-- Route logging through `smc.smedit.log`; fix EDT usage; fix silent catches.
-- README items: FlatLaf, improved camera/2D modes, cross-sections, workspace
-  layouts, scripting.
+**Phase 4 — quality & UX (largely done)**
+- ✅ JUnit test set (round-trip format tests + subsystem coverage) + GitHub Actions
+  CI and docs publishing.
+- ✅ FlatLaf dark look-and-feel.
+- Follow-up: route logging through `smc.smedit.log`; fix EDT usage; fix silent
+  catches. Further README items (improved camera/2D modes, cross-sections,
+  workspace layouts, scripting) are post-release.

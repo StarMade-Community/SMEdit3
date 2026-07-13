@@ -22,6 +22,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,8 @@ import smc.smedit.ship.logic.HeaderLogic;
 import smc.smedit.ship.logic.LogicLogic;
 import smc.smedit.ship.logic.MetaLogic;
 import smc.smedit.ship.logic.ShipLogic;
+import smc.smedit.ship.logic.Smbp5Logic;
+import smc.smedit.ship.logic.Smd3Logic;
 import smc.smedit.ui.logic.ShipSpec;
 import smc.smedit.vecmath.Point3i;
 
@@ -97,23 +100,47 @@ public class BlueprintLogic {
     public static Blueprint readBlueprint(File dir, IPluginCallback cb) throws IOException {
         Blueprint bp = new Blueprint();
         bp.setName(dir.getName());
-        File header = new File(dir, "header.smbph");
-        InputStream headerIS = new FileInputStream(header);
-        bp.setHeader(HeaderLogic.readFile(headerIS, true));
-        File logic = new File(dir, "logic.smbpl");
-        InputStream logicIS = new FileInputStream(logic);
-        bp.setLogic(LogicLogic.readFile(logicIS, true));
-        File meta = new File(dir, "meta.smbpm");
-        InputStream metaIS = new FileInputStream(meta);
-        bp.setMeta(MetaLogic.readFile(metaIS, true));
+        readOptionalMetadata(bp, dir);
         File dataDir = new File(dir, "DATA");
         bp.setData(DataLogic.readFiles(dataDir, bp.getName(), cb));
         return bp;
     }
 
+    /**
+     * Reads header.smbph / logic.smbpl / meta.smbpm best-effort. These advanced
+     * to newer on-disk versions in modern StarMade and are not consumed by the
+     * editor's load path (only the block DATA is), so a metadata format the old
+     * parsers can't read must not block opening a blueprint's blocks.
+     */
+    private static void readOptionalMetadata(Blueprint bp, File dir) {
+        File header = new File(dir, "header.smbph");
+        if (header.isFile()) {
+            try (InputStream is = new FileInputStream(header)) {
+                bp.setHeader(HeaderLogic.readFile(is, true));
+            } catch (Exception e) {
+                log.log(Level.WARNING, "Could not parse header.smbph (newer format?); continuing. {0}", e.toString());
+            }
+        }
+        File logic = new File(dir, "logic.smbpl");
+        if (logic.isFile()) {
+            try (InputStream is = new FileInputStream(logic)) {
+                bp.setLogic(LogicLogic.readFile(is, true));
+            } catch (Exception e) {
+                log.log(Level.WARNING, "Could not parse logic.smbpl (newer format?); continuing. {0}", e.toString());
+            }
+        }
+        File meta = new File(dir, "meta.smbpm");
+        if (meta.isFile()) {
+            try (InputStream is = new FileInputStream(meta)) {
+                bp.setMeta(MetaLogic.readFile(is, true));
+            } catch (Exception e) {
+                log.log(Level.WARNING, "Could not parse meta.smbpm (newer format?); continuing. {0}", e.toString());
+            }
+        }
+    }
+
     public static void saveBlueprint(SparseMatrix<Block> grid, ShipSpec spec, boolean def, IPluginCallback cb) {
         try {
-            Map<Point3i, Data> data = ShipLogic.getData(grid);
             File baseDir = spec.getFile();
             if (!baseDir.exists()) {
                 baseDir.mkdir();
@@ -123,22 +150,27 @@ public class BlueprintLogic {
                     StarMadeLogic.getInstance().setBlueprints(null);
                 }
             }
-            // header file
-            Header header = HeaderLogic.make(grid);
-            File headerFile = new File(baseDir, "header.smbph");
-            HeaderLogic.writeFile(header, new FileOutputStream(headerFile), true);
-            Logic logic = LogicLogic.make(grid);
-            File logicFile = new File(baseDir, "logic.smbpl");
-            LogicLogic.writeFile(logic, new FileOutputStream(logicFile), true);
-            Meta meta = MetaLogic.make(grid);
-            File metaFile = new File(baseDir, "meta.smbpm");
-            MetaLogic.writeFile(meta, new FileOutputStream(metaFile), true);
-            // data file
+            // header.smbph, logic.smbpl, meta.smbpm all in the modern format so
+            // StarMade can load the blueprint (logic is written with an empty
+            // control-element map for now — see Smbp5Logic#writeLogic).
+            try (OutputStream headerOut = new FileOutputStream(new File(baseDir, "header.smbph"))) {
+                Smbp5Logic.writeHeader(grid, headerOut);
+            }
+            try (OutputStream logicOut = new FileOutputStream(new File(baseDir, "logic.smbpl"))) {
+                Smbp5Logic.writeLogic(logicOut);
+            }
+            try (OutputStream metaOut = new FileOutputStream(new File(baseDir, "meta.smbpm"))) {
+                Smbp5Logic.writeMeta(metaOut);
+            }
+            // data files: modern .smd3 (32³, v6). NOTE: header/logic/meta above are
+            // still written in the legacy format, so SMEdit can reopen its own
+            // saves, but StarMade itself needs v5 header/meta to load them — that
+            // metadata-write modernization is a follow-up.
             File dataDir = new File(baseDir, "DATA");
             if (!dataDir.exists()) {
                 dataDir.mkdir();
             }
-            DataLogic.writeFiles(data, dataDir, spec.getName(), cb);
+            Smd3Logic.writeFiles(grid, dataDir, spec.getName());
         } catch (IOException e1) {
             log.log(Level.WARNING, "saveBlueprint failed!", e1);
             e1.printStackTrace();

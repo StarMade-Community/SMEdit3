@@ -17,8 +17,15 @@
  */
 package smc.smedit;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.formdev.flatlaf.FlatDarkLaf;
+
 import smc.smedit.util.GlobalConfiguration;
+import smc.smedit.util.GpuOffload;
 import smc.smedit.util.OptionScreen;
+import smc.smedit.util.Paths;
 
 /**
  * Application entry point.
@@ -38,8 +45,30 @@ import smc.smedit.util.OptionScreen;
  */
 public class SMEdit {
 
+    private static final Logger log = Logger.getLogger(SMEdit.class.getName());
+
     public static void main(final String[] args) {
+        // On Linux hybrid-graphics systems, re-exec onto the discrete GPU before
+        // any AWT/GL init (may exit this process). No-op elsewhere / with -igpu.
+        GpuOffload.preferDiscreteGpu(args);
+        // Apply the modern look-and-feel before any Swing component is created
+        // (the folder chooser below is the first one).
+        setupLookAndFeel();
+        // Resolve the StarMade install folder first (auto-detect, else prompt).
+        // SMEdit's own directories live under it, so this must happen before
+        // createDirectories(). Cancelling means there's nothing to edit.
+        if (!Paths.validateCurrentDirectory()) {
+            System.exit(0);
+        }
         GlobalConfiguration.createDirectories();
         new OptionScreen(args);
+    }
+
+    private static void setupLookAndFeel() {
+        try {
+            FlatDarkLaf.setup();
+        } catch (final Throwable t) {
+            log.log(Level.WARNING, "FlatLaf setup failed; using the default look-and-feel. " + t);
+        }
     }
 }

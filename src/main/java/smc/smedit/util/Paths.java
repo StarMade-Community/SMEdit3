@@ -22,14 +22,13 @@ import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
-import java.net.URL;
 import java.net.URLDecoder;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 import java.util.logging.Logger;
-import javax.swing.JOptionPane;
+
+import smc.smedit.ui.StarMadeDirChooser;
 
 /**
  *
@@ -40,7 +39,6 @@ public class Paths {
     public static final String ROOT = ".";
     public static final String RESOURCES = ROOT + File.separator + "resources";
     public static final String SVERSION = RESOURCES + File.separator + "start_version.dat";
-    private static Map<String, File> downloadCache;
     private static final Logger log = Logger.getLogger(Paths.class.getName());
     /* file locations */
     private static Properties mProps;
@@ -59,39 +57,6 @@ public class Paths {
         return path;
     }
 
-    public static Map<String, File> getDownloadCaches() {
-        if (downloadCache == null) {
-            downloadCache = new HashMap<>(8);
-            /* FILES */
-            downloadCache.put(URLs.DOWNLOAD, new File(getHomeDirectory(), "jo_sm.jar"));
-            downloadCache.put(URLs.DOWNLOADPLUG, new File(getPluginsDirectory(), "JoFileMods.jar"));
-            downloadCache.put(URLs.ISANTH_HEAD, new File(getIsanthDirectory(), "header.smbph"));
-            downloadCache.put(URLs.ISANTH_LOGIC, new File(getIsanthDirectory(), "logic.smbpl"));
-            downloadCache.put(URLs.ISANTH_META, new File(getIsanthDirectory(), "meta.smbpm"));
-            downloadCache.put(URLs.ISANTH_DATA, new File(getIsanthDataDirectory(), "Omen-Navy-Class.0.0.0.smd2"));
-
-            /* ICONS */
-            downloadCache.put(URLs.ICON_FILE_ACCOUNT, new File(getIconDirectory(), "account.png"));
-            downloadCache.put(URLs.ICON_FILE_HOME, new File(getIconDirectory(), "home.png"));
-            downloadCache.put(URLs.ICON_FILE_PLUGINS, new File(getIconDirectory(), "plugins.png"));
-            downloadCache.put(URLs.ICON_FILE_UNDO, new File(getIconDirectory(), "undo.png"));
-            downloadCache.put(URLs.ICON_FILE_REDO, new File(getIconDirectory(), "redo.png"));
-            downloadCache.put(URLs.ICON_FILE_STOP, new File(getIconDirectory(), "stop.png"));
-            downloadCache.put(URLs.ICON_FILE_FILL, new File(getIconDirectory(), "fill.png"));
-            downloadCache.put(URLs.ICON_FILE_SHOT, new File(getIconDirectory(), "shot.png"));
-            downloadCache.put(URLs.ICON_FILE_FILE, new File(getIconDirectory(), "open.png"));
-            downloadCache.put(URLs.ICON_FILE_BPFILE, new File(getIconDirectory(), "open_print.png"));
-            downloadCache.put(URLs.ICON_FILE_SAVE, new File(getIconDirectory(), "save.png"));
-            downloadCache.put(URLs.ICON_FILE_SAVEAS, new File(getIconDirectory(), "save_as.png"));
-
-            downloadCache.put(URLs.ICON_FILE_WIKI, new File(getIconDirectory(), "wiki.png"));
-            downloadCache.put(URLs.ICON_FILE_FACE, new File(getIconDirectory(), "face.png"));
-            downloadCache.put(URLs.ICON_FILE_TWIT, new File(getIconDirectory(), "twit.png"));
-            downloadCache.put(URLs.ICON_FILE_PROJECT, new File(getIconDirectory(), "web.png"));
-
-        }
-        return Collections.unmodifiableMap(downloadCache);
-    }
     /* folder directories */
 
     public static String getHomeDirectory() {
@@ -182,15 +147,10 @@ public class Paths {
     }
 
     private static boolean isStarMadeDirectory(File d) {
-        if (!d.exists()) {
-            return false;
-        }
-        File smJar = new File(d, "StarMade.jar");
-        if (!smJar.exists()) {
-            return false;
-        }
-        File crashJar = new File(d, "CrashAndBugReport.jar");
-        return crashJar.exists();
+        // A StarMade install is marked by StarMade.jar. (The old code also
+        // required CrashAndBugReport.jar, which modern StarMade may not ship and
+        // which disagreed with StarMadeLogic#isStarMadeDirectory — now consistent.)
+        return d != null && d.isDirectory() && new File(d, "StarMade.jar").exists();
     }
 
     public static void loadProps() {
@@ -210,48 +170,71 @@ public class Paths {
         }
     }
 
+    /**
+     * Resolves the StarMade installation directory and records it in
+     * {@code ~/.josm}. Resolution order (no full-disk scan): the previously
+     * saved / manually chosen folder, the current working directory, a short
+     * list of common install locations, and finally a folder picker for manual
+     * selection. Returns {@code false} only if the user cancels the picker.
+     */
     public static boolean validateCurrentDirectory() {
         loadProps();
-        mStarMadeDir = new File(mProps.getProperty("starmade.home", ""));
-        if (isStarMadeDirectory(mStarMadeDir)) {
+
+        // 1. Previously saved (or manually chosen) install.
+        String saved = mProps.getProperty("starmade.home", "");
+        if (!saved.isEmpty() && isStarMadeDirectory(new File(saved))) {
+            mStarMadeDir = new File(saved);
             return true;
         }
-        mStarMadeDir = new File(".");
-        if (isStarMadeDirectory(mStarMadeDir)) {
+
+        // 2. Launched from inside the install?
+        File cwd = new File(System.getProperty("user.dir"));
+        if (isStarMadeDirectory(cwd)) {
+            mStarMadeDir = cwd;
             saveProps();
             return true;
         }
-        System.out.println("Scanning current directory");
-        mStarMadeDir = null;
-        String home = System.getProperty("user.dir");
-        lookForStarMadeDir(new File(home));
-        if (mStarMadeDir != null) {
-            saveProps();
-            // (Phase 0) Removed the startup download of jo_sm.jar / JoFileMods.jar
-            // here -- that remote-download bootstrap was dropped; the editor and
-            // its bundled plugins are launched in-tree. See docs/ARCHITECTURE.md.
-            return true;
-        }
-        System.out.println("Scanning home directory");
-        mStarMadeDir = null;
-        home = System.getProperty("user.home");
-        lookForStarMadeDir(new File(home));
-        if (mStarMadeDir != null) {
-            saveProps();
-            return true;
-        }
-        for (;;) {
-            home = JOptionPane.showInputDialog(null, "Enter in the home directory for StarMade", home);
-            if (home == null) {
-                return false;
-            }
-            mStarMadeDir = new File(home);
-            if (isStarMadeDirectory(mStarMadeDir)) {
-                break;
+
+        // 3. A few common install locations (bounded; no recursive scan).
+        for (File candidate : commonInstallLocations()) {
+            if (isStarMadeDirectory(candidate)) {
+                mStarMadeDir = candidate;
+                saveProps();
+                return true;
             }
         }
-        saveProps();
-        return true;
+
+        // 4. Ask the user to point us at it (manual input).
+        File chosen = StarMadeDirChooser.choose(null, mStarMadeDir);
+        if (chosen != null) {
+            mStarMadeDir = chosen;
+            saveProps();
+            return true;
+        }
+        mStarMadeDir = null;
+        return false;
+    }
+
+    /** Well-known StarMade install locations, checked before prompting. */
+    private static List<File> commonInstallLocations() {
+        List<File> list = new ArrayList<>();
+        String userHome = getUnixHome();
+        String os = System.getProperty("os.name", "").toLowerCase();
+        list.add(new File(userHome, "StarMade"));
+        list.add(new File(userHome, "starmade"));
+        if (os.contains("win")) {
+            list.add(new File("C:/Program Files (x86)/Steam/steamapps/common/StarMade"));
+            list.add(new File("C:/Program Files/Steam/steamapps/common/StarMade"));
+            list.add(new File("C:/StarMade"));
+        } else if (os.contains("mac")) {
+            list.add(new File(userHome, "Library/Application Support/Steam/steamapps/common/StarMade"));
+            list.add(new File(userHome, "Library/Application Support/StarMade"));
+        } else {
+            list.add(new File(userHome, ".steam/steam/steamapps/common/StarMade"));
+            list.add(new File(userHome, ".local/share/Steam/steamapps/common/StarMade"));
+            list.add(new File(userHome, ".local/share/StarMade"));
+        }
+        return list;
     }
 
     private static void saveProps() {
@@ -269,25 +252,6 @@ public class Paths {
             }
         } catch (IOException e) {
 
-        }
-    }
-
-    private static void lookForStarMadeDir(File root) {
-        if (isStarMadeDirectory(root)) {
-            mStarMadeDir = root;
-            return;
-        }
-        File[] children = root.listFiles();
-        if (children == null) {
-            return;
-        }
-        for (File child : children) {
-            if (child.isDirectory()) {
-                lookForStarMadeDir(child);
-                if (mStarMadeDir != null) {
-                    return;
-                }
-            }
         }
     }
 

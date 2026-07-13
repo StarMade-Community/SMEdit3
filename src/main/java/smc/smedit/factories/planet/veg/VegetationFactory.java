@@ -18,6 +18,7 @@
 package smc.smedit.factories.planet.veg;
 
 import java.io.File;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
@@ -62,13 +63,19 @@ public class VegetationFactory implements IStarMadePluginFactory {
     }
 
     private void loadDefinitions() {
-        File plugins = new File(Paths.getPluginsDirectory());
-        File viewFilters = new File(plugins, "SurfaceVegetation.xml");
-        Document xml;
-        if (viewFilters.exists()) {
-            xml = XMLUtils.readFile(viewFilters);
+        File file = new File(Paths.getPluginsDirectory(), "SurfaceVegetation.xml");
+        Document xml = null;
+        if (file.exists()) {
+            xml = XMLUtils.readFile(file);
         } else {
-            xml = XMLUtils.readStream(ResourceUtils.loadSystemResourceStream("SurfaceVegetation.xml", VegetationFactory.class));
+            InputStream is = ResourceUtils.loadSystemResourceStream("SurfaceVegetation.xml", VegetationFactory.class);
+            if (is != null) {
+                xml = XMLUtils.readStream(is);
+            }
+        }
+        if (xml == null) {
+            log.log(Level.WARNING, "SurfaceVegetation.xml not found; no vegetation plugins loaded");
+            return;
         }
         loadDefinitions(xml);
     }

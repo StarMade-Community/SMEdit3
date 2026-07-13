@@ -56,31 +56,71 @@ public class DataLogic {
     public static Map<Point3i, Data> readFiles(File dataDir, String prefix, IPluginCallback cb) throws IOException {
         cb.setStatus("Reading " + prefix);
         Map<Point3i, Data> data = new HashMap<>();
-        List<File> files = new ArrayList<>();
-        for (File dataFile : dataDir.listFiles()) {
-            if (dataFile.getName().endsWith(".smd2")
-                    && dataFile.getName().startsWith(prefix)) {
-                files.add(dataFile);
-            }
+        File[] all = dataDir.listFiles();
+        if (all == null) {
+            return data;
         }
-        if (files.isEmpty()) {
-            for (File dataFile : dataDir.listFiles()) {
-                if (dataFile.getName().endsWith(".smd2")) {
-                    if ((dataFile.toString().contains("server-database"))
-                            && !dataFile.getName().startsWith("ENTITY_SHIP_")) {
-                        continue;
-                    }
-                    files.add(dataFile);
+
+        // Prefer the modern .smd3 (32³, serialization v6) format; fall back to
+        // the legacy .smd2 (16³) format for older blueprints.
+        List<File> smd3 = collectDataFiles(all, ".smd3", prefix);
+        if (!smd3.isEmpty()) {
+            cb.startTask(smd3.size());
+            for (File dataFile : smd3) {
+                Point3i position = filePosition(dataFile);
+                log.log(Level.INFO, "Reading .smd3 {0} - {1}", new Object[]{dataFile.getName(), position});
+                try (FileInputStream in = new FileInputStream(dataFile)) {
+                    data.put(position, Smd3Logic.readData(in));
                 }
+                cb.workTask(1);
             }
+            cb.endTask();
+            return data;
         }
-        cb.startTask(files.size());
-        for (File dataFile : files) {
+
+        List<File> smd2 = collectDataFiles(all, ".smd2", prefix);
+        cb.startTask(smd2.size());
+        for (File dataFile : smd2) {
             readDataFromEntityFile(dataFile, data);
             cb.workTask(1);
         }
         cb.endTask();
         return data;
+    }
+
+    /** Collects data files by extension, preferring the blueprint prefix. */
+    private static List<File> collectDataFiles(File[] all, String ext, String prefix) {
+        List<File> matching = new ArrayList<>();
+        for (File f : all) {
+            if (f.getName().endsWith(ext) && f.getName().startsWith(prefix)) {
+                matching.add(f);
+            }
+        }
+        if (matching.isEmpty()) {
+            for (File f : all) {
+                if (f.getName().endsWith(ext)) {
+                    if (f.toString().contains("server-database")
+                            && !f.getName().startsWith("ENTITY_SHIP_")) {
+                        continue;
+                    }
+                    matching.add(f);
+                }
+            }
+        }
+        return matching;
+    }
+
+    /** Parses the {@code .x.y.z.} region index encoded in a data file name. */
+    private static Point3i filePosition(File dataFile) {
+        String[] parts = dataFile.getName().split("\\.");
+        int l = parts.length;
+        try {
+            return new Point3i(Integer.parseInt(parts[l - 4]),
+                    Integer.parseInt(parts[l - 3]),
+                    Integer.parseInt(parts[l - 2]));
+        } catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
+            return new Point3i();
+        }
     }
 
     private static void readDataFromEntityFile(File dataFile,

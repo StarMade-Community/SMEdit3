@@ -2,6 +2,8 @@ SMEdit3
 =======
 version 1.3.67
 
+[![Build](https://github.com/StarMade-Community/SMEdit3/actions/workflows/build.yml/badge.svg)](https://github.com/StarMade-Community/SMEdit3/actions/workflows/build.yml)
+
 A Java-based GUI editor for editing entities (ships, stations, planets) for the game StarMade.
 
 ## Documentation

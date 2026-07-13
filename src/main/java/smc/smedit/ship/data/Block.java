@@ -26,6 +26,9 @@ public final class Block {
 
     private short mBlockID;
     private byte mOrientation;
+    /** -1 = unset; fall back to the block-type default in {@link #getHitPoints()}. */
+    private short mHitPoints = -1;
+    private boolean mActive;
 
     public Block() {
     }
@@ -38,6 +41,8 @@ public final class Block {
     public Block(Block b) {
         mBlockID = b.mBlockID;
         mOrientation = b.mOrientation;
+        mHitPoints = b.mHitPoints;
+        mActive = b.mActive;
     }
 
     public short getBlockID() {
@@ -49,13 +54,17 @@ public final class Block {
     }
 
     public boolean isActive() {
-        return false;
+        return mActive;
     }
 
     public void setActive(boolean active) {
+        mActive = active;
     }
 
     public short getHitPoints() {
+        if (mHitPoints >= 0) {
+            return mHitPoints;
+        }
         if (BlockTypeColors.BLOCK_HITPOINTS.containsKey(mBlockID)) {
             return BlockTypeColors.BLOCK_HITPOINTS.get(mBlockID);
         } else {
@@ -64,6 +73,7 @@ public final class Block {
     }
 
     public void setHitPoints(short hitPoints) {
+        mHitPoints = hitPoints;
     }
 
     public short getOrientation() {

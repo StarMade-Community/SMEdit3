@@ -93,6 +93,11 @@ public class StarMadeLogic {
             log.log(Level.INFO, "LWJGL native path -> {0}", libs.getAbsolutePath());
         }
 
+        // Register the plugins that ship inside SMEdit itself (edit/import/
+        // export/generate tools). Historically only external plugin JARs were
+        // discovered, so none of the built-in tools ever reached the menus.
+        smc.smedit.plugins.BuiltinPlugins.register();
+
         List<String> blocksPlugins = new ArrayList<>();
         List<String> pluginFactories = new ArrayList<>();
         discoverPlugins(baseDir, blocksPlugins, pluginFactories);
@@ -199,9 +204,14 @@ public class StarMadeLogic {
         List<IBlocksPlugin> plugins = new ArrayList<>();
         plugins.addAll(getInstance().getBlocksPlugins());
         for (IStarMadePluginFactory factory : getInstance().getPluginFactories()) {
-            IStarMadePlugin[] plugs = factory.getPlugins();
-            if (plugins != null) {
-            } else {
+            IStarMadePlugin[] plugs;
+            try {   // a factory may scan disk and fail; don't let it break the menus
+                plugs = factory.getPlugins();
+            } catch (Exception e) {
+                log.log(Level.WARNING, "plugin factory getPlugins() failed", e);
+                continue;
+            }
+            if (plugs == null) {
                 continue;
             }
             for (IStarMadePlugin plugin : plugs) {

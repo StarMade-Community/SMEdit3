@@ -183,13 +183,31 @@ and doesn't cover shapes, orientation, or the ~1600 unknown IDs.
 Prioritized. Each is scoped to specific SMEdit files.
 
 **Must-fix to read a current blueprint at all**
-- [ ] Add `.smd3` support: 32³ segments, serializer v6 record framing, per-segment
-      Deflate with int size-prefix. — `DataLogic`, `ShipLogic` (super-chunk stride),
-      `Blueprint`/`Data` model.
-- [ ] Correct the per-block bit layout (HP 11–17, active 18, orientation 19–23,
-      5-bit). — `DataLogic.java:164-169` (read), `:291-294` (write), `Chunk.java`
-      field-layout comments.
-- [ ] Keep reading legacy `.smd2` for backward compatibility (migration path).
+- [x] **Add `.smd3` segment reading** — done: [Smd3Logic](../src/main/java/smc/smedit/ship/logic/Smd3Logic.java)
+      parses the v6 container (16388-byte header, 4096-slot index, 49152-byte
+      sectors, per-segment Deflate) into [Smd3Segment](../src/main/java/smc/smedit/ship/data/Smd3Segment.java)
+      (32³ blocks). Verified by `Smd3LogicTest` against a synthetic file (exact
+      values) **and** the real Isanth fixture (2 segments, sane ids/orientations).
+- [x] **Correct per-block bit layout** (type 0–10, hp 11–17, active 18,
+      orientation 19–23) — done in `Smd3Logic`; `Block` now stores hp/active
+      (was discarding them). The legacy `.smd2` path in `DataLogic` keeps its own
+      (older) layout.
+- [x] **Wire `.smd3` into the blueprint load path** — done: `DataLogic.readFiles`
+      prefers `.smd3` (`Smd3Logic.readData` → `Data`, splitting each 32³ segment
+      into 8× 16³ chunks at absolute coords → `ShipLogic.getBlocks`). The model
+      keys blocks by absolute position (16-bit packed, negatives OK), so no
+      coordinate-origin surgery was needed. `readBlueprint` now reads
+      header/logic/meta **best-effort** (they're unused by the load path and
+      advanced to v5), so newer metadata can't block opening the blocks.
+      Verified end-to-end by `BlueprintLoadTest` against the real Isanth dir.
+- [x] **`.smd3` writing** — done: `Smd3Logic.writeFiles`/`writeRegionFile` emit
+      the v6 container (index table, 49152-byte sectors, per-segment deflate,
+      region grouping by StarMade's slot/region math). `saveBlueprint` now writes
+      `.smd3` DATA. Verified by in-memory and multi-region write→read round-trip
+      tests. **Caveat:** header/logic/meta are still written in the legacy format,
+      so SMEdit reopens its own saves but StarMade needs v5 header/meta (below).
+- [x] Keep reading legacy `.smd2` for backward compatibility — `DataLogic` still
+      reads `.smd2` when no `.smd3` is present.
 
 **Must-fix to render/edit correctly**
 - [ ] Read `BlockStyle` from `BlockConfig.xml` and treat shape as a property; stop
@@ -204,15 +222,20 @@ Prioritized. Each is scoped to specific SMEdit files.
 **Must-fix to avoid data loss**
 - [ ] Stop downgrading meta on save (`MetaLogic.make` `unknown2=1`); round-trip
       docks + the tag tree, or at minimum preserve unread bytes verbatim.
-- [ ] Persist real per-block hit points/active instead of the lookup default.
+- [x] Persist real per-block hit points/active instead of the lookup default —
+      done: `Block` now stores hp/active (falling back to the type default only
+      when unset).
 - [ ] Read/preserve `modmappings.smbmm` so mod blocks survive a round-trip.
 
 **Should-fix**
 - [ ] Model rail docking (metaVersion 5) instead of docking beams.
 - [ ] Update importer/exporter block mappings (`schematic_map.xml`,
       `color_map.xml`) against current IDs.
-- [ ] Add round-trip format tests using the current default blueprints (Isanth)
-      as fixtures — this is the safety net for all of the above.
+- [x] Format tests — `Smd3LogicTest` covers `.smd3` read (synthetic exact-value
+      + real Isanth), the 32³→model mapping, and read/write round-trips
+      (in-memory + multi-region files); `BlueprintLoadTest` opens the real Isanth
+      blueprint directory end-to-end. JUnit 5 harness (`src/test/java`,
+      `./gradlew test`).
 
 **Verification fixtures available in the StarMade tree**
 - `blueprints-default/Isanth Type-PNR-25-{B,C,M}/` — full modern ships with
