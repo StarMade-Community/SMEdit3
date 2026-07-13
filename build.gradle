@@ -3,7 +3,7 @@ plugins {
     id 'application'
 }
 
-group = 'jo.sm'
+group = 'smc.smedit'
 version = '3.0.0'
 
 repositories {
@@ -12,7 +12,7 @@ repositories {
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
@@ -20,21 +20,27 @@ tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
 }
 
+// LWJGL 2.9.3 — the same version StarMade ships (previously SMEdit vendored the
+// older 2.9.1). Only the pure-Java jars are pulled from Maven; the *native*
+// libraries are loaded at runtime from the StarMade install's native/<os>
+// folder (see smc.smedit.logic.StarMadeLogic#setBaseDir). StarMade rebuilds its
+// LWJGL natives for Java 9+, whereas the stock LWJGL 2.x natives on Maven still
+// link the removed libjawt `SUNWprivate_1.1` symbol and fail to load on the
+// Java 21 toolchain -- so we deliberately do NOT depend on lwjgl-platform here.
+def lwjglVersion = '2.9.3'
+
 dependencies {
-    // TODO: Migrate to LWJGL 3.x from Maven Central (HIGH PRIORITY)
-    // StarMade game now uses LWJGL 3, so this editor should match
-    // See MODERNIZATION_PLAN.md Task 3 for detailed migration guide
-    // Current workaround: Using LWJGL 2.9.1 file dependencies for compatibility
-    implementation fileTree(dir: 'jo_sm/lwjgl-2.9.1/jar', include: ['lwjgl.jar', 'lwjgl_util.jar'])
+    implementation "org.lwjgl.lwjgl:lwjgl:${lwjglVersion}"
+    implementation "org.lwjgl.lwjgl:lwjgl_util:${lwjglVersion}"
 }
 
 application {
-    mainClass = 'jo.sm.edit.SMEdit'
+    mainClass = 'smc.smedit.SMEdit'
 }
 
 jar {
     archiveBaseName = 'SMEdit'
     manifest {
-        attributes 'Main-Class': 'jo.sm.edit.SMEdit'
+        attributes 'Main-Class': 'smc.smedit.SMEdit'
     }
 }

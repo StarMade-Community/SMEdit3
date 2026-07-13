@@ -4,17 +4,24 @@ version 1.3.67
 
 A Java-based GUI editor for editing entities (ships, stations, planets) for the game StarMade.
 
+## Documentation
+
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — current project structure, subsystem map, code-health issues, and the prioritized modernization roadmap.
+- **[docs/STARMADE_COMPATIBILITY.md](docs/STARMADE_COMPATIBILITY.md)** — how SMEdit's frozen (~2014) format understanding has drifted from current StarMade (`.smd3`/32³ segments, per-block bit layout, `BlockStyle` shapes, data-driven block config) and a remediation checklist.
+
+These supersede the older inline plan below (the deleted `MODERNIZATION_PLAN.md`).
+
 ## Recent Updates
 
 ### ✅ Modernization (December 2025)
 - **Build System**: Migrated from Apache Ant to Gradle
-- **Java Version**: Upgraded from Java 7 to Java 25
+- **Java Version**: Upgraded from Java 7 to Java 21
 - **Project Structure**: Consolidated to standard Gradle structure with single module
 - **Gradle Wrapper**: Added for consistent builds across environments
 
 ## Requirements
 
-- **Java 25** or higher
+- **Java 21** or higher
 - 4GB RAM recommended
 
 ## Building
@@ -61,29 +68,32 @@ SMEdit3/
 
 ## Modernization Plan
 
-We are actively modernizing this codebase. See [MODERNIZATION_PLAN.md](MODERNIZATION_PLAN.md) for the complete modernization strategy.
-
 ### Completed
 - ✅ Gradle build system
-- ✅ Java 25 upgrade
+- ✅ Java 21 upgrade
 - ✅ Consolidated to standard Gradle structure (single module)
 
 ### In Progress / Planned
-- 🔴 Migrate to LWJGL 3.x (HIGH - StarMade now uses LWJGL 3)
-- 🔴 Add comprehensive test coverage (HIGH)
-- 🔴 Setup CI/CD pipeline (HIGH)
+- 🟡 Consolidate library folders and move to gradle lib definitions where possible
+- 🟡 Add comprehensive test coverage
+- 🟡 Setup CI/CD pipeline
 - 🟡 Code modernization (use modern Java features)
 - 🟡 Improve documentation
-- 🟡 Further refactoring and code quality improvements
-
-Issue templates are available in [.github/ISSUE_TEMPLATES/modernization_issues.md](.github/ISSUE_TEMPLATES/modernization_issues.md)
+- 🟡 Further refactoring and code quality improvements 
+- 🟡 UI style modernization (FlatLaf?)
+- 🟡 Improved model importing
+- 🟡 Improved 3d camera controls, and the ability to switch to a 2d mode for different axes
+- 🟡 Ability to view/edit/export cross-sections
+- 🟡 Modernize UI assets
+- 🟡 Ability to create and set different panel layout presets / workspaces and fast switching between them
+- 🟡 Rework / modernize / simplify plugin system
+- 🟡 Lua or python scripting?
 
 ## Contributing
 
 We welcome contributions! The modernization effort provides many opportunities to help:
 - Migrate code to use modern Java features
 - Add tests for existing functionality
-- Update LWJGL 2 code to LWJGL 3
 - Improve documentation
 
 ## History
