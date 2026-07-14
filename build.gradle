@@ -20,19 +20,6 @@ tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
 }
 
-// Several plugins and factories keep their data files (block/material/vegetation
-// definitions, mesh templates) next to their sources under src/main/java. Ship
-// them as classpath resources so they resolve at runtime via
-// ResourceUtils.loadSystemResourceStream (package-relative lookups).
-sourceSets {
-    main {
-        resources {
-            srcDir 'src/main/java'
-            include '**/*.xml', '**/*.dae'
-        }
-    }
-}
-
 // LWJGL 2.9.3 — the same version StarMade ships (previously SMEdit vendored the
 // older 2.9.1). Only the pure-Java jars are pulled from Maven; the *native*
 // libraries are loaded at runtime from the StarMade install's native/<os>

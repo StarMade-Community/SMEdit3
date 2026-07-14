@@ -1,0 +1,6 @@
+# java.util.ServiceLoader providers: built-in plugin factories (data-driven plugin sets).
+# Discovered by smc.smedit.plugins.BuiltinPlugins. Add a class here to register a new one.
+smc.smedit.factories.all.macro.MacroFactory
+smc.smedit.factories.planet.comp.MaterialFactory
+smc.smedit.factories.planet.veg.VegetationFactory
+smc.smedit.factories.ship.filter.ViewFilterFactory
