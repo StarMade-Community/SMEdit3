@@ -1,5 +1,5 @@
 /**
- * Copyright 2014 
+ * Copyright 2014
  * SMEdit https://github.com/StarMade/SMEdit
  * SMTools https://github.com/StarMade/SMTools
  *
@@ -21,65 +21,51 @@ import java.awt.Component;
 import java.awt.KeyEventDispatcher;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
 import javax.swing.JFrame;
+import javax.swing.Timer;
 
-import smc.smedit.data.SparseMatrix;
-import smc.smedit.logic.GridLogic;
-import smc.smedit.logic.StarMadeLogic;
-import smc.smedit.ship.data.Block;
 import smc.smedit.vecmath.Point3f;
-import smc.smedit.vecmath.Point3i;
-import smc.smedit.vecmath.logic.Point3iLogic;
+import smc.smedit.vecmath.logic.TransformEye;
 
+/**
+ * Fly-style keyboard camera controls for the OpenGL viewport.
+ *
+ * <p>Keys are <em>held</em>: a key press adds it to {@link #mPressed} and a
+ * timer applies movement every tick until it is released, so holding a key
+ * moves continuously (the LWJGL-&gt;AWT bridge only sends one press/one release,
+ * never auto-repeats). W/S/A/D move relative to the view; E/Q move along world
+ * vertical (so "up" is always up, whatever angle you've orbited to). Hold Shift
+ * to move faster.
+ */
 public class LWJGLKeyEventDispatcher implements KeyEventDispatcher, KeyListener {
 
-    private static final int PAN_XM = 'D';
-    private static final int PAN_XP = 'A';
-    private static final int PAN_YM = 'W';
-    private static final int PAN_YP = 'S';
-    private static final int PAN_ZM = 'Q';
-    private static final int PAN_ZP = 'E';
+    private static final int MOVE_FORWARD = 'W';
+    private static final int MOVE_BACK = 'S';
+    private static final int MOVE_LEFT = 'A';
+    private static final int MOVE_RIGHT = 'D';
+    private static final int MOVE_UP = 'E';
+    private static final int MOVE_DOWN = 'Q';
 
-    private static final int ROT_YM = 'J';
-    private static final int ROT_YP = 'L';
-    private static final int ROT_PM = 'I';
-    private static final int ROT_PP = 'K';
-    private static final int ROT_RM = 'U';
-    private static final int ROT_RP = 'O';
+    private static final Set<Integer> MOVE_KEYS = Set.of(
+            MOVE_FORWARD, MOVE_BACK, MOVE_LEFT, MOVE_RIGHT, MOVE_UP, MOVE_DOWN);
 
-    private static final int SELECTION_MOVE = 0;
-    private static final int SELECTION_MOVE_UPPER = 0x40;
-    private static final int SELECTION_MOVE_LOWER = 0x80;
-    private static final int SELECTION_NUDGE = 0x200;
-
-    private static final Set<Integer> PAN_KEYS = new HashSet<>();
-
-    static {
-        PAN_KEYS.add(PAN_XM);
-        PAN_KEYS.add(PAN_XP);
-        PAN_KEYS.add(PAN_YM);
-        PAN_KEYS.add(PAN_YP);
-        PAN_KEYS.add(PAN_ZM);
-        PAN_KEYS.add(PAN_ZP);
-    }
-    private static final Set<Integer> ROT_KEYS = new HashSet<>();
-
-    static {
-        ROT_KEYS.add(ROT_YM);
-        ROT_KEYS.add(ROT_YP);
-        ROT_KEYS.add(ROT_PM);
-        ROT_KEYS.add(ROT_PP);
-        ROT_KEYS.add(ROT_RM);
-        ROT_KEYS.add(ROT_RP);
-    }
+    /** World units per tick (~60 ticks/sec); Shift multiplies this. */
+    private static final float STEP = 0.4f;
+    private static final float FAST_MULTIPLIER = 4f;
 
     private final LWJGLRenderPanel mPanel;
+    private final Set<Integer> mPressed = Collections.synchronizedSet(new HashSet<>());
+    private final Timer mMoveTimer;
+    private volatile boolean mShiftDown;
 
     public LWJGLKeyEventDispatcher(LWJGLRenderPanel panel) {
         mPanel = panel;
+        mMoveTimer = new Timer(16, e -> tick());
+        mMoveTimer.setCoalesce(true);
     }
 
     @Override
@@ -88,166 +74,81 @@ public class LWJGLKeyEventDispatcher implements KeyEventDispatcher, KeyListener 
             return false;
         }
         if (ev.getID() == KeyEvent.KEY_PRESSED) {
-            doKeyDown(ev.getKeyCode(), ev.getModifiersEx());
+            keyPressed(ev);
         } else if (ev.getID() == KeyEvent.KEY_RELEASED) {
-            doKeyUp(ev.getKeyCode(), ev.getModifiersEx());
-        }
-        return false;
-    }
-
-    public void doKeyDown(int keyCode, int keyMod) {
-        if (PAN_KEYS.contains(keyCode)) {
-            doPan(keyCode, keyMod);
-        } else if (ROT_KEYS.contains(keyCode)) {
-            doRot(keyCode, keyMod);
-        }
-        /*
-         //System.out.println("code="+Integer.toHexString(keyCode)+", mod="+Integer.toHexString(keyMod));
-         Point3i lower = StarMadeLogic.getInstance().getSelectedLower();
-         Point3i upper = StarMadeLogic.getInstance().getSelectedUpper();
-         if ((lower != null) && (upper != null))
-         {
-         normalize(lower, upper);
-         if (keyMod == SELECTION_MOVE_UPPER)
-         doMoveUpperSelection(keyCode, upper);
-         else if (keyMod == SELECTION_MOVE_LOWER)
-         doMoveLowerSelection(keyCode, lower);
-         else if (keyMod == SELECTION_MOVE)
-         doMoveSelection(keyCode, lower, upper);
-         else if (keyMod == SELECTION_NUDGE)
-         doNudgeSelection(keyCode, lower, upper);
-         mPanel.updateTiles();
-         }
-         else
-         {
-         doPan(keyCode, keyMod);
-         }
-         */
-    }
-
-    private void normalize(Point3i lower, Point3i upper) {
-        Point3i l = Point3iLogic.min(lower, upper);
-        Point3i u = Point3iLogic.max(lower, upper);
-        lower.set(l);
-        upper.set(u);
-    }
-
-    private void doPan(int keyCode, int keyMod) {
-        if (keyMod == 0) {
-            Point3i delta = keyToDelta(keyCode, null);
-            if (delta != null) {
-                mPanel.moveCamera(delta);
-            }
-        }
-        if (keyMod == KeyEvent.VK_SHIFT) {
-            Point3i delta = keyToDelta(keyCode, null);
-            if (delta != null) {
-                mPanel.setLookAt(new Point3f(delta));
-            }
-        }
-    }
-
-    private void doRot(int keyCode, int keyMod) {
-        if (keyMod == 0) {
-            Point3i delta = keyToRot(keyCode, null);
-            if (delta != null) {
-                mPanel.rotateCamera(delta);
-            }
-        }
-    }
-
-    private void doMoveUpperSelection(int keyCode, Point3i upper) {
-        keyToDelta(keyCode, upper);
-    }
-
-    private void doMoveLowerSelection(int keyCode, Point3i lower) {
-        keyToDelta(keyCode, lower);
-    }
-
-    private void doMoveSelection(int keyCode, Point3i lower, Point3i upper) {
-        keyToDelta(keyCode, lower);
-        keyToDelta(keyCode, upper);
-    }
-
-    private void doNudgeSelection(int keyCode, Point3i lower, Point3i upper) {
-        mPanel.getUndoer().checkpoint(StarMadeLogic.getModel());
-        SparseMatrix<Block> clip = GridLogic.extract(StarMadeLogic.getModel(), lower, upper);
-        GridLogic.delete(StarMadeLogic.getModel(), lower, upper);
-        keyToDelta(keyCode, lower);
-        keyToDelta(keyCode, upper);
-        GridLogic.insert(StarMadeLogic.getModel(), clip, lower);
-    }
-
-    private Point3i keyToDelta(int keyCode, Point3i delta) {
-        if (delta == null) {
-            delta = new Point3i();
-        }
-        if (keyCode == PAN_XP) {
-            delta.x++;
-        } else if (keyCode == PAN_XM) {
-            delta.x--;
-        } else if (keyCode == PAN_YP) {
-            delta.y++;
-        } else if (keyCode == PAN_YM) {
-            delta.y--;
-        } else if (keyCode == PAN_ZP) {
-            delta.z++;
-        } else if (keyCode == PAN_ZM) {
-            delta.z--;
-        } else {
-            return null;
-        }
-        return delta;
-    }
-
-    private Point3i keyToRot(int keyCode, Point3i delta) {
-        if (delta == null) {
-            delta = new Point3i();
-        }
-        if (keyCode == ROT_YP) {
-            delta.x++;
-        } else if (keyCode == ROT_YM) {
-            delta.x--;
-        } else if (keyCode == ROT_PP) {
-            delta.y++;
-        } else if (keyCode == ROT_PM) {
-            delta.y--;
-        } else if (keyCode == ROT_RP) {
-            delta.z++;
-        } else if (keyCode == ROT_RM) {
-            delta.z--;
-        } else {
-            return null;
-        }
-        return delta;
-    }
-
-    public void doKeyUp(int keyCode, int keyMod) {
-
-    }
-
-    private boolean isFocused() {
-        for (Component c = mPanel; c != null; c = c.getParent()) {
-            if (c instanceof JFrame) {
-                if (((JFrame) c).isActive()) {
-                    return true;
-                }
-            }
+            keyReleased(ev);
         }
         return false;
     }
 
     @Override
     public void keyPressed(KeyEvent e) {
-        doKeyDown(e.getKeyCode(), e.getModifiers());
+        mShiftDown = e.isShiftDown();
+        int code = e.getKeyCode();
+        if (MOVE_KEYS.contains(code)) {
+            mPressed.add(code);
+            if (!mMoveTimer.isRunning()) {
+                mMoveTimer.start();
+            }
+        }
     }
 
     @Override
     public void keyReleased(KeyEvent e) {
-        doKeyUp(e.getKeyCode(), e.getModifiers());
+        mShiftDown = e.isShiftDown();
+        mPressed.remove(e.getKeyCode());
+        if (mPressed.isEmpty()) {
+            mMoveTimer.stop();
+        }
     }
 
     @Override
     public void keyTyped(KeyEvent e) {
+    }
+
+    /** Applies one frame of movement for all currently-held keys (runs on the EDT). */
+    private void tick() {
+        if (mPressed.isEmpty() || !isFocused()) {
+            mPressed.clear();
+            mMoveTimer.stop();
+            return;
+        }
+        float step = STEP * (mShiftDown ? FAST_MULTIPLIER : 1f);
+        TransformEye cam = mPanel.mUniverse.getCamera();
+
+        // View-relative forward/back and strafe.
+        if (mPressed.contains(MOVE_FORWARD)) {
+            cam.moveForward(step);
+        }
+        if (mPressed.contains(MOVE_BACK)) {
+            cam.moveForward(-step);
+        }
+        if (mPressed.contains(MOVE_RIGHT)) {
+            cam.moveRight(step);
+        }
+        if (mPressed.contains(MOVE_LEFT)) {
+            cam.moveRight(-step);
+        }
+        // World-vertical up/down (independent of where the camera is pointing).
+        if (mPressed.contains(MOVE_UP) || mPressed.contains(MOVE_DOWN)) {
+            Point3f loc = cam.getLocation();
+            if (mPressed.contains(MOVE_UP)) {
+                loc.y += step;
+            }
+            if (mPressed.contains(MOVE_DOWN)) {
+                loc.y -= step;
+            }
+            cam.setLocation(loc);
+        }
+        mPanel.updateTransform();
+    }
+
+    private boolean isFocused() {
+        for (Component c = mPanel; c != null; c = c.getParent()) {
+            if (c instanceof JFrame) {
+                return ((JFrame) c).isActive();
+            }
+        }
+        return false;
     }
 }

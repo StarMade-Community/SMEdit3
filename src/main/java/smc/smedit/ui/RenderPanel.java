@@ -30,6 +30,14 @@ public abstract class RenderPanel extends JPanel {
 
     public abstract void updateTiles();
 
+    /** Resets the camera to a default 3/4 view looking down on the ship from the top-left. */
+    public abstract void resetCamera();
+
+    /** Toggles orthographic (vs. perspective) projection. */
+    public abstract void setOrthographic(boolean orthographic);
+
+    public abstract boolean isOrthographic();
+
     public abstract RenderPoly getTileAt(double x, double y);
 
     public abstract Block getBlockAt(double x, double y);

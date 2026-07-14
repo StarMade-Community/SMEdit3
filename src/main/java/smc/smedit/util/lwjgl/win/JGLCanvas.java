@@ -47,7 +47,10 @@ public class JGLCanvas extends Canvas {
     private int mWidth;
     private int mHeight;
 
+    private static final java.util.logging.Logger log = java.util.logging.Logger.getLogger(JGLCanvas.class.getName());
     private boolean mCloseRequested = false;
+    /** Set when the canvas is reparented (e.g. a dock panel closed) so the render loop rebuilds the Display. */
+    private volatile boolean mNeedsReinit = false;
     private AtomicReference<Dimension> mNewCanvasSize;
 
     private boolean[] mMouseState;
@@ -67,6 +70,15 @@ public class JGLCanvas extends Canvas {
             @Override
             public void componentResized(ComponentEvent e) {
                 mNewCanvasSize.set(getSize());
+            }
+        });
+        // When the docking framework reparents this heavyweight canvas (e.g. the
+        // user closes the Console panel and the split collapses), the native peer
+        // is recreated and the LWJGL Display bound to the old one dies. Flag it so
+        // the render loop tears the Display down and rebuilds it on the new peer.
+        addHierarchyListener(e -> {
+            if ((e.getChangeFlags() & java.awt.event.HierarchyEvent.PARENT_CHANGED) != 0) {
+                mNeedsReinit = true;
             }
         });
     }
@@ -196,58 +208,82 @@ public class JGLCanvas extends Canvas {
     }
 
     private void doRenderLoop() {
-        try {
-            // Wait until the canvas is realized AND has a real size. Creating the
-            // LWJGL Display against a 0x0 canvas fails with an X CreateWindow
-            // BadValue — which happens with a docking layout that sizes the
-            // heavyweight canvas a frame later than a plain BorderLayout did.
-            while (!isDisplayable() || getWidth() <= 0 || getHeight() <= 0) {
-                Thread.sleep(50);
-            }
-            Display.setParent(this);
-            Display.setVSyncEnabled(true);
-            Display.create();
-            mMouseState = new boolean[Mouse.getButtonCount()];
-            for (int i = 0; i < mMouseState.length; i++) {
-                mMouseState[i] = Mouse.isButtonDown(i);
-            }
-
-            //GL11.glsetSwapInterval(1);
-            GL11.glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-            //gl11.glColor3f(1.0f, 0.0f, 0.0f);
-            GL11.glHint(GL11.GL_PERSPECTIVE_CORRECTION_HINT, GL11.GL_NICEST);
-            GL11.glClearDepth(1.0);
-            GL11.glLineWidth(2);
-            GL11.glEnable(GL11.GL_DEPTH_TEST);
-            if (mScene.getAmbientLight() != null) {
-                GL11.glEnable(GL11.GL_LIGHTING);
-                GL11.glLightModel(GL11.GL_LIGHT_MODEL_AMBIENT, Color4fLogic.toFloatBuffer(mScene.getAmbientLight()));
-            }
-            if (mScene.getColorMaterialFace() != JGLColorMaterialFace.UNSET) {
-                initMaterial();
-            }
-            if (mScene.getFogMode() != JGLFogMode.UNSET) {
-                initFog();
-            }
-
-            Dimension newDim;
-
-            while (!Display.isCloseRequested() && !mCloseRequested) {
-                newDim = mNewCanvasSize.getAndSet(null);
-                if (newDim != null) {
-                    GL11.glViewport(0, 0, newDim.width, newDim.height);
-                    syncViewportSize();
+        // Outer loop: rebuild the Display whenever it is lost (the canvas being
+        // reparented by the docking framework recreates the native peer).
+        while (!mCloseRequested) {
+            try {
+                // Wait until the canvas is realized AND has a real size. Creating
+                // the LWJGL Display against a 0x0 canvas fails with an X
+                // CreateWindow BadValue — which happens with a docking layout that
+                // sizes the heavyweight canvas a frame later than a plain
+                // BorderLayout did.
+                while (!mCloseRequested && (!isDisplayable() || getWidth() <= 0 || getHeight() <= 0)) {
+                    Thread.sleep(50);
                 }
-                doRender();
-                doMouse();
-                doKeys();
-                doEye();
-                Display.update();
-            }
+                if (mCloseRequested) {
+                    break;
+                }
+                mNeedsReinit = false;
+                Display.setParent(this);
+                Display.setVSyncEnabled(true);
+                Display.create();
+                mMouseState = new boolean[Mouse.getButtonCount()];
+                for (int i = 0; i < mMouseState.length; i++) {
+                    mMouseState[i] = Mouse.isButtonDown(i);
+                }
 
-            Display.destroy();
-        } catch (InterruptedException | LWJGLException e) {
-            e.printStackTrace();
+                GL11.glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+                GL11.glHint(GL11.GL_PERSPECTIVE_CORRECTION_HINT, GL11.GL_NICEST);
+                GL11.glClearDepth(1.0);
+                GL11.glLineWidth(2);
+                GL11.glEnable(GL11.GL_DEPTH_TEST);
+                if (mScene.getAmbientLight() != null) {
+                    GL11.glEnable(GL11.GL_LIGHTING);
+                    GL11.glLightModel(GL11.GL_LIGHT_MODEL_AMBIENT, Color4fLogic.toFloatBuffer(mScene.getAmbientLight()));
+                }
+                if (mScene.getColorMaterialFace() != JGLColorMaterialFace.UNSET) {
+                    initMaterial();
+                }
+                if (mScene.getFogMode() != JGLFogMode.UNSET) {
+                    initFog();
+                }
+
+                Dimension newDim;
+                // Inner loop: render until close, or until a reparent asks us to
+                // rebuild the Display against the new native peer.
+                while (!Display.isCloseRequested() && !mCloseRequested && !mNeedsReinit) {
+                    newDim = mNewCanvasSize.getAndSet(null);
+                    if (newDim != null) {
+                        GL11.glViewport(0, 0, newDim.width, newDim.height);
+                        syncViewportSize();
+                    }
+                    doRender();
+                    doMouse();
+                    doKeys();
+                    doEye();
+                    Display.update();
+                }
+            } catch (InterruptedException e) {
+                return;
+            } catch (LWJGLException | RuntimeException e) {
+                log.log(java.util.logging.Level.WARNING, "Render loop error; rebuilding the GL display.", e);
+            } finally {
+                if (Display.isCreated()) {
+                    try {
+                        Display.destroy();
+                    } catch (Throwable ignored) {
+                        // best-effort teardown
+                    }
+                }
+            }
+            // Brief pause before rebuilding so a burst of reparent events settles.
+            if (!mCloseRequested) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    return;
+                }
+            }
         }
     }
 
@@ -378,7 +414,9 @@ public class JGLCanvas extends Canvas {
             int y = Mouse.getEventY();
             int modifiers = 0;
             if (button >= 0) {
-                int jButton = (button == 0) ? MouseEvent.BUTTON1 : (button == 1) ? MouseEvent.BUTTON2 : MouseEvent.BUTTON3;
+                // LWJGL mouse buttons: 0=left, 1=right, 2=middle -> AWT
+                // BUTTON1=left, BUTTON3=right, BUTTON2=middle.
+                int jButton = (button == 0) ? MouseEvent.BUTTON1 : (button == 1) ? MouseEvent.BUTTON3 : MouseEvent.BUTTON2;
                 if (mMouseState[button] != buttonState) {
                     //System.out.println("Button="+button+", state="+buttonState+", x="+x+", y="+y);
                     if (buttonState) {
@@ -391,16 +429,16 @@ public class JGLCanvas extends Canvas {
                     mMouseState[button] = buttonState;
                 }
             }
-            if ((dX > 0) || (dY > 0)) {
+            if ((dX != 0) || (dY != 0)) {
                 int jButton = 0;
                 if (mMouseState[0]) {
                     jButton |= MouseEvent.BUTTON1;
                 }
                 if (mMouseState[1]) {
-                    jButton |= MouseEvent.BUTTON2;
+                    jButton |= MouseEvent.BUTTON3;
                 }
                 if (mMouseState[2]) {
-                    jButton |= MouseEvent.BUTTON3;
+                    jButton |= MouseEvent.BUTTON2;
                 }
                 if (jButton != 0) {
                     MouseEvent event = new MouseEvent(this, MouseEvent.MOUSE_DRAGGED, nanoseconds, modifiers, x, y, 1, false, jButton);

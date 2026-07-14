@@ -27,14 +27,20 @@ import smc.smedit.logic.RenderPolyLogic;
 import smc.smedit.logic.StarMadeLogic;
 import smc.smedit.vecmath.Point3f;
 import smc.smedit.vecmath.Point3i;
+import smc.smedit.vecmath.logic.TransformEye;
 
 public class LWJGLMouseAdapter extends MouseAdapter {
 
     public static final float PIXEL_TO_RADIANS = (1f / 3.14159f / 16f);
+    /** Radians per pixel when orbiting (left-drag). */
+    private static final float ORBIT_SPEED = 0.01f;
+    /** World units per pixel when panning (right/middle-drag). */
+    private static final float PAN_SPEED = 0.05f;
 
     private static final int MOUSE_MODE_NULL = 0;
-    private static final int MOUSE_MODE_PIVOT = 1;
+    private static final int MOUSE_MODE_PIVOT = 1; // orbit around the ship centre
     private static final int MOUSE_MODE_SELECT = 2;
+    private static final int MOUSE_MODE_PAN = 3;
 
     private final LWJGLRenderPanel mPanel;
 
@@ -48,16 +54,12 @@ public class LWJGLMouseAdapter extends MouseAdapter {
 
     @Override
     public void mousePressed(MouseEvent ev) {
-        if (ev.getButton() == MouseEvent.BUTTON1) {
-            doMouseDown(ev.getPoint(), ev.getModifiers());
-        }
+        doMouseDown(ev.getPoint(), ev.getModifiers(), ev.getButton());
     }
 
     @Override
     public void mouseReleased(MouseEvent ev) {
-        if (ev.getButton() == MouseEvent.BUTTON1) {
-            doMouseUp(ev.getPoint(), ev.getModifiers());
-        }
+        doMouseUp(ev.getPoint(), ev.getModifiers());
     }
 
     @Override
@@ -72,48 +74,40 @@ public class LWJGLMouseAdapter extends MouseAdapter {
         doMouseWheel(e.getWheelRotation());
     }
 
-    private void doMouseDown(Point p, int modifiers) {
+    private void doMouseDown(Point p, int modifiers, int button) {
         mMouseDownAt = p;
-        //System.out.println("MouseMod="+Integer.toHexString(modifiers));
-        if ((modifiers & MouseEvent.SHIFT_MASK) != 0) {
-            RenderPoly tile = mPanel.getTileAt(p.x, p.y);
-            if (tile == null) {
-                return;
-            }
-            mMouseMode = MOUSE_MODE_SELECT;
-            StarMadeLogic.getInstance().setSelectedLower(null);
-            StarMadeLogic.getInstance().setSelectedUpper(null);
-            extendSelection(tile);
-        } else {
+        if (button == MouseEvent.BUTTON3) {
+            // Right-drag orbits around the ship centre.
             mMouseMode = MOUSE_MODE_PIVOT;
-//            Point3i pivot = getPointAt(p.x, p.y);
-//            if (pivot != null)
-//                mMousePivotAround = new Point3f(pivot.x, pivot.y, pivot.z);
-//            else
-            mMousePivotAround = null;
+        } else if (button == MouseEvent.BUTTON2) {
+            // Middle-drag pans the view.
+            mMouseMode = MOUSE_MODE_PAN;
+        } else {
+            // Left button is reserved for selection (added later).
+            mMouseMode = MOUSE_MODE_NULL;
         }
     }
 
     private void doMouseMove(Point p, int modifiers) {
+        int dx = p.x - mMouseDownAt.x;
+        int dy = p.y - mMouseDownAt.y;
         if (mMouseMode == MOUSE_MODE_PIVOT) {
-            int dx = p.x - mMouseDownAt.x;
-            int dy = p.y - mMouseDownAt.y;
             mMouseDownAt = p;
             if ((dx != 0) || (dy != 0)) {
-                if (mMousePivotAround == null) {
-                    //System.out.println("Pivot around ourselves");
-                    if (dx != 0) {
-                        mPanel.mUniverse.getCamera().yaw(dx * PIXEL_TO_RADIANS);
-                    }
-                    if (dy != 0) {
-                        mPanel.mUniverse.getCamera().pitch(dy * PIXEL_TO_RADIANS);
-                    }
-                } else {
-                    Point3f rot = new Point3f(dx * PIXEL_TO_RADIANS, dy * PIXEL_TO_RADIANS, 0);
-                    System.out.println("Pivot around " + mMousePivotAround + ", location=" + mPanel.mUniverse.getCamera().getLocation() + " by " + rot);
-                    mPanel.mUniverse.getCamera().rotateAround(mMousePivotAround, rot);
-                    System.out.println("After pivot=\n" + mPanel.mUniverse.getCamera());
-                }
+                // Turntable orbit: move the camera around the ship centre, then
+                // re-level it with lookAt so the horizon stays flat (a plain
+                // rotateAround accumulates roll and the view drifts sideways).
+                TransformEye cam = mPanel.mUniverse.getCamera();
+                cam.rotateAround(mPanel.mOrbitCenter,
+                        new Point3f(dx * ORBIT_SPEED, dy * ORBIT_SPEED, 0));
+                cam.lookAt(cam.getLocation(), mPanel.mOrbitCenter);
+                mPanel.updateTransform();
+            }
+        } else if (mMouseMode == MOUSE_MODE_PAN) {
+            mMouseDownAt = p;
+            if ((dx != 0) || (dy != 0)) {
+                mPanel.mUniverse.getCamera().moveRight(-dx * PAN_SPEED);
+                mPanel.mUniverse.getCamera().moveUp(dy * PAN_SPEED);
                 mPanel.updateTransform();
             }
         } else if (mMouseMode == MOUSE_MODE_SELECT) {
@@ -138,7 +132,14 @@ public class LWJGLMouseAdapter extends MouseAdapter {
         if (roll == 0) {
             return;
         }
-        mPanel.mUniverse.getCamera().moveForward(-roll * 1.0f);
+        // Zoom proportionally to the distance from the ship, so it feels the same
+        // whether zoomed out or in close.
+        Point3f loc = mPanel.mUniverse.getCamera().getLocation();
+        Point3f c = mPanel.mOrbitCenter;
+        float dist = (float) Math.sqrt((loc.x - c.x) * (loc.x - c.x)
+                + (loc.y - c.y) * (loc.y - c.y) + (loc.z - c.z) * (loc.z - c.z));
+        float step = Math.max(1f, dist * 0.15f);
+        mPanel.mUniverse.getCamera().moveForward(-roll * step);
         mPanel.updateTransform();
     }
 

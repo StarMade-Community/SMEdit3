@@ -82,6 +82,26 @@ public class JGLScene {
         mBetweenRenderers.remove(r);
     }
 
+    private boolean mOrthographic;
+    private float mOrthoHalfHeight = 1f;
+
+    public boolean isOrthographic() {
+        return mOrthographic;
+    }
+
+    public void setOrthographic(boolean orthographic) {
+        mOrthographic = orthographic;
+    }
+
+    /** Half-height of the orthographic view box (kept in sync with the orbit distance). */
+    public float getOrthoHalfHeight() {
+        return mOrthoHalfHeight;
+    }
+
+    public void setOrthoHalfHeight(float orthoHalfHeight) {
+        mOrthoHalfHeight = orthoHalfHeight;
+    }
+
     public JGLNode getNode() {
         return mNode;
     }

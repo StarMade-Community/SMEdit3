@@ -70,15 +70,25 @@ public class DrawLogic {
                 Color4f bg = scene.getBackground();
                 GL11.glClearColor(bg.x, bg.y, bg.z, bg.w);
             }
-            GL11.glCullFace(GL11.GL_FRONT);
-            GL11.glEnable(GL11.GL_CULL_FACE);
-            GL11.glFrontFace(GL11.GL_CCW);
+            // Backface culling is off: the shaped blocks (wedge/corner/tetra/hepta)
+            // mix triangle windings, and culling either hid their faces (see-through)
+            // or, with double-sided emission, caused z-fighting. Rendering opaque
+            // geometry double-sided is correct and avoids both.
+            GL11.glDisable(GL11.GL_CULL_FACE);
 
             GL11.glMatrixMode(GL11.GL_PROJECTION);
             GL11.glLoadIdentity();
             float aspect;
             aspect = x / (float) y;
-            GLU.gluPerspective(scene.getFieldOfView(), aspect, scene.getMinZ(), scene.getMaxZ());
+            if (scene.isOrthographic()) {
+                float hh = scene.getOrthoHalfHeight();
+                if (hh <= 0f) {
+                    hh = 1f;
+                }
+                GL11.glOrtho(-hh * aspect, hh * aspect, -hh, hh, scene.getMinZ(), scene.getMaxZ());
+            } else {
+                GLU.gluPerspective(scene.getFieldOfView(), aspect, scene.getMinZ(), scene.getMaxZ());
+            }
 
             GL11.glMatrixMode(GL11.GL_MODELVIEW);
             GL11.glLoadIdentity();

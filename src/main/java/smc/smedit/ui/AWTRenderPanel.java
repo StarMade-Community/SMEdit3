@@ -238,6 +238,25 @@ public class AWTRenderPanel extends RenderPanel {
         RenderPolyLogic.draw(g2, mTiles, !mPlainGraphics);
     }
 
+    @Override
+    public void setOrthographic(boolean orthographic) {
+        // The software renderer already uses a flat/orthographic-style projection.
+    }
+
+    @Override
+    public boolean isOrthographic() {
+        return true;
+    }
+
+    @Override
+    public void resetCamera() {
+        // Best-effort 3/4 top-left view for the software renderer, then recenter
+        // and rescale to fit.
+        mRotX = (float) (Math.PI + Math.PI / 6.0);
+        mRotY = (float) (-Math.PI / 4.0);
+        doNewGrid();
+    }
+
     private void doNewGrid() {
         Point3i lower = new Point3i();
         Point3i upper = new Point3i();

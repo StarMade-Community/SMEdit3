@@ -46,6 +46,29 @@ public class LWJGLRenderLogic {
             JGLTextureCache.register(1, BlockTypeColors.mAllTextures);
             mTextureID = 1;
         }
+        // Opaque and transparent (glass/light) geometry are meshed separately so
+        // the transparent pass can be drawn last, blended, with depth-writes off —
+        // otherwise glass punches a hole in the depth buffer and you see straight
+        // through into the ship.
+        MeshInfo opaque = newMeshInfo(plain);
+        MeshInfo transparent = newMeshInfo(plain);
+        for (Iterator<Point3i> i = grid.iteratorNonNull(); i.hasNext();) {
+            Point3i p = i.next();
+            Block b = grid.get(p);
+            if (b == null) {
+                continue;
+            }
+            addBlock(BlockTypeColors.isTransparent(b.getBlockID()) ? transparent : opaque, grid, p);
+        }
+        group.add(infoToObj(opaque));
+        if (!transparent.verts.isEmpty()) {
+            JGLObj transObj = infoToObj(transparent);
+            transObj.setTransparent(true);
+            group.add(transObj); // added after the opaque mesh so it draws on top
+        }
+    }
+
+    private static MeshInfo newMeshInfo(boolean plain) {
         MeshInfo info = new MeshInfo();
         info.verts = new ArrayList<>();
         info.indexes = new ArrayList<>();
@@ -54,11 +77,7 @@ public class LWJGLRenderLogic {
         } else {
             info.uv = new ArrayList<>();
         }
-        for (Iterator<Point3i> i = grid.iteratorNonNull(); i.hasNext();) {
-            addBlock(info, grid, i.next());
-        }
-        JGLObj obj = infoToObj(info);
-        group.add(obj);
+        return info;
     }
 
     /**
@@ -91,31 +110,59 @@ public class LWJGLRenderLogic {
         if (b == null) {
             return;
         }
+        // Slab blocks (partial-height) take priority over the shape style.
+        int slab = BlockTypeColors.getBlockSlab(b.getBlockID());
+        if (slab > 0) {
+            addSlab(group, p, b, slab);
+            return;
+        }
+        // Shaped blocks render as their real geometry; unhandled styles/orientations
+        // fall back to a full cube (solid, if the wrong shape).
+        int style = BlockTypeColors.getBlockStyle(b.getBlockID());
+        if (style == BlockTypeColors.STYLE_WEDGE) {
+            int[] cut = wedgeCutFaces(b.getOrientation());
+            if (cut != null) {
+                addWedge(group, grid, p, b, cut);
+                return;
+            }
+        } else if (style == BlockTypeColors.STYLE_CORNER) {
+            addCorner(group, p, b);
+            return;
+        } else if (style == BlockTypeColors.STYLE_SPRITE) {
+            addSprite(group, p, b);
+            return;
+        } else if (style == BlockTypeColors.STYLE_TETRA) {
+            addTetra(group, p, b);
+            return;
+        } else if (style == BlockTypeColors.STYLE_HEPTA) {
+            addHepta(group, p, b);
+            return;
+        }
         Point3f lower = new Point3f(p.x - .5f, p.y - .5f, p.z - .5f);
         Point3f upper = new Point3f(p.x + .5f, p.y + .5f, p.z + .5f);
         short[] colors = new short[]{b.getBlockID()};
         List<JGLObj> objs = new ArrayList<>();
-        if (!grid.contains(p.x + 1, p.y, p.z)) {
+        if (!occludes(grid, p.x + 1, p.y, p.z)) {
             addSelectFace(group, upper.x, lower.y, lower.z, upper.x, upper.y, upper.z,
                     RenderPoly.XP, colors[0 % colors.length]);
         }
-        if (!grid.contains(p.x - 1, p.y, p.z)) {
+        if (!occludes(grid, p.x - 1, p.y, p.z)) {
             addSelectFace(group, lower.x, lower.y, lower.z, lower.x, upper.y, upper.z,
                     RenderPoly.XM, colors[1 % colors.length]);
         }
-        if (!grid.contains(p.x, p.y + 1, p.z)) {
+        if (!occludes(grid, p.x, p.y + 1, p.z)) {
             addSelectFace(group, lower.x, upper.y, lower.z, upper.x, upper.y, upper.z,
                     RenderPoly.YP, colors[2 % colors.length]);
         }
-        if (!grid.contains(p.x, p.y - 1, p.z)) {
+        if (!occludes(grid, p.x, p.y - 1, p.z)) {
             addSelectFace(group, lower.x, lower.y, lower.z, upper.x, lower.y, upper.z,
                     RenderPoly.YM, colors[3 % colors.length]);
         }
-        if (!grid.contains(p.x, p.y, p.z + 1)) {
+        if (!occludes(grid, p.x, p.y, p.z + 1)) {
             addSelectFace(group, lower.x, lower.y, upper.z, upper.x, upper.y, upper.z,
                     RenderPoly.ZP, colors[4 % colors.length]);
         }
-        if (!grid.contains(p.x, p.y, p.z - 1)) {
+        if (!occludes(grid, p.x, p.y, p.z - 1)) {
             addSelectFace(group, lower.x, lower.y, lower.z, upper.x, upper.y, lower.z,
                     RenderPoly.ZM, colors[5 % colors.length]);
         }
@@ -123,6 +170,305 @@ public class LWJGLRenderLogic {
             obj.setData("point", p);
             obj.setData("block", b);
         }
+    }
+
+    // ---- Wedge (sloped block) geometry ----
+    //
+    // A wedge is a triangular prism: two adjacent cube faces are cut away and
+    // replaced by a slope. The cut-face pair is chosen by the block's orientation
+    // value (0-13), matching the legacy software renderer (RenderLogic.doWedge).
+    // Element faces: FRONT=0 BACK=1 TOP=2 BOTTOM=3 RIGHT=4 LEFT=5.
+    private static final int[][] WEDGE_CUT_BY_ORIENT = new int[14][];
+
+    static {
+        WEDGE_CUT_BY_ORIENT[0] = new int[] {2, 1};  // TOP, BACK
+        WEDGE_CUT_BY_ORIENT[1] = new int[] {5, 2};  // LEFT, TOP
+        WEDGE_CUT_BY_ORIENT[2] = new int[] {2, 0};  // TOP, FRONT
+        WEDGE_CUT_BY_ORIENT[3] = new int[] {4, 2};  // RIGHT, TOP
+        WEDGE_CUT_BY_ORIENT[4] = new int[] {3, 1};  // BOTTOM, BACK
+        WEDGE_CUT_BY_ORIENT[5] = new int[] {4, 3};  // RIGHT, BOTTOM
+        WEDGE_CUT_BY_ORIENT[6] = new int[] {3, 0};  // BOTTOM, FRONT
+        WEDGE_CUT_BY_ORIENT[7] = new int[] {5, 3};  // LEFT, BOTTOM
+        WEDGE_CUT_BY_ORIENT[8] = new int[] {4, 1};  // RIGHT, BACK
+        WEDGE_CUT_BY_ORIENT[9] = null;              // unknown -> draw a cube
+        WEDGE_CUT_BY_ORIENT[10] = new int[] {5, 1}; // LEFT, BACK
+        WEDGE_CUT_BY_ORIENT[11] = new int[] {5, 0}; // LEFT, FRONT
+        WEDGE_CUT_BY_ORIENT[12] = new int[] {4, 1}; // (== 8)
+        WEDGE_CUT_BY_ORIENT[13] = new int[] {4, 0}; // RIGHT, FRONT
+    }
+
+    /** @return the two cut faces for a wedge orientation, or {@code null} if unknown. */
+    private static int[] wedgeCutFaces(int orientation) {
+        if (orientation >= 0 && orientation < WEDGE_CUT_BY_ORIENT.length) {
+            return WEDGE_CUT_BY_ORIENT[orientation];
+        }
+        return null;
+    }
+
+    private static float[] faceDir(int face) {
+        switch (face) {
+            case 0: return new float[] {0, 0, 1};   // FRONT +Z
+            case 1: return new float[] {0, 0, -1};  // BACK  -Z
+            case 2: return new float[] {0, 1, 0};   // TOP   +Y
+            case 3: return new float[] {0, -1, 0};  // BOTTOM -Y
+            case 4: return new float[] {1, 0, 0};   // RIGHT +X
+            default: return new float[] {-1, 0, 0}; // LEFT  -X
+        }
+    }
+
+    /**
+     * Adds a wedge prism. {@code cut} is the pair of faces the slope replaces (from
+     * {@link #wedgeCutFaces}). The two full faces opposite the cut faces are culled
+     * against neighbours like a cube; the slope and the two triangular sides
+     * complete the prism. Faces are emitted double-sided so they are visible
+     * regardless of winding (the viewport has backface culling on).
+     */
+    public static void addWedge(MeshInfo info, SparseMatrix<Block> grid, Point3i p, Block b, int[] cut) {
+        short id = b.getBlockID();
+        float[] a = faceDir(cut[0]);
+        float[] bDir = faceDir(cut[1]);
+        float[] c = cross(a, bDir); // prism axis (perpendicular to both cut faces)
+
+        // Triangle corners: C1 = +a-b, C2 = -a-b (right angle), C3 = -a+b.
+        Point3f c1 = corner(p, a, bDir, 0.5f, -0.5f);
+        Point3f c2 = corner(p, a, bDir, -0.5f, -0.5f);
+        Point3f c3 = corner(p, a, bDir, -0.5f, 0.5f);
+        Point3f v1a = shift(c1, c, 0.5f), v1b = shift(c1, c, -0.5f);
+        Point3f v2a = shift(c2, c, 0.5f), v2b = shift(c2, c, -0.5f);
+        Point3f v3a = shift(c3, c, 0.5f), v3b = shift(c3, c, -0.5f);
+
+        // Full face opposite the first cut face (normal -a).
+        if (!occludesDir(grid, p, a, -1)) {
+            addWedgeFace(info, v2a, v2b, v3b, v3a, id);
+        }
+        // Full face opposite the second cut face (normal -b).
+        if (!occludesDir(grid, p, bDir, -1)) {
+            addWedgeFace(info, v1a, v1b, v2b, v2a, id);
+        }
+        // The slope (hypotenuse) — always exposed.
+        addWedgeFace(info, v1a, v1b, v3b, v3a, id);
+        // The two triangular sides (a degenerate quad = triangle), culled against
+        // the neighbours along the prism axis.
+        if (!occludesDir(grid, p, c, 1)) {
+            addWedgeFace(info, v1a, v2a, v3a, v3a, id);
+        }
+        if (!occludesDir(grid, p, c, -1)) {
+            addWedgeFace(info, v1b, v2b, v3b, v3b, id);
+        }
+    }
+
+    /** Adds one shaped-block face. Backface culling is disabled, so it's visible from both sides. */
+    private static void addWedgeFace(MeshInfo info, Point3f a, Point3f b, Point3f c, Point3f d, short id) {
+        addSelectQuad(info, a, b, c, d, id);
+    }
+
+    // The 5 vertices per corner ("Spike") orientation 0-23 — the 4 base-square
+    // corners (in order) + the apex — ported verbatim from StarMade's Spike* classes.
+    private static final float[][][] CORNER_VERTS = {
+        {{-.5f, -.5f, -.5f}, {-.5f, -.5f, .5f}, {.5f, -.5f, .5f}, {.5f, -.5f, -.5f}, {-.5f, .5f, .5f}},  // 0
+        {{-.5f, -.5f, -.5f}, {-.5f, -.5f, .5f}, {.5f, -.5f, .5f}, {.5f, -.5f, -.5f}, {-.5f, .5f, -.5f}}, // 1
+        {{-.5f, -.5f, -.5f}, {-.5f, -.5f, .5f}, {.5f, -.5f, .5f}, {.5f, -.5f, -.5f}, {.5f, .5f, -.5f}},  // 2
+        {{-.5f, -.5f, -.5f}, {-.5f, -.5f, .5f}, {.5f, -.5f, .5f}, {.5f, -.5f, -.5f}, {.5f, .5f, .5f}},   // 3
+        {{-.5f, .5f, -.5f}, {-.5f, .5f, .5f}, {.5f, .5f, .5f}, {.5f, .5f, -.5f}, {-.5f, -.5f, .5f}},     // 4
+        {{-.5f, .5f, -.5f}, {-.5f, .5f, .5f}, {.5f, .5f, .5f}, {.5f, .5f, -.5f}, {-.5f, -.5f, -.5f}},    // 5
+        {{-.5f, .5f, -.5f}, {-.5f, .5f, .5f}, {.5f, .5f, .5f}, {.5f, .5f, -.5f}, {.5f, -.5f, -.5f}},     // 6
+        {{-.5f, .5f, -.5f}, {-.5f, .5f, .5f}, {.5f, .5f, .5f}, {.5f, .5f, -.5f}, {.5f, -.5f, .5f}},      // 7
+        {{-.5f, .5f, -.5f}, {-.5f, -.5f, -.5f}, {.5f, -.5f, -.5f}, {.5f, .5f, -.5f}, {-.5f, .5f, .5f}},  // 8
+        {{-.5f, .5f, -.5f}, {-.5f, -.5f, -.5f}, {.5f, -.5f, -.5f}, {.5f, .5f, -.5f}, {.5f, .5f, .5f}},   // 9
+        {{-.5f, .5f, -.5f}, {-.5f, -.5f, -.5f}, {.5f, -.5f, -.5f}, {.5f, .5f, -.5f}, {.5f, -.5f, .5f}},  // 10
+        {{-.5f, .5f, -.5f}, {-.5f, -.5f, -.5f}, {.5f, -.5f, -.5f}, {.5f, .5f, -.5f}, {-.5f, -.5f, .5f}}, // 11
+        {{-.5f, .5f, .5f}, {-.5f, -.5f, .5f}, {.5f, -.5f, .5f}, {.5f, .5f, .5f}, {-.5f, -.5f, -.5f}},    // 12
+        {{-.5f, .5f, .5f}, {-.5f, -.5f, .5f}, {.5f, -.5f, .5f}, {.5f, .5f, .5f}, {-.5f, .5f, -.5f}},     // 13
+        {{-.5f, .5f, .5f}, {-.5f, -.5f, .5f}, {.5f, -.5f, .5f}, {.5f, .5f, .5f}, {.5f, .5f, -.5f}},      // 14
+        {{-.5f, .5f, .5f}, {-.5f, -.5f, .5f}, {.5f, -.5f, .5f}, {.5f, .5f, .5f}, {.5f, -.5f, -.5f}},     // 15
+        {{-.5f, -.5f, .5f}, {-.5f, -.5f, -.5f}, {-.5f, .5f, -.5f}, {-.5f, .5f, .5f}, {.5f, -.5f, -.5f}}, // 16
+        {{-.5f, -.5f, .5f}, {-.5f, -.5f, -.5f}, {-.5f, .5f, -.5f}, {-.5f, .5f, .5f}, {.5f, .5f, -.5f}},  // 17
+        {{-.5f, -.5f, .5f}, {-.5f, -.5f, -.5f}, {-.5f, .5f, -.5f}, {-.5f, .5f, .5f}, {.5f, .5f, .5f}},   // 18
+        {{-.5f, -.5f, .5f}, {-.5f, -.5f, -.5f}, {-.5f, .5f, -.5f}, {-.5f, .5f, .5f}, {.5f, -.5f, .5f}},  // 19
+        {{.5f, -.5f, .5f}, {.5f, -.5f, -.5f}, {.5f, .5f, -.5f}, {.5f, .5f, .5f}, {-.5f, -.5f, -.5f}},    // 20
+        {{.5f, -.5f, .5f}, {.5f, -.5f, -.5f}, {.5f, .5f, -.5f}, {.5f, .5f, .5f}, {-.5f, .5f, -.5f}},     // 21
+        {{.5f, -.5f, .5f}, {.5f, -.5f, -.5f}, {.5f, .5f, -.5f}, {.5f, .5f, .5f}, {-.5f, .5f, .5f}},      // 22
+        {{.5f, -.5f, .5f}, {.5f, -.5f, -.5f}, {.5f, .5f, -.5f}, {.5f, .5f, .5f}, {-.5f, -.5f, .5f}},     // 23
+    };
+
+    /** Adds a corner ("Spike"): a square-base pyramid; 24 orientations from StarMade's exact vertices. */
+    public static void addCorner(MeshInfo info, Point3i p, Block b) {
+        short id = b.getBlockID();
+        float[][] v = CORNER_VERTS[((b.getOrientation() % 24) + 24) % 24];
+        Point3f q0 = pt(p, v[0][0], v[0][1], v[0][2]);
+        Point3f q1 = pt(p, v[1][0], v[1][1], v[1][2]);
+        Point3f q2 = pt(p, v[2][0], v[2][1], v[2][2]);
+        Point3f q3 = pt(p, v[3][0], v[3][1], v[3][2]);
+        Point3f apex = pt(p, v[4][0], v[4][1], v[4][2]);
+        addWedgeFace(info, q0, q1, q2, q3, id); // base square
+        addWedgeFace(info, q0, q1, apex, apex, id);
+        addWedgeFace(info, q1, q2, apex, apex, id);
+        addWedgeFace(info, q2, q3, apex, apex, id);
+        addWedgeFace(info, q3, q0, apex, apex, id);
+    }
+
+    private static int switchLeftRight(int dir) {
+        if (dir == 4) {
+            return 5;
+        }
+        if (dir == 5) {
+            return 4;
+        }
+        return dir;
+    }
+
+    /**
+     * Adds a slab: a cube shortened along one axis to {@code 0.5 - slab*0.25}
+     * (slab 1/2/3 = 3/4, 1/2, 1/4 thick). Orientation % 6 picks the face it's cut
+     * toward (matching StarMade Element.getSlab handling).
+     */
+    public static void addSlab(MeshInfo info, Point3i p, Block b, int slab) {
+        short id = b.getBlockID();
+        float slabP = 0.5f - slab * 0.25f;
+        float minX = -0.5f, minY = -0.5f, minZ = -0.5f;
+        float maxX = 0.5f, maxY = 0.5f, maxZ = 0.5f;
+        switch (switchLeftRight(((int) b.getOrientation()) % 6)) {
+            case 0: maxZ = slabP; break;   // FRONT: cut +Z
+            case 1: minZ = -slabP; break;  // BACK:  cut -Z
+            case 2: maxY = slabP; break;   // TOP:   cut +Y
+            case 3: minY = -slabP; break;  // BOTTOM: cut -Y
+            case 4: maxX = slabP; break;   // RIGHT: cut +X
+            default: minX = -slabP; break; // LEFT:  cut -X
+        }
+        float x0 = p.x + minX, x1 = p.x + maxX;
+        float y0 = p.y + minY, y1 = p.y + maxY;
+        float z0 = p.z + minZ, z1 = p.z + maxZ;
+        addSelectFace(info, x1, y0, z0, x1, y1, z1, RenderPoly.XP, id);
+        addSelectFace(info, x0, y0, z0, x0, y1, z1, RenderPoly.XM, id);
+        addSelectFace(info, x0, y1, z0, x1, y1, z1, RenderPoly.YP, id);
+        addSelectFace(info, x0, y0, z0, x1, y0, z1, RenderPoly.YM, id);
+        addSelectFace(info, x0, y0, z1, x1, y1, z1, RenderPoly.ZP, id);
+        addSelectFace(info, x0, y0, z0, x1, y1, z0, RenderPoly.ZM, id);
+    }
+
+    /** Adds a sprite: two crossed vertical quads (an X), like foliage. Rendered double-sided. */
+    public static void addSprite(MeshInfo info, Point3i p, Block b) {
+        short id = b.getBlockID();
+        addWedgeFace(info, pt(p, -.5f, -.5f, -.5f), pt(p, .5f, -.5f, .5f),
+                pt(p, .5f, .5f, .5f), pt(p, -.5f, .5f, -.5f), id);
+        addWedgeFace(info, pt(p, .5f, -.5f, -.5f), pt(p, -.5f, -.5f, .5f),
+                pt(p, -.5f, .5f, .5f), pt(p, .5f, .5f, -.5f), id);
+    }
+
+    private static Point3f pt(Point3i p, float dx, float dy, float dz) {
+        return new Point3f(p.x + dx, p.y + dy, p.z + dz);
+    }
+
+    // The 4 tetrahedron vertices per orientation 0-7, ported verbatim from
+    // StarMade's Tetrahedron* shape classes (registration order = stored value).
+    private static final float[][][] TETRA_VERTS = {
+        {{-.5f, -.5f, -.5f}, {-.5f, -.5f, .5f}, {.5f, -.5f, .5f}, {-.5f, .5f, .5f}},   // 0
+        {{-.5f, -.5f, -.5f}, {-.5f, -.5f, .5f}, {.5f, -.5f, -.5f}, {-.5f, .5f, -.5f}}, // 1
+        {{-.5f, -.5f, -.5f}, {.5f, -.5f, .5f}, {.5f, -.5f, -.5f}, {.5f, .5f, -.5f}},   // 2
+        {{-.5f, -.5f, .5f}, {.5f, -.5f, .5f}, {.5f, -.5f, -.5f}, {.5f, .5f, .5f}},     // 3
+        {{-.5f, .5f, -.5f}, {-.5f, .5f, .5f}, {.5f, .5f, .5f}, {-.5f, -.5f, .5f}},     // 4
+        {{-.5f, .5f, -.5f}, {-.5f, .5f, .5f}, {.5f, .5f, -.5f}, {-.5f, -.5f, -.5f}},   // 5
+        {{-.5f, .5f, -.5f}, {.5f, .5f, .5f}, {.5f, .5f, -.5f}, {.5f, -.5f, -.5f}},     // 6
+        {{-.5f, .5f, .5f}, {.5f, .5f, .5f}, {.5f, .5f, -.5f}, {.5f, -.5f, .5f}},       // 7
+    };
+
+    // The cube corner sliced off per hepta ("penta") orientation 0-7 (the negated
+    // tetra apex, matching StarMade's Penta* classes).
+    private static final float[][] HEPTA_CUT = {
+        {.5f, .5f, -.5f}, {.5f, .5f, .5f}, {-.5f, .5f, .5f}, {-.5f, .5f, -.5f},
+        {.5f, -.5f, -.5f}, {.5f, -.5f, .5f}, {-.5f, -.5f, .5f}, {-.5f, -.5f, -.5f},
+    };
+
+    /** Adds a tetra (tetrahedron): 4 triangular faces from StarMade's exact vertices. */
+    public static void addTetra(MeshInfo info, Point3i p, Block b) {
+        short id = b.getBlockID();
+        float[][] v = TETRA_VERTS[((b.getOrientation() % 8) + 8) % 8];
+        Point3f v0 = pt(p, v[0][0], v[0][1], v[0][2]);
+        Point3f v1 = pt(p, v[1][0], v[1][1], v[1][2]);
+        Point3f v2 = pt(p, v[2][0], v[2][1], v[2][2]);
+        Point3f v3 = pt(p, v[3][0], v[3][1], v[3][2]);
+        addWedgeFace(info, v0, v1, v2, v2, id);
+        addWedgeFace(info, v0, v1, v3, v3, id);
+        addWedgeFace(info, v0, v2, v3, v3, id);
+        addWedgeFace(info, v1, v2, v3, v3, id);
+    }
+
+    /**
+     * Adds a hepta: a cube with the corner tetra sliced off (7 faces = 3 full
+     * squares + 3 triangles + the diagonal cut), the cut corner from {@link #HEPTA_CUT}.
+     */
+    public static void addHepta(MeshInfo info, Point3i p, Block b) {
+        short id = b.getBlockID();
+        float[] c = HEPTA_CUT[((b.getOrientation() % 8) + 8) % 8];
+        float cx = c[0], cy = c[1], cz = c[2];
+        Point3f ax = pt(p, -cx, cy, cz);
+        Point3f ay = pt(p, cx, -cy, cz);
+        Point3f az = pt(p, cx, cy, -cz);
+        Point3f f = pt(p, -cx, -cy, -cz);
+        Point3f exy = pt(p, -cx, -cy, cz);
+        Point3f exz = pt(p, -cx, cy, -cz);
+        Point3f eyz = pt(p, cx, -cy, -cz);
+        // Three full squares (the faces not touching the cut corner).
+        addWedgeFace(info, ax, exy, f, exz, id);
+        addWedgeFace(info, ay, exy, f, eyz, id);
+        addWedgeFace(info, az, exz, f, eyz, id);
+        // Three triangles (the cut-corner faces, minus the corner).
+        addWedgeFace(info, ay, az, eyz, eyz, id);
+        addWedgeFace(info, ax, az, exz, exz, id);
+        addWedgeFace(info, ax, ay, exy, exy, id);
+        // The diagonal cut face.
+        addWedgeFace(info, ax, ay, az, az, id);
+    }
+
+    private static float[] cross(float[] u, float[] v) {
+        return new float[] {
+            u[1] * v[2] - u[2] * v[1],
+            u[2] * v[0] - u[0] * v[2],
+            u[0] * v[1] - u[1] * v[0],
+        };
+    }
+
+    /** Block-centre + sa*a + sb*b (half-unit corner offsets). */
+    private static Point3f corner(Point3i p, float[] a, float[] b, float sa, float sb) {
+        return new Point3f(p.x + a[0] * sa + b[0] * sb,
+                p.y + a[1] * sa + b[1] * sb,
+                p.z + a[2] * sa + b[2] * sb);
+    }
+
+    private static Point3f shift(Point3f base, float[] d, float s) {
+        return new Point3f(base.x + d[0] * s, base.y + d[1] * s, base.z + d[2] * s);
+    }
+
+    /**
+     * Whether the block at (x,y,z) fully covers the shared face — i.e. it's a
+     * solid, full-size cube. Slabs and shaped blocks (wedge/corner/tetra/hepta/
+     * sprite) don't fill the whole cell, so a neighbour's face against them stays
+     * visible and must NOT be culled (otherwise you can see straight through the
+     * gap into the ship interior).
+     */
+    private static boolean occludes(SparseMatrix<Block> grid, int x, int y, int z) {
+        Block n = grid.get(x, y, z);
+        if (n == null) {
+            return false;
+        }
+        short id = n.getBlockID();
+        if (BlockTypeColors.getBlockSlab(id) > 0) {
+            return false;
+        }
+        // Transparent blocks (glass, lights) don't hide what's behind them, so a
+        // neighbour's face against them must stay visible.
+        if (BlockTypeColors.isTransparent(id)) {
+            return false;
+        }
+        int style = BlockTypeColors.getBlockStyle(id);
+        return style == BlockTypeColors.STYLE_NORMAL || style == BlockTypeColors.STYLE_NORMAL24;
+    }
+
+    /** {@link #occludes} in a direction from {@code p} (dir components are rounded). */
+    private static boolean occludesDir(SparseMatrix<Block> grid, Point3i p, float[] dir, int sign) {
+        return occludes(grid, p.x + Math.round(dir[0] * sign),
+                p.y + Math.round(dir[1] * sign),
+                p.z + Math.round(dir[2] * sign));
     }
 
     /**
@@ -172,13 +518,13 @@ public class LWJGLRenderLogic {
                         new Point3f(x1, y1, z2),
                         new Point3f(x1, y2, z2),
                         new Point3f(x1, y2, z1),
-                        type);
+                        type, face);
             } else {
                 addSelectQuad(group, new Point3f(x1, y1, z1),
                         new Point3f(x1, y2, z1),
                         new Point3f(x1, y2, z2),
                         new Point3f(x1, y1, z2),
-                        type);
+                        type, face);
             }
         } else if (MathUtils.epsilonEquals(y1, y2)) {
             if (face == RenderPoly.YP) {
@@ -186,13 +532,13 @@ public class LWJGLRenderLogic {
                         new Point3f(x2, y1, z1),
                         new Point3f(x2, y1, z2),
                         new Point3f(x1, y1, z2),
-                        type);
+                        type, face);
             } else {
                 addSelectQuad(group, new Point3f(x1, y1, z1),
                         new Point3f(x1, y1, z2),
                         new Point3f(x2, y1, z2),
                         new Point3f(x2, y1, z1),
-                        type);
+                        type, face);
             }
         } else if (MathUtils.epsilonEquals(z1, z2)) {
             if (face == RenderPoly.ZP) {
@@ -200,13 +546,13 @@ public class LWJGLRenderLogic {
                         new Point3f(x1, y2, z1),
                         new Point3f(x2, y2, z1),
                         new Point3f(x2, y1, z1),
-                        type);
+                        type, face);
             } else {
                 addSelectQuad(group, new Point3f(x1, y1, z1),
                         new Point3f(x2, y1, z1),
                         new Point3f(x2, y2, z1),
                         new Point3f(x1, y2, z1),
-                        type);
+                        type, face);
             }
         }
     }
@@ -222,6 +568,16 @@ public class LWJGLRenderLogic {
      */
     public static void addSelectQuad(MeshInfo info, Point3f left, Point3f top, Point3f right, Point3f bottom,
             short type) {
+        addSelectQuad(info, left, top, right, bottom, type, -1);
+    }
+
+    /**
+     * Adds one quad. {@code face} is a {@link RenderPoly} cube face (XP..ZM) so
+     * the quad samples that face's own texture on multi-textured blocks; pass -1
+     * (e.g. for shaped-block faces) to use the block's primary texture.
+     */
+    public static void addSelectQuad(MeshInfo info, Point3f left, Point3f top, Point3f right, Point3f bottom,
+            short type, int face) {
         info.verts.add(left);
         info.verts.add(top);
         info.verts.add(right);
@@ -239,7 +595,9 @@ public class LWJGLRenderLogic {
             info.colors.add(color);
         }
         if (info.uv != null) {
-            Rectangle2D.Float rec = BlockTypeColors.getAllTextureLocation(type);
+            Rectangle2D.Float rec = (face >= 0)
+                    ? BlockTypeColors.getFaceTextureLocation(type, face)
+                    : BlockTypeColors.getAllTextureLocation(type);
             info.uv.add(new Point2f(rec.x, rec.y));
             info.uv.add(new Point2f(rec.x + rec.width, rec.y));
             info.uv.add(new Point2f(rec.x + rec.width, rec.y + rec.height));

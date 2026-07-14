@@ -809,13 +809,66 @@ public class BlockTypeColors {
 
     public static final Map<Short, Short> BLOCK_HITPOINTS = new HashMap<>();
     public static final Map<Short, Integer> BLOCK_TEXTURE_IDS = new HashMap<>();
+    /**
+     * Per-face texture ids for each block, in StarMade's side order
+     * [FRONT, BACK, TOP, BOTTOM, RIGHT, LEFT] (Element.java constants) — exactly
+     * the order of the six comma-separated values in BlockConfig's {@code textureId}.
+     */
+    public static final Map<Short, short[]> BLOCK_TEXTURE_IDS_PER_FACE = new HashMap<>();
+    /** RenderPoly face (XP,XM,YP,YM,ZP,ZM = 0..5) -> index into the per-face array above. */
+    private static final int[] FACE_TO_SIDE = {4, 5, 2, 3, 0, 1};
+    /** BlockConfig &lt;BlockStyle&gt; per block id (StarMade BlockStyle enum values). */
+    public static final Map<Short, Integer> BLOCK_STYLE = new HashMap<>();
+
+    public static final int STYLE_NORMAL = 0;
+    public static final int STYLE_WEDGE = 1;
+    public static final int STYLE_CORNER = 2;
+    public static final int STYLE_SPRITE = 3;
+    public static final int STYLE_TETRA = 4;
+    public static final int STYLE_HEPTA = 5;   // aka "penta": a cube with a tetra cut off
+    public static final int STYLE_NORMAL24 = 6; // full 6-sided cube, 24 orientations (rails, etc.)
+
+    /** @return the shape style for a block id (0/normal if unknown). */
+    public static int getBlockStyle(short blockID) {
+        Integer s = BLOCK_STYLE.get(blockID);
+        return s != null ? s : STYLE_NORMAL;
+    }
+
+    /** BlockConfig &lt;Slab&gt; per block id: 1/2/3 = quarter-step partial-height (absent = full). */
+    public static final Map<Short, Integer> BLOCK_SLAB = new HashMap<>();
+
+    /** @return the slab level for a block id (0 = full block). */
+    public static int getBlockSlab(short blockID) {
+        Integer s = BLOCK_SLAB.get(blockID);
+        return s != null ? s : 0;
+    }
+
+    /** Block ids flagged &lt;Transparency&gt;true&lt;/Transparency&gt; in BlockConfig (glass, lights, etc.). */
+    public static final java.util.Set<Short> BLOCK_TRANSPARENT = new java.util.HashSet<>();
+
+    /** @return whether a block is transparent (renders in the blended, non-occluding pass). */
+    public static boolean isTransparent(short blockID) {
+        return BLOCK_TRANSPARENT.contains(blockID);
+    }
 
     private static boolean mBlockIconsLoaded = false;
     private static final Map<Short, ImageIcon> mBlockIcons = new HashMap<>();
     private static final List<BufferedImage> mTextureMaps = new ArrayList<>();
     public static int mAllTexturesImagesPerSide;
-    public static int mAllTexturesPixelsPerImage;
+    public static int mAllTexturesPixelsPerImage; // full cell size (inner tile + gutter*2)
     public static BufferedImage mAllTextures;
+    /** Combined-atlas edge in px. 4096 keeps ~4x the detail of the old 1024 while staying within the GL max texture size on all supported GPUs. */
+    private static final int ATLAS_SIZE = 4096;
+    /**
+     * Fraction of each tile cropped inward per edge, matching StarMade's shader
+     * (data/shader/cube/quads13/cube.vsh: {@code antibleeding adi=0.00485} against
+     * a {@code tiling=1/16}). StarMade never samples the outer ring of a block
+     * tile — that ring is a baked-in border/bevel — so we must crop it too, else
+     * the border shows up as a visible edge around every face.
+     */
+    private static final float TILE_CROP = 0.00485f / 0.0625f; // ~0.0776 per edge
+    /** Replicated-edge gutter (px) around each atlas tile so LINEAR/mipmap sampling can't pull in a neighbouring tile (the "bleed edge" StarMade gets for free from its per-tile texture array). */
+    private static int mAllTexturesGutter;
     public static Properties mBlockTypes;
     private static Properties mProps;
 
@@ -888,14 +941,44 @@ public class BlockTypeColors {
                 // textures (e.g. "33, 33, 33, 33, 33, 33"); use the first face.
                 String textureAttr = XMLUtils.getAttribute(n, "textureId");
                 int textureID = 0;
+                short[] faceTex = null;
                 if (textureAttr != null && !textureAttr.isEmpty()) {
-                    textureID = IntegerUtils.parseInt(textureAttr.split(",")[0].trim());
+                    String[] parts = textureAttr.split(",");
+                    textureID = IntegerUtils.parseInt(parts[0].trim());
+                    // Keep all six per-face ids so each cube face draws its own
+                    // texture (the config lists FRONT,BACK,TOP,BOTTOM,RIGHT,LEFT).
+                    // Short lists just repeat the last value across the rest.
+                    faceTex = new short[6];
+                    for (int fi = 0; fi < 6; fi++) {
+                        faceTex[fi] = (short) IntegerUtils.parseInt(
+                                parts[fi < parts.length ? fi : parts.length - 1].trim());
+                    }
                 }
                 short hitPoints = ShortUtils.parseShort(XMLUtils.getTextTag(n, "Hitpoints"));
+                // Block shape: <BlockStyle> 0=normal 1=wedge 2=corner 3=sprite
+                // 4=tetra 5=hepta 6=normal24. Drives shaped-block rendering.
+                int blockStyle = IntegerUtils.parseInt(XMLUtils.getTextTag(n, "BlockStyle"));
+                // <Slab> 0=full, 1/2/3 = quarter-step partial-height block.
+                int slab = IntegerUtils.parseInt(XMLUtils.getTextTag(n, "Slab"));
+                // <Transparency> glass/lights: rendered blended and never occlude
+                // their neighbours (else you see straight through into the ship).
+                String transparencyTag = XMLUtils.getTextTag(n, "Transparency");
+                boolean transparent = transparencyTag != null
+                        && "true".equalsIgnoreCase(transparencyTag.trim());
 
                 BlockTypes.BLOCK_NAMES.put(id, name);
                 BLOCK_HITPOINTS.put(id, hitPoints);
                 BLOCK_TEXTURE_IDS.put(id, textureID);
+                if (faceTex != null) {
+                    BLOCK_TEXTURE_IDS_PER_FACE.put(id, faceTex);
+                }
+                BLOCK_STYLE.put(id, blockStyle);
+                if (slab > 0) {
+                    BLOCK_SLAB.put(id, slab);
+                }
+                if (transparent) {
+                    BLOCK_TRANSPARENT.add(id);
+                }
                 try {
                     Field f = BlockTypes.class.getField(type);
                     if (f != null) {
@@ -912,7 +995,7 @@ public class BlockTypeColors {
 
     private static void loadTextureMaps() throws IOException {
         loadProps();
-        // Modern StarMade ships texture packs under data/textures/block/<pack>/64/.
+        // Modern StarMade ships texture packs under data/textures/block/<pack>/<res>/.
         // Default to the stock "Default" pack when the user hasn't chosen one,
         // otherwise the path collapses to an unresolvable "block//64" and no
         // textures (or approximated colors) load at all.
@@ -920,10 +1003,21 @@ public class BlockTypeColors {
         if (pack.isEmpty()) {
             pack = "Default";
         }
+        // The old code always loaded /64/, then crushed everything into a 1024px
+        // atlas (~23px per tile). We now use a 4096px atlas (~85px inner tiles),
+        // so 128px source sheets are the sweet spot — sharp enough to fill a tile
+        // without holding ~4x the memory that the 256px sheets would (they'd only
+        // be downscaled away anyway). Fall back to 256 then 64 if 128 is absent.
+        File packDir = new File(StarMadeLogic.getInstance().getBaseDir(), "data/textures/block/" + pack);
+        String res = "64";
+        for (String candidate : new String[] {"128", "256", "64"}) {
+            if (new File(packDir, candidate + "/t000.png").exists()) {
+                res = candidate;
+                break;
+            }
+        }
         for (int i = 0; i < 256; i++) {
-            File f = new File(StarMadeLogic.getInstance().getBaseDir(),
-                    "data/textures/block/" + pack + "/64/t" + StringUtils.zeroPrefix(i, 3) + ".png");
-
+            File f = new File(packDir, res + "/t" + StringUtils.zeroPrefix(i, 3) + ".png");
             if (!f.exists()) {
                 break;
             }
@@ -932,31 +1026,77 @@ public class BlockTypeColors {
         }
         int numTextures = 16 * 16 * mTextureMaps.size();
         mAllTexturesImagesPerSide = (int) Math.ceil(Math.sqrt(numTextures));
-        mAllTexturesPixelsPerImage = 1024 / mAllTexturesImagesPerSide;
-        mAllTextures = new BufferedImage(1024, 1024, BufferedImage.TYPE_INT_ARGB);
-        Graphics g = mAllTextures.getGraphics();
+        mAllTexturesPixelsPerImage = ATLAS_SIZE / mAllTexturesImagesPerSide;
+        // Gutter ~= 1/16 of a cell (min 2px): enough for LINEAR + a few mipmap
+        // levels to stay inside the tile, cheap enough not to eat the tile.
+        mAllTexturesGutter = Math.max(2, mAllTexturesPixelsPerImage / 16);
+        mAllTextures = new BufferedImage(ATLAS_SIZE, ATLAS_SIZE, BufferedImage.TYPE_INT_ARGB);
+        java.awt.Graphics2D g = mAllTextures.createGraphics();
+        g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC);
         for (int i = 0; i < numTextures; i++) {
             BufferedImage texture = getTextureImage(i);
-            Rectangle r = getAllTextureLocation(i);
-            g.drawImage(texture, r.x, r.y, r.x + r.width, r.y + r.height, 0, 0, texture.getWidth(), texture.getHeight(), null);
+            Rectangle r = getAllTextureLocation(i); // inner tile rect (inset by the gutter)
+            g.drawImage(texture, r.x, r.y, r.x + r.width, r.y + r.height,
+                    0, 0, texture.getWidth(), texture.getHeight(), null);
+            // Replicate the tile's edge pixels outward into the gutter so any
+            // sampling that strays past the tile edge stays this tile's colour.
+            int gut = mAllTexturesGutter;
+            g.drawImage(mAllTextures, r.x - gut, r.y, r.x, r.y + r.height,
+                    r.x, r.y, r.x + 1, r.y + r.height, null);            // left
+            g.drawImage(mAllTextures, r.x + r.width, r.y, r.x + r.width + gut, r.y + r.height,
+                    r.x + r.width - 1, r.y, r.x + r.width, r.y + r.height, null); // right
+            g.drawImage(mAllTextures, r.x - gut, r.y - gut, r.x + r.width + gut, r.y,
+                    r.x - gut, r.y, r.x + r.width + gut, r.y + 1, null);  // top (incl. corners)
+            g.drawImage(mAllTextures, r.x - gut, r.y + r.height, r.x + r.width + gut, r.y + r.height + gut,
+                    r.x - gut, r.y + r.height - 1, r.x + r.width + gut, r.y + r.height, null); // bottom
         }
+        g.dispose();
     }
 
+    /** Pixel-space rect of a tile's <em>inner</em> region (the gutter surrounds it). */
     private static Rectangle getAllTextureLocation(int textureID) {
         int j = textureID % mAllTexturesImagesPerSide;
         int k = textureID / mAllTexturesImagesPerSide;
-        return new Rectangle(j * mAllTexturesPixelsPerImage, 1024 - k * mAllTexturesPixelsPerImage - mAllTexturesPixelsPerImage,
-                mAllTexturesPixelsPerImage, mAllTexturesPixelsPerImage);
+        int cell = mAllTexturesPixelsPerImage;
+        int gut = mAllTexturesGutter;
+        int inner = cell - 2 * gut;
+        return new Rectangle(j * cell + gut, ATLAS_SIZE - (k + 1) * cell + gut, inner, inner);
     }
 
     public static Rectangle2D.Float getAllTextureLocation(short blockID) {
-        int textureID = BLOCK_TEXTURE_IDS.get(blockID);
+        return atlasUV(BLOCK_TEXTURE_IDS.get(blockID));
+    }
+
+    /**
+     * Atlas UV for a specific cube face of a block. {@code renderPolyFace} is a
+     * {@link RenderPoly} face (XP,XM,YP,YM,ZP,ZM = 0..5); other values or blocks
+     * without per-face data fall back to the block's primary texture.
+     */
+    public static Rectangle2D.Float getFaceTextureLocation(short blockID, int renderPolyFace) {
+        short[] faces = BLOCK_TEXTURE_IDS_PER_FACE.get(blockID);
+        if (faces == null || renderPolyFace < 0 || renderPolyFace >= FACE_TO_SIDE.length) {
+            return getAllTextureLocation(blockID);
+        }
+        return atlasUV(faces[FACE_TO_SIDE[renderPolyFace]] & 0xFFFF);
+    }
+
+    /** Normalised UV of a tile's sampled (gutter-inset, border-cropped) region. */
+    private static Rectangle2D.Float atlasUV(int textureID) {
         int j = textureID % mAllTexturesImagesPerSide;
         int k = textureID / mAllTexturesImagesPerSide;
-        float effectiveWidth = mAllTexturesImagesPerSide * mAllTexturesPixelsPerImage / 1024f;
-        float chunk = effectiveWidth / mAllTexturesImagesPerSide;
-        Rectangle2D.Float abs = new Rectangle2D.Float(j * chunk, k * chunk, chunk, chunk);
-        return abs;
+        // GL v-origin at the bottom. Start from the gutter-inset inner tile, then
+        // crop inward by the same fraction StarMade's shader does (TILE_CROP) so
+        // the tile's baked-in border/bevel is never sampled — that border is what
+        // showed up as a visible edge around each face.
+        float cell = mAllTexturesPixelsPerImage / (float) ATLAS_SIZE;
+        float gut = mAllTexturesGutter / (float) ATLAS_SIZE;
+        float inner = cell - 2 * gut;
+        float crop = inner * TILE_CROP;
+        float x0 = j * cell + gut + crop;
+        float y0 = k * cell + gut + crop;
+        float size = inner - 2 * crop;
+        return new Rectangle2D.Float(x0, y0, size, size);
     }
 
     private static final Map<Short, ImageIcon> SPECIAL_ICONS = new HashMap<>();

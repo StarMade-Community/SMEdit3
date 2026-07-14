@@ -58,6 +58,9 @@ public class LWJGLRenderPanel extends RenderPanel {
 
     Vector3f mPOVTranslate;
 
+    /** The point the camera orbits around (the ship centre); set by {@link #setLookAt}. */
+    Point3f mOrbitCenter = new Point3f();
+
     public LWJGLRenderPanel() {
         mUndoer = new UndoBuffer();
         mPOVTranslate = new Vector3f();
@@ -92,15 +95,68 @@ public class LWJGLRenderPanel extends RenderPanel {
 
     @Override
     public void updateTransform() {
-        // TODO Auto-generated method stub
+        // Keep the orthographic view box sized to match the perspective framing at
+        // the current orbit distance, so zoom behaves the same in both modes.
+        Point3f loc = mUniverse.getCamera().getLocation();
+        float dx = loc.x - mOrbitCenter.x;
+        float dy = loc.y - mOrbitCenter.y;
+        float dz = loc.z - mOrbitCenter.z;
+        float dist = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+        mScene.setOrthoHalfHeight((float) (dist * Math.tan(Math.toRadians(mScene.getFieldOfView() / 2.0))));
+    }
 
+    @Override
+    public void setOrthographic(boolean orthographic) {
+        mScene.setOrthographic(orthographic);
+        updateTransform();
+    }
+
+    @Override
+    public boolean isOrthographic() {
+        return mScene.isOrthographic();
+    }
+
+    @Override
+    public void resetCamera() {
+        // Look down at the ship from the top-left (a 3/4 view): camera up (+Y),
+        // left (-X) and back (-Z) of the model centre. setLookAt scales the axis
+        // by the model size, so normalize it for a consistent distance.
+        Point3f axis = new Point3f(-1f, 1.2f, -1f);
+        float len = (float) Math.sqrt(axis.x * axis.x + axis.y * axis.y + axis.z * axis.z);
+        if (len > 0f) {
+            axis.scale(1f / len);
+        }
+        setLookAt(axis);
+    }
+
+    /** Average of all block positions; falls back to the bounding-box centre if empty. */
+    private Point3f modelCentroid(Point3i lower, Point3i upper) {
+        SparseMatrix<Block> grid = StarMadeLogic.getModel();
+        double sx = 0, sy = 0, sz = 0;
+        long n = 0;
+        for (java.util.Iterator<Point3i> it = grid.iteratorNonNull(); it.hasNext();) {
+            Point3i p = it.next();
+            sx += p.x;
+            sy += p.y;
+            sz += p.z;
+            n++;
+        }
+        if (n == 0) {
+            return new Point3f((upper.x + lower.x) / 2f, (upper.y + lower.y) / 2f, (upper.z + lower.z) / 2f);
+        }
+        return new Point3f((float) (sx / n), (float) (sy / n), (float) (sz / n));
     }
 
     public void setLookAt(Point3f axis) {
         Point3i lower = new Point3i();
         Point3i upper = new Point3i();
         StarMadeLogic.getModel().getBounds(lower, upper);
-        Point3f lookAtThis = new Point3f((upper.x + lower.x) / 2, (upper.y + lower.y) / 2, (upper.z + lower.z) / 2);
+        // Orbit/look at the ship's CENTROID (average block position), not the
+        // bounding-box centre — a long thin protrusion (nose, antenna) skews the
+        // box centre well off the ship's actual mass, which makes orbit feel
+        // off-centre.
+        Point3f lookAtThis = modelCentroid(lower, upper);
+        mOrbitCenter = new Point3f(lookAtThis);
         float maxModel = Math.max(Math.max(upper.x - lower.x, upper.y - lower.y), upper.z - lower.z) + 1;
         Point3f standHere = new Point3f(axis);
         standHere.scale(maxModel * 2);

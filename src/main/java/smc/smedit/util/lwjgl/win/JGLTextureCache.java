@@ -15,7 +15,11 @@ import javax.imageio.ImageIO;
 import smc.smedit.logic.utils.BufferLogic;
 import smc.smedit.logic.utils.IntegerUtils;
 
+import org.lwjgl.opengl.EXTTextureFilterAnisotropic;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL12;
+import org.lwjgl.opengl.GL14;
+import org.lwjgl.opengl.GLContext;
 
 public class JGLTextureCache {
 
@@ -125,11 +129,27 @@ public class JGLTextureCache {
             boolean storeAlphaChannel) {
         int components = storeAlphaChannel ? 4 : 3;
         int format = storeAlphaChannel ? GL11.GL_RGBA : GL11.GL_RGB;
+        // Filtering matched to StarMade's block textures: clamp (so edges don't
+        // wrap), linear magnification, and trilinear minification via mipmaps to
+        // kill the shimmer/aliasing that plain LINEAR shows on a distant hull.
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR_MIPMAP_LINEAR);
+        // Cap mip depth so a tile never shrinks below its gutter and starts
+        // bleeding into its atlas neighbour.
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL12.GL_TEXTURE_MAX_LEVEL, 4);
+        // Auto-build the mip chain on upload (GL 1.4, fixed-function friendly);
+        // must be set before glTexImage2D.
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL14.GL_GENERATE_MIPMAP, GL11.GL_TRUE);
+        if (GLContext.getCapabilities().GL_EXT_texture_filter_anisotropic) {
+            float max = GL11.glGetFloat(EXTTextureFilterAnisotropic.GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+            GL11.glTexParameterf(GL11.GL_TEXTURE_2D,
+                    EXTTextureFilterAnisotropic.GL_TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8f, max));
+        }
+        GL11.glTexEnvi(GL11.GL_TEXTURE_ENV, GL11.GL_TEXTURE_ENV_MODE, GL11.GL_MODULATE);
         GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, components, width,
                 height, 0, format, GL11.GL_UNSIGNED_BYTE, img);
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
-        GL11.glTexEnvi(GL11.GL_TEXTURE_ENV, GL11.GL_TEXTURE_ENV_MODE, GL11.GL_MODULATE);
     }
 
     private static BufferedImage readImage(int textureID) {
@@ -159,9 +179,13 @@ public class JGLTextureCache {
         } else {
             texBuf = ByteBuffer.allocateDirect(w * h * 3);
         }
+        // Bulk-fetch the whole raster once (per-pixel getRGB is far too slow at
+        // 4096x4096 = 16M pixels), then emit rows bottom-up for GL's v-origin.
+        int[] row = new int[w];
         for (int i = h - 1; i >= 0; i--) {
+            img.getRGB(0, i, w, 1, row, 0, w);
             for (int j = 0; j < w; j++) {
-                int pix = img.getRGB(j, i);
+                int pix = row[j];
                 texBuf.put((byte) ((pix >> 16) & 0xff));// red
                 texBuf.put((byte) ((pix >> 8) & 0xff)); // green
                 texBuf.put((byte) ((pix) & 0xff)); // blue

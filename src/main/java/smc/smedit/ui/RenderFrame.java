@@ -538,6 +538,12 @@ public class RenderFrame extends JFrame {
         redoButton = getDefaultButton(new RedoActionButton(this), "Redo last action", r);
         outerToolBar.add(redoButton);
 
+        outerToolBar.addSeparator();
+        JButton resetCamButton = new JButton("Reset View");
+        resetCamButton.setToolTipText("Reset the camera to look down at the ship from the top-left");
+        resetCamButton.addActionListener(e -> getClient().resetCamera());
+        outerToolBar.add(resetCamButton);
+
         outerToolBar.add(Box.createHorizontalGlue());
 
         final ImageIcon p = new ImageIcon(Paths.getIconDirectory() + "/plugins.png");
@@ -595,6 +601,12 @@ public class RenderFrame extends JFrame {
         menuView.add(new JCheckBoxMenuItem(new PlainAction(this)));
         menuView.add(new JCheckBoxMenuItem(new AxisAction(this)));
         menuView.add(new JCheckBoxMenuItem(new DontDrawAction(this)));
+        JMenuItem resetCamItem = new JMenuItem("Reset Camera");
+        resetCamItem.addActionListener(e -> getClient().resetCamera());
+        menuView.add(resetCamItem);
+        JCheckBoxMenuItem orthoItem = new JCheckBoxMenuItem("Orthographic");
+        orthoItem.addActionListener(e -> getClient().setOrthographic(orthoItem.isSelected()));
+        menuView.add(orthoItem);
         JSeparator viewFileStart = new JSeparator();
         viewFileStart.setName("pluginsStartHere");
         menuView.add(viewFileStart);

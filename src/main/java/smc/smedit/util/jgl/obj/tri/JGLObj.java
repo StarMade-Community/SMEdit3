@@ -44,6 +44,7 @@ public class JGLObj extends JGLNode {
     protected boolean mWireframe;
     protected Color3f mWireColor;
     private boolean mAnyAlpha;
+    private boolean mTransparent;
     protected int mVertices;
     protected int mIndices;
     protected int mColors;
@@ -458,6 +459,15 @@ public class JGLObj extends JGLNode {
 
     public void setAnyAlpha(boolean anyAlpha) {
         mAnyAlpha = anyAlpha;
+    }
+
+    /** Whether this mesh is drawn in the blended, depth-write-off transparent pass. */
+    public boolean isTransparent() {
+        return mTransparent;
+    }
+
+    public void setTransparent(boolean transparent) {
+        mTransparent = transparent;
     }
 
     public int getMode() {
