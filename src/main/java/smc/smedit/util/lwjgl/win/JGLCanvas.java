@@ -66,6 +66,10 @@ public class JGLCanvas extends Canvas {
         this.mMouseMotionListeners = new ArrayList<>();
         this.mKeyListeners = new ArrayList<>();
         mIB16 = BufferUtils.createIntBuffer(16);
+        // Must hold keyboard focus for LWJGL to deliver key events (WASD/EQ fly
+        // controls). Swing widgets in other panels can steal it, so we reclaim it
+        // on click and after each Display (re)build below.
+        setFocusable(true);
         addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
@@ -207,6 +211,17 @@ public class JGLCanvas extends Canvas {
         return -1;
     }
 
+    /** Tears down the LWJGL Display if one exists, swallowing errors from a dead peer. */
+    private static void destroyDisplayQuietly() {
+        if (Display.isCreated()) {
+            try {
+                Display.destroy();
+            } catch (Throwable ignored) {
+                // The old native peer may already be gone after a reparent; best effort.
+            }
+        }
+    }
+
     private void doRenderLoop() {
         // Outer loop: rebuild the Display whenever it is lost (the canvas being
         // reparented by the docking framework recreates the native peer).
@@ -224,9 +239,29 @@ public class JGLCanvas extends Canvas {
                     break;
                 }
                 mNeedsReinit = false;
+                // Never call create() with a context still alive. A reparent (or a
+                // teardown that threw because the old peer was already gone) can
+                // leave one, and LWJGL then throws "Only one LWJGL context may be
+                // instantiated at any one time".
+                destroyDisplayQuietly();
                 Display.setParent(this);
+                try {
+                    Display.create();
+                } catch (IllegalStateException stale) {
+                    destroyDisplayQuietly();
+                    Display.create();
+                }
+                // VSync needs a current GL context, so it must come after create();
+                // calling it first NPEs (current_context is null) and the loop then
+                // spins rebuilding the Display forever.
                 Display.setVSyncEnabled(true);
-                Display.create();
+                // Fresh GL context: every texture uploaded to the previous one is
+                // gone. Drop the cached GL ids so they re-upload (otherwise the ship
+                // renders as a white silhouette after a panel add/remove).
+                JGLTextureCache.invalidate();
+                // A rebuilt Display starts unfocused; reclaim keyboard focus so the
+                // fly controls keep working after a panel add/remove.
+                java.awt.EventQueue.invokeLater(this::requestFocusInWindow);
                 mMouseState = new boolean[Mouse.getButtonCount()];
                 for (int i = 0; i < mMouseState.length; i++) {
                     mMouseState[i] = Mouse.isButtonDown(i);
@@ -268,13 +303,7 @@ public class JGLCanvas extends Canvas {
             } catch (LWJGLException | RuntimeException e) {
                 log.log(java.util.logging.Level.WARNING, "Render loop error; rebuilding the GL display.", e);
             } finally {
-                if (Display.isCreated()) {
-                    try {
-                        Display.destroy();
-                    } catch (Throwable ignored) {
-                        // best-effort teardown
-                    }
-                }
+                destroyDisplayQuietly();
             }
             // Brief pause before rebuilding so a burst of reparent events settles.
             if (!mCloseRequested) {
@@ -413,6 +442,21 @@ public class JGLCanvas extends Canvas {
             int x = Mouse.getEventX();
             int y = Mouse.getEventY();
             int modifiers = 0;
+            // Fold the LWJGL keyboard's shift/ctrl state into the synthesized AWT
+            // event so listeners (e.g. additive block selection) can read it.
+            if (Keyboard.isCreated()) {
+                if (Keyboard.isKeyDown(Keyboard.KEY_LSHIFT) || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT)) {
+                    modifiers |= java.awt.event.InputEvent.SHIFT_MASK;
+                }
+                if (Keyboard.isKeyDown(Keyboard.KEY_LCONTROL) || Keyboard.isKeyDown(Keyboard.KEY_RCONTROL)) {
+                    modifiers |= java.awt.event.InputEvent.CTRL_MASK;
+                }
+            }
+            // The LWJGL Display polls the mouse globally while focused, so a scroll
+            // or click over another Swing panel would still zoom/pick the viewport.
+            // Only act when the cursor is actually over the canvas. (y is bottom-up,
+            // but 0..height either way.)
+            boolean inCanvas = x >= 0 && y >= 0 && x < getWidth() && y < getHeight();
             if (button >= 0) {
                 // LWJGL mouse buttons: 0=left, 1=right, 2=middle -> AWT
                 // BUTTON1=left, BUTTON3=right, BUTTON2=middle.
@@ -420,13 +464,21 @@ public class JGLCanvas extends Canvas {
                 if (mMouseState[button] != buttonState) {
                     //System.out.println("Button="+button+", state="+buttonState+", x="+x+", y="+y);
                     if (buttonState) {
-                        MouseEvent event = new MouseEvent(this, MouseEvent.MOUSE_PRESSED, nanoseconds, modifiers, x, y, 1, false, jButton);
-                        fireMouseEvent(event);
+                        if (inCanvas) {
+                            // Clicking the viewport reclaims keyboard focus (Swing panels
+                            // may have taken it), so WASD/EQ work again right after.
+                            if (!isFocusOwner()) {
+                                java.awt.EventQueue.invokeLater(this::requestFocusInWindow);
+                            }
+                            MouseEvent event = new MouseEvent(this, MouseEvent.MOUSE_PRESSED, nanoseconds, modifiers, x, y, 1, false, jButton);
+                            fireMouseEvent(event);
+                            mMouseState[button] = true;
+                        }
                     } else {
                         MouseEvent event = new MouseEvent(this, MouseEvent.MOUSE_RELEASED, nanoseconds, modifiers, x, y, 1, false, jButton);
                         fireMouseEvent(event);
+                        mMouseState[button] = false;
                     }
-                    mMouseState[button] = buttonState;
                 }
             }
             if ((dX != 0) || (dY != 0)) {
@@ -448,7 +500,7 @@ public class JGLCanvas extends Canvas {
                     fireMouseMoveEvent(event);
                 }
             }
-            if (dWheel != 0) {
+            if (dWheel != 0 && inCanvas) {
                 MouseWheelEvent event = new MouseWheelEvent(this, MouseEvent.MOUSE_WHEEL, nanoseconds, modifiers,
                         x, y, 1, false, MouseWheelEvent.WHEEL_UNIT_SCROLL, dWheel, dWheel / 120);
                 fireMouseWheelEvent(event);

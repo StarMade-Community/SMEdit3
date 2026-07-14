@@ -22,8 +22,6 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
 
-import smc.smedit.data.RenderPoly;
-import smc.smedit.logic.RenderPolyLogic;
 import smc.smedit.logic.StarMadeLogic;
 import smc.smedit.vecmath.Point3f;
 import smc.smedit.vecmath.Point3i;
@@ -39,7 +37,6 @@ public class LWJGLMouseAdapter extends MouseAdapter {
 
     private static final int MOUSE_MODE_NULL = 0;
     private static final int MOUSE_MODE_PIVOT = 1; // orbit around the ship centre
-    private static final int MOUSE_MODE_SELECT = 2;
     private static final int MOUSE_MODE_PAN = 3;
 
     private final LWJGLRenderPanel mPanel;
@@ -83,8 +80,14 @@ public class LWJGLMouseAdapter extends MouseAdapter {
             // Middle-drag pans the view.
             mMouseMode = MOUSE_MODE_PAN;
         } else {
-            // Left button is reserved for selection (added later).
+            // Left-click selects the block under the cursor. Shift/Ctrl forces
+            // additive (toggle) selection regardless of the active mode.
             mMouseMode = MOUSE_MODE_NULL;
+            Point3i hit = mPanel.getPointAt(p.x, p.y);
+            boolean additive = (modifiers
+                    & (java.awt.event.InputEvent.SHIFT_MASK | java.awt.event.InputEvent.CTRL_MASK)) != 0;
+            StarMadeLogic.getInstance().getSelection()
+                    .applyPick(hit, StarMadeLogic.getModel(), additive);
         }
     }
 
@@ -110,11 +113,6 @@ public class LWJGLMouseAdapter extends MouseAdapter {
                 mPanel.mUniverse.getCamera().moveUp(dy * PAN_SPEED);
                 mPanel.updateTransform();
             }
-        } else if (mMouseMode == MOUSE_MODE_SELECT) {
-            RenderPoly tile = mPanel.getTileAt(p.x, p.y);
-            if (tile != null) {
-                extendSelection(tile);
-            }
         }
     }
 
@@ -122,8 +120,6 @@ public class LWJGLMouseAdapter extends MouseAdapter {
         if (mMouseMode == MOUSE_MODE_PIVOT) {
             doMouseMove(p, modifiers);
             mMouseDownAt = null;
-        } else if (mMouseMode == MOUSE_MODE_SELECT) {
-            doMouseMove(p, modifiers);
         }
         mMouseMode = MOUSE_MODE_NULL;
     }
@@ -143,28 +139,4 @@ public class LWJGLMouseAdapter extends MouseAdapter {
         mPanel.updateTransform();
     }
 
-    private void extendSelection(RenderPoly tile) {
-        Point3i lowest = new Point3i();
-        Point3i highest = new Point3i();
-        RenderPolyLogic.getBounds(tile, lowest, highest);
-        Point3i lower = StarMadeLogic.getInstance().getSelectedLower();
-        if (lower == null) {
-            lower = lowest;
-            StarMadeLogic.getInstance().setSelectedLower(lower);
-        } else {
-            lower.x = Math.min(lower.x, lowest.x);
-            lower.y = Math.min(lower.y, lowest.y);
-            lower.z = Math.min(lower.z, lowest.z);
-        }
-        Point3i upper = StarMadeLogic.getInstance().getSelectedUpper();
-        if (upper == null) {
-            upper = highest;
-            StarMadeLogic.getInstance().setSelectedUpper(upper);
-        } else {
-            upper.x = Math.min(upper.x, highest.x);
-            upper.y = Math.min(upper.y, highest.y);
-            upper.z = Math.min(upper.z, highest.z);
-        }
-        mPanel.updateSelectionBox();
-    }
 }

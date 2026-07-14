@@ -142,29 +142,30 @@ public class LWJGLRenderLogic {
         Point3f upper = new Point3f(p.x + .5f, p.y + .5f, p.z + .5f);
         short[] colors = new short[]{b.getBlockID()};
         List<JGLObj> objs = new ArrayList<>();
-        if (!occludes(grid, p.x + 1, p.y, p.z)) {
+        int orient = b.getOrientation();
+        if (!hidesFace(grid, b, p.x + 1, p.y, p.z)) {
             addSelectFace(group, upper.x, lower.y, lower.z, upper.x, upper.y, upper.z,
-                    RenderPoly.XP, colors[0 % colors.length]);
+                    RenderPoly.XP, colors[0 % colors.length], orient);
         }
-        if (!occludes(grid, p.x - 1, p.y, p.z)) {
+        if (!hidesFace(grid, b, p.x - 1, p.y, p.z)) {
             addSelectFace(group, lower.x, lower.y, lower.z, lower.x, upper.y, upper.z,
-                    RenderPoly.XM, colors[1 % colors.length]);
+                    RenderPoly.XM, colors[1 % colors.length], orient);
         }
-        if (!occludes(grid, p.x, p.y + 1, p.z)) {
+        if (!hidesFace(grid, b, p.x, p.y + 1, p.z)) {
             addSelectFace(group, lower.x, upper.y, lower.z, upper.x, upper.y, upper.z,
-                    RenderPoly.YP, colors[2 % colors.length]);
+                    RenderPoly.YP, colors[2 % colors.length], orient);
         }
-        if (!occludes(grid, p.x, p.y - 1, p.z)) {
+        if (!hidesFace(grid, b, p.x, p.y - 1, p.z)) {
             addSelectFace(group, lower.x, lower.y, lower.z, upper.x, lower.y, upper.z,
-                    RenderPoly.YM, colors[3 % colors.length]);
+                    RenderPoly.YM, colors[3 % colors.length], orient);
         }
-        if (!occludes(grid, p.x, p.y, p.z + 1)) {
+        if (!hidesFace(grid, b, p.x, p.y, p.z + 1)) {
             addSelectFace(group, lower.x, lower.y, upper.z, upper.x, upper.y, upper.z,
-                    RenderPoly.ZP, colors[4 % colors.length]);
+                    RenderPoly.ZP, colors[4 % colors.length], orient);
         }
-        if (!occludes(grid, p.x, p.y, p.z - 1)) {
+        if (!hidesFace(grid, b, p.x, p.y, p.z - 1)) {
             addSelectFace(group, lower.x, lower.y, lower.z, upper.x, upper.y, lower.z,
-                    RenderPoly.ZM, colors[5 % colors.length]);
+                    RenderPoly.ZM, colors[5 % colors.length], orient);
         }
         for (JGLObj obj : objs) {
             obj.setData("point", p);
@@ -238,21 +239,21 @@ public class LWJGLRenderLogic {
         Point3f v3a = shift(c3, c, 0.5f), v3b = shift(c3, c, -0.5f);
 
         // Full face opposite the first cut face (normal -a).
-        if (!occludesDir(grid, p, a, -1)) {
+        if (!hidesFaceDir(grid, p, b, a, -1)) {
             addWedgeFace(info, v2a, v2b, v3b, v3a, id);
         }
         // Full face opposite the second cut face (normal -b).
-        if (!occludesDir(grid, p, bDir, -1)) {
+        if (!hidesFaceDir(grid, p, b, bDir, -1)) {
             addWedgeFace(info, v1a, v1b, v2b, v2a, id);
         }
         // The slope (hypotenuse) — always exposed.
         addWedgeFace(info, v1a, v1b, v3b, v3a, id);
         // The two triangular sides (a degenerate quad = triangle), culled against
         // the neighbours along the prism axis.
-        if (!occludesDir(grid, p, c, 1)) {
+        if (!hidesFaceDir(grid, p, b, c, 1)) {
             addWedgeFace(info, v1a, v2a, v3a, v3a, id);
         }
-        if (!occludesDir(grid, p, c, -1)) {
+        if (!hidesFaceDir(grid, p, b, c, -1)) {
             addWedgeFace(info, v1b, v2b, v3b, v3b, id);
         }
     }
@@ -338,12 +339,13 @@ public class LWJGLRenderLogic {
         float x0 = p.x + minX, x1 = p.x + maxX;
         float y0 = p.y + minY, y1 = p.y + maxY;
         float z0 = p.z + minZ, z1 = p.z + maxZ;
-        addSelectFace(info, x1, y0, z0, x1, y1, z1, RenderPoly.XP, id);
-        addSelectFace(info, x0, y0, z0, x0, y1, z1, RenderPoly.XM, id);
-        addSelectFace(info, x0, y1, z0, x1, y1, z1, RenderPoly.YP, id);
-        addSelectFace(info, x0, y0, z0, x1, y0, z1, RenderPoly.YM, id);
-        addSelectFace(info, x0, y0, z1, x1, y1, z1, RenderPoly.ZP, id);
-        addSelectFace(info, x0, y0, z0, x1, y1, z0, RenderPoly.ZM, id);
+        int orient = b.getOrientation();
+        addSelectFace(info, x1, y0, z0, x1, y1, z1, RenderPoly.XP, id, orient);
+        addSelectFace(info, x0, y0, z0, x0, y1, z1, RenderPoly.XM, id, orient);
+        addSelectFace(info, x0, y1, z0, x1, y1, z1, RenderPoly.YP, id, orient);
+        addSelectFace(info, x0, y0, z0, x1, y0, z1, RenderPoly.YM, id, orient);
+        addSelectFace(info, x0, y0, z1, x1, y1, z1, RenderPoly.ZP, id, orient);
+        addSelectFace(info, x0, y0, z0, x1, y1, z0, RenderPoly.ZM, id, orient);
     }
 
     /** Adds a sprite: two crossed vertical quads (an X), like foliage. Rendered double-sided. */
@@ -440,23 +442,14 @@ public class LWJGLRenderLogic {
     }
 
     /**
-     * Whether the block at (x,y,z) fully covers the shared face — i.e. it's a
-     * solid, full-size cube. Slabs and shaped blocks (wedge/corner/tetra/hepta/
-     * sprite) don't fill the whole cell, so a neighbour's face against them stays
-     * visible and must NOT be culled (otherwise you can see straight through the
-     * gap into the ship interior).
+     * Whether {@code id} is a solid, full-size cube that fully covers any face
+     * touching it. Slabs, transparent blocks and shaped blocks (wedge/corner/
+     * tetra/hepta/sprite) don't, so a neighbour's face against them stays visible.
      */
-    private static boolean occludes(SparseMatrix<Block> grid, int x, int y, int z) {
-        Block n = grid.get(x, y, z);
-        if (n == null) {
-            return false;
-        }
-        short id = n.getBlockID();
+    private static boolean isFullOpaqueCube(short id) {
         if (BlockTypeColors.getBlockSlab(id) > 0) {
             return false;
         }
-        // Transparent blocks (glass, lights) don't hide what's behind them, so a
-        // neighbour's face against them must stay visible.
         if (BlockTypeColors.isTransparent(id)) {
             return false;
         }
@@ -464,9 +457,46 @@ public class LWJGLRenderLogic {
         return style == BlockTypeColors.STYLE_NORMAL || style == BlockTypeColors.STYLE_NORMAL24;
     }
 
-    /** {@link #occludes} in a direction from {@code p} (dir components are rounded). */
-    private static boolean occludesDir(SparseMatrix<Block> grid, Point3i p, float[] dir, int sign) {
-        return occludes(grid, p.x + Math.round(dir[0] * sign),
+    /**
+     * Whether {@code self}'s face toward the block at (x,y,z) is hidden and can be
+     * skipped. Rules:
+     * <ul>
+     * <li>A full opaque cube always hides the face.</li>
+     * <li>Two adjacent transparent blocks of the <em>same</em> id share an
+     * internal face neither needs to draw (no overdraw inside a glass volume).</li>
+     * <li>A partial/transparent neighbour (glass, crystal, slab, shaped) only
+     * reveals the face behind it if that neighbour is itself exposed to air. A
+     * neighbour buried inside a solid mass hides the face — so fully-packed cores
+     * (e.g. system-block fill) draw no internal geometry, while a window still
+     * shows the hull directly behind the glass.</li>
+     * </ul>
+     */
+    private static boolean hidesFace(SparseMatrix<Block> grid, Block self, int x, int y, int z) {
+        Block n = grid.get(x, y, z);
+        if (n == null) {
+            return false;
+        }
+        short nid = n.getBlockID();
+        if (isFullOpaqueCube(nid)) {
+            return true;
+        }
+        short sid = self.getBlockID();
+        if (sid == nid && BlockTypeColors.isTransparent(sid)) {
+            return true;
+        }
+        return !hasAirNeighbor(grid, x, y, z);
+    }
+
+    /** Whether the cell at (x,y,z) has at least one empty (air) orthogonal neighbour. */
+    private static boolean hasAirNeighbor(SparseMatrix<Block> grid, int x, int y, int z) {
+        return !grid.contains(x + 1, y, z) || !grid.contains(x - 1, y, z)
+                || !grid.contains(x, y + 1, z) || !grid.contains(x, y - 1, z)
+                || !grid.contains(x, y, z + 1) || !grid.contains(x, y, z - 1);
+    }
+
+    /** {@link #hidesFace} in a direction from {@code p} (dir components are rounded). */
+    private static boolean hidesFaceDir(SparseMatrix<Block> grid, Point3i p, Block self, float[] dir, int sign) {
+        return hidesFace(grid, self, p.x + Math.round(dir[0] * sign),
                 p.y + Math.round(dir[1] * sign),
                 p.z + Math.round(dir[2] * sign));
     }
@@ -512,19 +542,25 @@ public class LWJGLRenderLogic {
      */
     public static void addSelectFace(MeshInfo group, float x1, float y1, float z1, float x2, float y2, float z2,
             int face, short type) {
+        addSelectFace(group, x1, y1, z1, x2, y2, z2, face, type, 0);
+    }
+
+    /** As {@link #addSelectFace}, with the block {@code orientation} for per-face texture selection. */
+    public static void addSelectFace(MeshInfo group, float x1, float y1, float z1, float x2, float y2, float z2,
+            int face, short type, int orientation) {
         if (MathUtils.epsilonEquals(x1, x2)) {
             if (face == RenderPoly.XP) {
                 addSelectQuad(group, new Point3f(x1, y1, z1),
                         new Point3f(x1, y1, z2),
                         new Point3f(x1, y2, z2),
                         new Point3f(x1, y2, z1),
-                        type, face);
+                        type, face, orientation);
             } else {
                 addSelectQuad(group, new Point3f(x1, y1, z1),
                         new Point3f(x1, y2, z1),
                         new Point3f(x1, y2, z2),
                         new Point3f(x1, y1, z2),
-                        type, face);
+                        type, face, orientation);
             }
         } else if (MathUtils.epsilonEquals(y1, y2)) {
             if (face == RenderPoly.YP) {
@@ -532,13 +568,13 @@ public class LWJGLRenderLogic {
                         new Point3f(x2, y1, z1),
                         new Point3f(x2, y1, z2),
                         new Point3f(x1, y1, z2),
-                        type, face);
+                        type, face, orientation);
             } else {
                 addSelectQuad(group, new Point3f(x1, y1, z1),
                         new Point3f(x1, y1, z2),
                         new Point3f(x2, y1, z2),
                         new Point3f(x2, y1, z1),
-                        type, face);
+                        type, face, orientation);
             }
         } else if (MathUtils.epsilonEquals(z1, z2)) {
             if (face == RenderPoly.ZP) {
@@ -546,13 +582,13 @@ public class LWJGLRenderLogic {
                         new Point3f(x1, y2, z1),
                         new Point3f(x2, y2, z1),
                         new Point3f(x2, y1, z1),
-                        type, face);
+                        type, face, orientation);
             } else {
                 addSelectQuad(group, new Point3f(x1, y1, z1),
                         new Point3f(x2, y1, z1),
                         new Point3f(x2, y2, z1),
                         new Point3f(x1, y2, z1),
-                        type, face);
+                        type, face, orientation);
             }
         }
     }
@@ -568,16 +604,17 @@ public class LWJGLRenderLogic {
      */
     public static void addSelectQuad(MeshInfo info, Point3f left, Point3f top, Point3f right, Point3f bottom,
             short type) {
-        addSelectQuad(info, left, top, right, bottom, type, -1);
+        addSelectQuad(info, left, top, right, bottom, type, -1, 0);
     }
 
     /**
      * Adds one quad. {@code face} is a {@link RenderPoly} cube face (XP..ZM) so
-     * the quad samples that face's own texture on multi-textured blocks; pass -1
-     * (e.g. for shaped-block faces) to use the block's primary texture.
+     * the quad samples that face's own texture on multi-textured blocks (with the
+     * block's {@code orientation} applied); pass -1 (e.g. for shaped-block faces)
+     * to use the block's primary texture.
      */
     public static void addSelectQuad(MeshInfo info, Point3f left, Point3f top, Point3f right, Point3f bottom,
-            short type, int face) {
+            short type, int face, int orientation) {
         info.verts.add(left);
         info.verts.add(top);
         info.verts.add(right);
@@ -596,12 +633,87 @@ public class LWJGLRenderLogic {
         }
         if (info.uv != null) {
             Rectangle2D.Float rec = (face >= 0)
-                    ? BlockTypeColors.getFaceTextureLocation(type, face)
+                    ? BlockTypeColors.getFaceTextureLocation(type, face, orientation)
                     : BlockTypeColors.getAllTextureLocation(type);
-            info.uv.add(new Point2f(rec.x, rec.y));
-            info.uv.add(new Point2f(rec.x + rec.width, rec.y));
-            info.uv.add(new Point2f(rec.x + rec.width, rec.y + rec.height));
-            info.uv.add(new Point2f(rec.x, rec.y + rec.height));
+            // Emitted UV order maps to tile-corner indices (u + 2v): c0=(0,0)=0,
+            // c1=(1,0)=1, c2=(1,1)=3, c3=(0,1)=2. The per-face transform rotates the
+            // texture to match the block's orientation (identity for unrotated blocks).
+            int[] cornerIdx = {0, 1, 3, 2};
+            int[] perm = (face >= 0) ? BlockTypeColors.getFaceUvTransform(type, face, orientation) : null;
+            for (int k = 0; k < 4; k++) {
+                int idx = (perm != null) ? perm[cornerIdx[k]] : cornerIdx[k];
+                float u = idx & 1;
+                float v = (idx >> 1) & 1;
+                info.uv.add(new Point2f(rec.x + u * rec.width, rec.y + v * rec.height));
+            }
+        }
+    }
+
+    /**
+     * Reorders a transparent mesh's quads back-to-front relative to {@code cam}
+     * (world/model space, same space as the block vertices) so alpha blending
+     * composites in the correct order — without this, stacked glass blends in
+     * index order and shows artifacts. Cheap enough to call on camera moves, and
+     * safe to run while the render thread draws (both hold the obj's monitor).
+     */
+    public static void sortTransparentQuads(JGLObj obj, Point3f cam) {
+        synchronized (obj) {
+            java.nio.FloatBuffer vb = obj.getVertexBuffer();
+            if (vb == null) {
+                return;
+            }
+            java.nio.IntBuffer ib = obj.getIndexIntBuffer();
+            java.nio.ShortBuffer sb = (ib == null) ? obj.getIndexShortBuffer() : null;
+            int n = ib != null ? ib.limit() : (sb != null ? sb.limit() : 0);
+            int quads = n / 4;
+            if (quads < 2) {
+                return;
+            }
+            int[] idx = new int[n];
+            if (ib != null) {
+                for (int i = 0; i < n; i++) {
+                    idx[i] = ib.get(i);
+                }
+            } else {
+                for (int i = 0; i < n; i++) {
+                    idx[i] = sb.get(i) & 0xFFFF;
+                }
+            }
+            float[] dist = new float[quads];
+            Integer[] order = new Integer[quads];
+            for (int q = 0; q < quads; q++) {
+                order[q] = q;
+                float cx = 0, cy = 0, cz = 0;
+                for (int k = 0; k < 4; k++) {
+                    int vi = idx[q * 4 + k] * 3;
+                    cx += vb.get(vi);
+                    cy += vb.get(vi + 1);
+                    cz += vb.get(vi + 2);
+                }
+                cx *= 0.25f;
+                cy *= 0.25f;
+                cz *= 0.25f;
+                float dx = cx - cam.x, dy = cy - cam.y, dz = cz - cam.z;
+                dist[q] = dx * dx + dy * dy + dz * dz;
+            }
+            java.util.Arrays.sort(order, (a, b) -> Float.compare(dist[b], dist[a])); // farthest first
+            if (ib != null) {
+                for (int q = 0; q < quads; q++) {
+                    int src = order[q] * 4;
+                    for (int k = 0; k < 4; k++) {
+                        ib.put(q * 4 + k, idx[src + k]);
+                    }
+                }
+                ib.position(0);
+            } else {
+                for (int q = 0; q < quads; q++) {
+                    int src = order[q] * 4;
+                    for (int k = 0; k < 4; k++) {
+                        sb.put(q * 4 + k, (short) idx[src + k]);
+                    }
+                }
+                sb.position(0);
+            }
         }
     }
 }

@@ -35,6 +35,10 @@ dependencies {
 
     // Modern Swing look-and-feel (3.7.1 to match what modern-docking-ui pulls in).
     implementation 'com.formdev:flatlaf:3.7.1'
+    // Ikonli: free public icon packs rendered as Swing Icons (crisp at any size,
+    // tinted to the theme). Feather pack (MIT icons) covers the toolbar actions.
+    implementation 'org.kordamp.ikonli:ikonli-swing:12.3.1'
+    implementation 'org.kordamp.ikonli:ikonli-feather-pack:12.3.1'
 
     // Dockable / floating / collapsible panels (paint-program-style layout) with
     // layout persistence. modern-docking-ui adds FlatLaf integration.
@@ -55,6 +59,9 @@ test {
 
 application {
     mainClass = 'smc.smedit.SMEdit'
+    // Roomy heap for the block-texture atlas + large blueprints. GpuOffload's
+    // discrete-GPU relaunch propagates these -X args to the child JVM.
+    applicationDefaultJvmArgs = ['-Xmx8g']
 }
 
 jar {

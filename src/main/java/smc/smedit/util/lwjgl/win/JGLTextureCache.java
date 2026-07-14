@@ -63,6 +63,19 @@ public class JGLTextureCache {
         }
     }
 
+    /**
+     * Drops all cached GL texture ids without touching the registered specs. Call
+     * after the GL context is (re)created — the old ids belong to the dead context
+     * and would bind to nothing (everything renders white); this forces each
+     * texture to re-upload from its spec on next use.
+     */
+    public static void invalidate() {
+        synchronized (mMRULoaded) {
+            mMRULoaded.clear();
+        }
+        mLoadedCache.clear();
+    }
+
     public static void freeUnusedTextures() {
         int[] unused = getUnUsedTextures();
         System.out.println("Freeing gl#" + unused);

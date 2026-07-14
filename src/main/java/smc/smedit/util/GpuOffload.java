@@ -18,19 +18,21 @@
 package smc.smedit.util;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Best-effort discrete-GPU selection on Linux hybrid-graphics ("Optimus"-style)
- * systems, so the 3D editor renders on the dedicated GPU instead of the
- * integrated one.
+ * Best-effort discrete-GPU selection so the 3D editor renders on the dedicated
+ * GPU instead of the integrated one.
  *
  * <p>Which GPU an OpenGL/GLX context uses is decided by environment variables
  * read when the context is created, so they must be present <em>before</em> the
@@ -38,7 +40,7 @@ import java.util.logging.Logger;
  * native libraries, so when a discrete GPU is detected and we are not already
  * offloaded, we re-exec the JVM once with the right variables set:
  * <ul>
- *   <li><b>NVIDIA</b> (Optimus): {@code __NV_PRIME_RENDER_OFFLOAD=1} +
+ *   <li><b>NVIDIA</b>: {@code __NV_PRIME_RENDER_OFFLOAD=1} +
  *       {@code __GLX_VENDOR_LIBRARY_NAME=nvidia} — uses the native NVIDIA GLX
  *       driver (as opposed to {@code DRI_PRIME=1}, which routes through Mesa's
  *       GL-on-Vulkan "zink" translation layer).</li>
@@ -80,10 +82,13 @@ public final class GpuOffload {
                     return;
                 }
             }
+            if ("false".equalsIgnoreCase(pref("gpu.offload"))) {
+                return; // disabled in Settings > Performance
+            }
             if (!System.getProperty("os.name", "").toLowerCase().contains("linux")) {
                 return; // macOS: automatic; Windows: driver profile / native launcher
             }
-            final Map<String, String> env = discreteGpuEnv();
+            Map<String, String> env = discreteGpuEnv();
             if (env.isEmpty()) {
                 return; // single GPU, or nothing to offload to
             }
@@ -142,11 +147,50 @@ public final class GpuOffload {
         }
     }
 
+    /**
+     * Reads one preference from the shared {@code ~/.josm} store directly (this
+     * runs before the toolkit / StarMadeLogic are initialised). Returns null on
+     * any problem.
+     */
+    private static String pref(final String key) {
+        try {
+            final File f = new File(System.getProperty("user.home"), ".josm");
+            if (!f.isFile()) {
+                return null;
+            }
+            final Properties p = new Properties();
+            try (InputStream is = new FileInputStream(f)) {
+                p.load(is);
+            }
+            return p.getProperty(key);
+        } catch (final Exception e) {
+            return null;
+        }
+    }
+
     private static void relaunch(final Map<String, String> env, final String[] args) throws Exception {
         final String javaBin = System.getProperty("java.home")
                 + File.separator + "bin" + File.separator + "java";
         final List<String> cmd = new ArrayList<>();
         cmd.add(javaBin);
+        // Heap: prefer the Settings "memory" (GB) value; else carry over the parent
+        // JVM's -Xmx. Also carry the parent's other -Xm*/-Xss/-XX tuning, so the
+        // child doesn't silently drop to the default max heap. Debug/agent args are
+        // skipped so we don't re-bind their ports.
+        final String memPref = pref("memory");
+        final boolean heapFromPref = memPref != null && memPref.matches("\\d+");
+        if (heapFromPref) {
+            cmd.add("-Xmx" + memPref + "g");
+        }
+        for (final String a : java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments()) {
+            if (a.startsWith("-Xmx")) {
+                if (!heapFromPref) {
+                    cmd.add(a);
+                }
+            } else if (a.startsWith("-Xm") || a.startsWith("-Xss") || a.startsWith("-XX")) {
+                cmd.add(a);
+            }
+        }
         cmd.add("-cp");
         cmd.add(System.getProperty("java.class.path"));
         cmd.add(MAIN_CLASS);

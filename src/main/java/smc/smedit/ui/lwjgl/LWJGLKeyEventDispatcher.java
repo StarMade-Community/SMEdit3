@@ -17,7 +17,6 @@
  **/
 package smc.smedit.ui.lwjgl;
 
-import java.awt.Component;
 import java.awt.KeyEventDispatcher;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
@@ -25,7 +24,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
-import javax.swing.JFrame;
 import javax.swing.Timer;
 
 import smc.smedit.vecmath.Point3f;
@@ -144,11 +142,10 @@ public class LWJGLKeyEventDispatcher implements KeyEventDispatcher, KeyListener 
     }
 
     private boolean isFocused() {
-        for (Component c = mPanel; c != null; c = c.getParent()) {
-            if (c instanceof JFrame) {
-                return ((JFrame) c).isActive();
-            }
-        }
-        return false;
+        // Only move while the app window is active. Use the actual window ancestor
+        // (the docking framework nests the viewport deep, so walking for a JFrame
+        // by hand is fragile).
+        java.awt.Window w = javax.swing.SwingUtilities.getWindowAncestor(mPanel);
+        return w != null && w.isActive();
     }
 }

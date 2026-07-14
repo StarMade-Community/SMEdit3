@@ -12,12 +12,12 @@ public class ObjDrawHandler extends NodeDrawHandler {
         synchronized (node) {
             preDraw(tick, node);
             JGLObj obj = (JGLObj) node;
-            // Transparent meshes (glass/lights) are drawn after the opaque pass:
-            // keep depth testing so they hide behind solid hull, but stop them
-            // writing depth so overlapping glass blends instead of z-fighting.
-            if (obj.isTransparent()) {
-                GL11.glDepthMask(false);
-            }
+            // Transparent meshes (glass/lights/crystal) are drawn after the opaque
+            // pass, blended over it. Depth WRITES stay on: the interior behind them
+            // was already drawn opaque (so they still read as see-through), and
+            // writing depth makes transparent surfaces occlude each other and reject
+            // coplanar duplicates — without it, overlapping/adjacent transparent
+            // faces double-blend and shimmer like z-fighting.
             GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
             if (obj.getNormalBuffer() != null) {
                 GL11.glEnableClientState(GL11.GL_NORMAL_ARRAY);
@@ -82,9 +82,6 @@ public class ObjDrawHandler extends NodeDrawHandler {
                 if (obj.isAnyAlpha()) {
                     GL11.glEnable(GL11.GL_BLEND);
                 }
-            }
-            if (obj.isTransparent()) {
-                GL11.glDepthMask(true);
             }
             postDraw(tick, node);
         }

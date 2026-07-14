@@ -815,8 +815,161 @@ public class BlockTypeColors {
      * the order of the six comma-separated values in BlockConfig's {@code textureId}.
      */
     public static final Map<Short, short[]> BLOCK_TEXTURE_IDS_PER_FACE = new HashMap<>();
-    /** RenderPoly face (XP,XM,YP,YM,ZP,ZM = 0..5) -> index into the per-face array above. */
+    /** RenderPoly face (XP,XM,YP,YM,ZP,ZM = 0..5) -> Element side (FRONT=0..LEFT=5). */
     private static final int[] FACE_TO_SIDE = {4, 5, 2, 3, 0, 1};
+    /** BlockConfig &lt;IndividualSides&gt; (1/3/6) — how many distinct per-face textures the block declares. */
+    public static final Map<Short, Integer> BLOCK_INDIVIDUAL_SIDES = new HashMap<>();
+
+    // StarMade's orientation -> texture-side remap tables, ported verbatim from
+    // CubeMeshBufferContainer. Indexed [orientation][worldSide]; the declared side
+    // shown on a world face is (5 - table[orientation][worldSide]). Rows and cols
+    // are in Element side order (FRONT,BACK,TOP,BOTTOM,RIGHT,LEFT = 0..5).
+    private static final int[][] ORIENT_MAP_6 = {
+        {5, 4, 3, 2, 0, 1}, // FRONT
+        {4, 5, 3, 2, 1, 0}, // BACK
+        {1, 0, 5, 4, 2, 3}, // TOP
+        {0, 1, 4, 5, 3, 2}, // BOTTOM
+        {1, 0, 3, 2, 4, 5}, // RIGHT
+        {0, 1, 3, 2, 5, 4}, // LEFT
+    };
+    private static final int[][] ORIENT_MAP_24 = {
+        {5, 4, 2, 3, 0, 1}, // FRONT
+        {4, 5, 2, 3, 1, 0}, // BACK
+        {0, 1, 4, 5, 3, 2}, // TOP
+        {1, 0, 5, 4, 2, 3}, // BOTTOM
+        {1, 0, 3, 2, 4, 5}, // RIGHT
+        {0, 1, 2, 3, 5, 4}, // LEFT
+    };
+    /** 3-sided blocks: orientation-independent (top/bottom distinct, all four sides share). */
+    private static final int[] ORIENT_MAP_3_ROW = {0, 0, 3, 2, 0, 0};
+
+    // ---- In-plane face-texture rotation (StarMade cube.vsh / normalBlock) ----
+    //
+    // StarMade rotates a NORMAL block's face texture with the block's orientation.
+    // We reproduce it as a corner permutation applied to each cube-face quad's UVs,
+    // computed as the DIFFERENCE between orientation O and orientation 0 — so the
+    // transform is the identity at orientation 0 and cannot alter the (overwhelming)
+    // majority of blocks that are unrotated. Only oriented blocks change.
+    //
+    // Side index order here matches the shader's sideId (which drives both position
+    // and texcoord): 0=+X, 1=-X, 2=+Y, 3=-Y, 4=+Z, 5=-Z. RenderPoly faces
+    // XP,XM,YP,YM,ZP,ZM (0..5) map to it 1:1.
+
+    /** Blocks with &lt;SideTexturesPointToOrientation&gt; use the ORIENT table, others NORMAL. */
+    public static final java.util.Set<Short> BLOCK_POINT_TO_ORIENT = new java.util.HashSet<>();
+
+    /** Per-vertex position-corner code (0..3) per face, from StarMade's vertexOrderMap. */
+    private static final int[][] VERTEX_ORDER = {
+        {3, 1, 0, 2}, {2, 0, 1, 3}, {1, 0, 2, 3}, {3, 2, 0, 1}, {2, 0, 1, 3}, {3, 1, 0, 2},
+    };
+
+    // texOrder tables [orientation][side][vertex] -> per-vertex texture code 0..3
+    // (data/textures/texOrder{Normal,PointToOrientation}.config, rows in file order).
+    private static final int[][][] TEX_ORDER_NORMAL = {
+        {{2, 0, 1, 3}, {1, 3, 2, 0}, {1, 3, 2, 0}, {1, 3, 2, 0}, {1, 3, 2, 0}, {2, 0, 1, 3}},
+        {{2, 0, 1, 3}, {1, 3, 2, 0}, {2, 0, 1, 3}, {2, 0, 1, 3}, {1, 3, 2, 0}, {2, 0, 1, 3}},
+        {{3, 2, 0, 1}, {3, 2, 0, 1}, {3, 2, 0, 1}, {3, 2, 0, 1}, {2, 0, 1, 3}, {2, 0, 1, 3}},
+        {{0, 1, 3, 2}, {0, 1, 3, 2}, {0, 1, 3, 2}, {0, 1, 3, 2}, {2, 0, 1, 3}, {2, 0, 1, 3}},
+        {{2, 0, 1, 3}, {1, 3, 2, 0}, {3, 2, 0, 1}, {0, 1, 3, 2}, {1, 3, 2, 0}, {2, 0, 1, 3}},
+        {{2, 0, 1, 3}, {1, 3, 2, 0}, {0, 1, 3, 2}, {3, 2, 0, 1}, {1, 3, 2, 0}, {2, 0, 1, 3}},
+    };
+    private static final int[][][] TEX_ORDER_ORIENT = {
+        {{2, 0, 1, 3}, {1, 3, 2, 0}, {1, 3, 2, 0}, {2, 0, 1, 3}, {0, 1, 3, 2}, {0, 1, 3, 2}},
+        {{2, 0, 1, 3}, {1, 3, 2, 0}, {2, 0, 1, 3}, {1, 3, 2, 0}, {3, 2, 0, 1}, {3, 2, 0, 1}},
+        {{2, 0, 1, 3}, {1, 3, 2, 0}, {1, 3, 2, 0}, {1, 3, 2, 0}, {1, 3, 2, 0}, {2, 0, 1, 3}},
+        {{1, 3, 2, 0}, {2, 0, 1, 3}, {1, 3, 2, 0}, {1, 3, 2, 0}, {2, 0, 1, 3}, {1, 3, 2, 0}},
+        {{3, 2, 0, 1}, {3, 2, 0, 1}, {3, 2, 0, 1}, {3, 2, 0, 1}, {1, 3, 2, 0}, {2, 0, 1, 3}},
+        {{0, 1, 3, 2}, {0, 1, 3, 2}, {0, 1, 3, 2}, {0, 1, 3, 2}, {1, 3, 2, 0}, {2, 0, 1, 3}},
+    };
+
+    /** Identity corner permutation (u+2v corner index -> same). */
+    private static final int[] IDENTITY_UV = {0, 1, 2, 3};
+
+    // Precomputed corner permutations: [table 0=NORMAL/1=ORIENT][side][orientation] -> int[4].
+    private static final int[][][][] UV_TRANSFORM = new int[2][6][6][];
+
+    static {
+        computeUvTransforms(TEX_ORDER_NORMAL, UV_TRANSFORM[0]);
+        computeUvTransforms(TEX_ORDER_ORIENT, UV_TRANSFORM[1]);
+    }
+
+    private static void computeUvTransforms(int[][][] table, int[][][] out) {
+        for (int s = 0; s < 6; s++) {
+            for (int o = 0; o < 6; o++) {
+                out[s][o] = deriveTransform(table, s, o);
+            }
+        }
+    }
+
+    /**
+     * The corner permutation mapping the tile UV a NORMAL-block face shows at
+     * orientation 0 to the one it shows at orientation {@code o}, for side {@code s}.
+     * Applied to our (already-correct-at-0) quad UVs. Identity if not derivable.
+     */
+    private static int[] deriveTransform(int[][][] table, int s, int o) {
+        int[] perm = {-1, -1, -1, -1};
+        boolean[] filled = new boolean[4];
+        for (int dex = 0; dex < 4; dex++) {
+            int base = faceCornerUv(table, s, 0, dex);
+            int cur = faceCornerUv(table, s, o, dex);
+            if (base < 0 || perm[base] != -1) {
+                return IDENTITY_UV; // degenerate/ambiguous — leave untouched
+            }
+            perm[base] = cur;
+            filled[base] = true;
+        }
+        for (boolean f : filled) {
+            if (!f) {
+                return IDENTITY_UV;
+            }
+        }
+        return perm;
+    }
+
+    /** The tile corner (index u+2v, 0..3) that face-vertex {@code dex} samples. */
+    private static int faceCornerUv(int[][][] table, int s, int o, int dex) {
+        int v = VERTEX_ORDER[s][dex];
+        int qx = v & 1;
+        int qy = (v >> 1) & 1;
+        int tex = table[o][s][dex];
+        if (((tex >> 1) & 1) == 1) { // mirror bit flips quad.x
+            qx = 1 - qx;
+        }
+        int b = tex & 1; // blockType bit selects the per-side texcoord variant
+        return gSide(s, qx, qy, b);
+    }
+
+    /** StarMade's per-side texcoord formula: (qx,qy,blockType) -&gt; corner index u+2v. */
+    private static int gSide(int s, int qx, int qy, int b) {
+        int u;
+        int val;
+        switch (s) {
+            case 0: u = (b == 0) ? 1 - qx : qx; val = 1 - qy; break;                 // +X
+            case 1: u = (b == 0) ? qx : 1 - qx; val = 1 - qy; break;                 // -X
+            case 2: u = (b == 0) ? 1 - qx : qx; val = (b == 0) ? 1 - qy : qy; break; // +Y
+            case 3: u = 1 - qx; val = (b == 0) ? qy : 1 - qy; break;                 // -Y
+            case 4: u = (b == 0) ? qx : 1 - qx; val = 1 - qy; break;                 // +Z
+            default: u = (b == 0) ? 1 - qx : qx; val = 1 - qy; break;                // -Z
+        }
+        return u + 2 * val;
+    }
+
+    /**
+     * The UV corner permutation for a cube face, or {@code null} for identity.
+     * {@code renderPolyFace} is a {@link RenderPoly} face (XP..ZM = 0..5). Only
+     * full NORMAL blocks rotate; shaped/NORMAL24 and 3-sided blocks return null.
+     */
+    public static int[] getFaceUvTransform(short blockID, int renderPolyFace, int orientation) {
+        if (renderPolyFace < 0 || renderPolyFace >= 6 || getBlockStyle(blockID) != STYLE_NORMAL) {
+            return null;
+        }
+        if (BLOCK_INDIVIDUAL_SIDES.getOrDefault(blockID, 1) == 3) {
+            return null;
+        }
+        int table = BLOCK_POINT_TO_ORIENT.contains(blockID) ? 1 : 0;
+        int[] perm = UV_TRANSFORM[table][renderPolyFace][Math.floorMod(orientation, 6)];
+        return perm == IDENTITY_UV ? null : perm;
+    }
     /** BlockConfig &lt;BlockStyle&gt; per block id (StarMade BlockStyle enum values). */
     public static final Map<Short, Integer> BLOCK_STYLE = new HashMap<>();
 
@@ -965,12 +1118,24 @@ public class BlockTypeColors {
                 String transparencyTag = XMLUtils.getTextTag(n, "Transparency");
                 boolean transparent = transparencyTag != null
                         && "true".equalsIgnoreCase(transparencyTag.trim());
+                // <IndividualSides> 1/3/6: drives the orientation->texture remap
+                // (how the six declared textures map onto the world faces).
+                int individualSides = IntegerUtils.parseInt(XMLUtils.getTextTag(n, "IndividualSides"));
+                if (individualSides <= 0) {
+                    individualSides = 1;
+                }
+                String ptoTag = XMLUtils.getTextTag(n, "SideTexturesPointToOrientation");
+                boolean pointToOrient = ptoTag != null && "true".equalsIgnoreCase(ptoTag.trim());
 
                 BlockTypes.BLOCK_NAMES.put(id, name);
                 BLOCK_HITPOINTS.put(id, hitPoints);
                 BLOCK_TEXTURE_IDS.put(id, textureID);
                 if (faceTex != null) {
                     BLOCK_TEXTURE_IDS_PER_FACE.put(id, faceTex);
+                }
+                BLOCK_INDIVIDUAL_SIDES.put(id, individualSides);
+                if (pointToOrient) {
+                    BLOCK_POINT_TO_ORIENT.add(id);
                 }
                 BLOCK_STYLE.put(id, blockStyle);
                 if (slab > 0) {
@@ -1069,16 +1234,40 @@ public class BlockTypeColors {
     }
 
     /**
-     * Atlas UV for a specific cube face of a block. {@code renderPolyFace} is a
-     * {@link RenderPoly} face (XP,XM,YP,YM,ZP,ZM = 0..5); other values or blocks
-     * without per-face data fall back to the block's primary texture.
+     * Atlas UV for a specific cube face of a block, accounting for the block's
+     * orientation (StarMade rotates which declared texture shows on which world
+     * face). {@code renderPolyFace} is a {@link RenderPoly} face (XP..ZM = 0..5);
+     * other values or blocks without per-face data fall back to the primary texture.
      */
-    public static Rectangle2D.Float getFaceTextureLocation(short blockID, int renderPolyFace) {
+    public static Rectangle2D.Float getFaceTextureLocation(short blockID, int renderPolyFace, int orientation) {
         short[] faces = BLOCK_TEXTURE_IDS_PER_FACE.get(blockID);
         if (faces == null || renderPolyFace < 0 || renderPolyFace >= FACE_TO_SIDE.length) {
             return getAllTextureLocation(blockID);
         }
-        return atlasUV(faces[FACE_TO_SIDE[renderPolyFace]] & 0xFFFF);
+        int declaredSide = declaredSideForFace(blockID, FACE_TO_SIDE[renderPolyFace], orientation);
+        return atlasUV(faces[declaredSide] & 0xFFFF);
+    }
+
+    /**
+     * Which declared texture side (0..5) shows on {@code worldSide} for a block of
+     * the given orientation — StarMade's remap (CubeMeshBufferContainer). Uniform
+     * (IndividualSides==1) blocks always use the primary side; 24-orientation
+     * blocks use orientation/4; 3-sided blocks are orientation-independent.
+     */
+    private static int declaredSideForFace(short blockID, int worldSide, int orientation) {
+        int sides = BLOCK_INDIVIDUAL_SIDES.getOrDefault(blockID, 1);
+        if (getBlockStyle(blockID) == STYLE_NORMAL24) {
+            return 5 - ORIENT_MAP_24[Math.floorMod(orientation / 4, 6)][worldSide];
+        } else if (sides == 6) {
+            return 5 - ORIENT_MAP_6[clampOrient(orientation)][worldSide];
+        } else if (sides == 3) {
+            return 5 - ORIENT_MAP_3_ROW[worldSide];
+        }
+        return 0; // uniform: every face uses the primary (FRONT) texture
+    }
+
+    private static int clampOrient(int orientation) {
+        return Math.max(0, Math.min(5, orientation));
     }
 
     /** Normalised UV of a tile's sampled (gutter-inset, border-cropped) region. */

@@ -90,4 +90,13 @@ public class DockPanel extends JPanel implements Dockable {
     public boolean isAutoHideAllowed() {
         return autoHideAllowed;
     }
+
+    @Override
+    public boolean isWrappableInScrollpane() {
+        // Never let the docking framework wrap our content in a JScrollPane: the
+        // viewport is a heavyweight GL canvas that must simply fill its area (an
+        // outer scroll pane gives it stray horizontal/vertical scrollbars), and the
+        // console/block-info panels already contain their own scroll panes.
+        return false;
+    }
 }

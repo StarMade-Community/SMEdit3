@@ -18,10 +18,10 @@
 package smc.smedit.ui.lwjgl;
 
 import java.awt.BorderLayout;
+import java.awt.event.FocusEvent;
+import java.awt.event.FocusListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseListener;
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 
 import smc.smedit.data.BlockTypes;
@@ -33,6 +33,7 @@ import smc.smedit.ship.data.Block;
 import smc.smedit.ui.RenderPanel;
 import smc.smedit.util.jgl.obj.JGLCamera;
 import smc.smedit.util.jgl.obj.JGLGroup;
+import smc.smedit.util.jgl.obj.JGLNode;
 import smc.smedit.util.jgl.obj.JGLScene;
 import smc.smedit.util.jgl.obj.tri.JGLObj;
 import smc.smedit.util.lwjgl.win.JGLCanvas;
@@ -46,7 +47,7 @@ public class LWJGLRenderPanel extends RenderPanel {
 
     private final JGLCanvas mCanvas;
     private final JGLScene mScene;
-    JGLCamera mUniverse;
+    public JGLCamera mUniverse;
     private final JGLGroup mBlocks;
     private final JGLGroup mSelection;
     private final JGLGroup mAxis;
@@ -61,6 +62,13 @@ public class LWJGLRenderPanel extends RenderPanel {
     /** The point the camera orbits around (the ship centre); set by {@link #setLookAt}. */
     Point3f mOrbitCenter = new Point3f();
 
+    /** Camera position at the last transparent-mesh depth sort (skip re-sorting when it barely moved). */
+    private Point3f mLastSortCam;
+    /** The transparent mesh last sorted, so a rebuilt mesh is always re-sorted even from the same camera. */
+    private JGLObj mLastSortedObj;
+    /** GL matrices of the block group, captured each frame for screen->world picking. */
+    private final PickMatrices mPickMatrices = new PickMatrices();
+
     public LWJGLRenderPanel() {
         mUndoer = new UndoBuffer();
         mPOVTranslate = new Vector3f();
@@ -69,6 +77,8 @@ public class LWJGLRenderPanel extends RenderPanel {
         mUniverse = new JGLCamera();
         mScene.setNode(mUniverse);
         mBlocks = new JGLGroup();
+        // Render thread stashes the block group's GL matrices here for picking.
+        mBlocks.setData("pickCapture", mPickMatrices);
         mUniverse.getChildren().add(mBlocks);
         mSelection = new JGLGroup();
         mUniverse.getChildren().add(mSelection);
@@ -85,12 +95,9 @@ public class LWJGLRenderPanel extends RenderPanel {
 //        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(
 //        		new LWJGLKeyEventDispatcher(this));
         mCanvas.addKeyListener(new LWJGLKeyEventDispatcher(this));
-        StarMadeLogic.getInstance().addPropertyChangeListener("model", new PropertyChangeListener() {
-            @Override
-            public void propertyChange(PropertyChangeEvent ev) {
-                setLookAt(new Point3f(0, 0, -1));
-            }
-        });
+        StarMadeLogic.getInstance().addPropertyChangeListener("model", ev -> setLookAt(new Point3f(0, 0, -1)));
+        // Refresh the viewport highlight whenever the selection changes.
+        StarMadeLogic.getInstance().getSelection().addListener(this::updateSelectionHighlight);
     }
 
     @Override
@@ -103,6 +110,36 @@ public class LWJGLRenderPanel extends RenderPanel {
         float dz = loc.z - mOrbitCenter.z;
         float dist = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
         mScene.setOrthoHalfHeight((float) (dist * Math.tan(Math.toRadians(mScene.getFieldOfView() / 2.0))));
+        sortTransparent(loc);
+    }
+
+    /**
+     * Re-sorts the glass/transparent mesh back-to-front for the current camera so
+     * it blends correctly. Skipped when the camera has barely moved since the last
+     * sort (keeps dragging cheap); the order only needs updating as the view swings.
+     */
+    private void sortTransparent(Point3f cam) {
+        JGLObj transparent = null;
+        for (JGLNode c : mBlocks.getChildren()) {
+            if (c instanceof JGLObj && ((JGLObj) c).isTransparent()) {
+                transparent = (JGLObj) c;
+                break;
+            }
+        }
+        if (transparent == null) {
+            mLastSortCam = null;
+            mLastSortedObj = null;
+            return;
+        }
+        if (transparent == mLastSortedObj && mLastSortCam != null) {
+            float mx = cam.x - mLastSortCam.x, my = cam.y - mLastSortCam.y, mz = cam.z - mLastSortCam.z;
+            if (mx * mx + my * my + mz * mz < 0.25f) { // moved < 0.5 world units
+                return;
+            }
+        }
+        LWJGLRenderLogic.sortTransparentQuads(transparent, cam);
+        mLastSortedObj = transparent;
+        mLastSortCam = new Point3f(cam);
     }
 
     @Override
@@ -121,7 +158,7 @@ public class LWJGLRenderPanel extends RenderPanel {
         // Look down at the ship from the top-left (a 3/4 view): camera up (+Y),
         // left (-X) and back (-Z) of the model centre. setLookAt scales the axis
         // by the model size, so normalize it for a consistent distance.
-        Point3f axis = new Point3f(-1f, 1.2f, -1f);
+        Point3f axis = new Point3f(-1f, 1f, 1f);
         float len = (float) Math.sqrt(axis.x * axis.x + axis.y * axis.y + axis.z * axis.z);
         if (len > 0f) {
             axis.scale(1f / len);
@@ -183,18 +220,55 @@ public class LWJGLRenderPanel extends RenderPanel {
         LWJGLRenderLogic.addBlocks(mBlocks, mFilteredGrid, mPlainGraphics);
         System.out.println("Quads:" + mBlocks.getChildren().size());
         updateSelectionBox();
+        // Depth-sort the freshly built glass mesh for the current camera.
+        updateTransform();
     }
 
     public void updateSelectionBox() {
-        /*
-         mSelection.getChildren().clear();
-         Point3i lower = StarMadeLogic.getInstance().getSelectedLower();
-         Point3i upper = StarMadeLogic.getInstance().getSelectedUpper();
-         if ((lower != null) && (upper != null))
-         LWJGLRenderLogic.addBox(mSelection, new Point3f(lower), new Point3f(upper), new short[] { BlockTypes.SPECIAL_SELECT_XP, BlockTypes.SPECIAL_SELECT_XM,
-         BlockTypes.SPECIAL_SELECT_YP, BlockTypes.SPECIAL_SELECT_YM,
-         BlockTypes.SPECIAL_SELECT_ZP, BlockTypes.SPECIAL_SELECT_ZM,});
-         */
+        updateSelectionHighlight();
+    }
+
+    private static final short[] SELECT_FACE_COLORS = {
+        BlockTypes.SPECIAL_SELECT_XP, BlockTypes.SPECIAL_SELECT_XM,
+        BlockTypes.SPECIAL_SELECT_YP, BlockTypes.SPECIAL_SELECT_YM,
+        BlockTypes.SPECIAL_SELECT_ZP, BlockTypes.SPECIAL_SELECT_ZM,
+    };
+
+    /** Rebuilds the empty box frame around the current selection's extent. */
+    public void updateSelectionHighlight() {
+        java.util.List<Point3i> selected = StarMadeLogic.getInstance().getSelection().getSelected();
+        MeshInfo info = new MeshInfo();
+        info.verts = new ArrayList<>();
+        info.indexes = new ArrayList<>();
+        info.colors = new ArrayList<>(); // plain-coloured, not textured
+        if (!selected.isEmpty()) {
+            // One frame around the whole selection's bounding extent, inflated a
+            // touch so its edges don't z-fight the enclosed blocks.
+            int minx = Integer.MAX_VALUE, miny = Integer.MAX_VALUE, minz = Integer.MAX_VALUE;
+            int maxx = Integer.MIN_VALUE, maxy = Integer.MIN_VALUE, maxz = Integer.MIN_VALUE;
+            for (Point3i p : selected) {
+                minx = Math.min(minx, p.x); miny = Math.min(miny, p.y); minz = Math.min(minz, p.z);
+                maxx = Math.max(maxx, p.x); maxy = Math.max(maxy, p.y); maxz = Math.max(maxz, p.z);
+            }
+            final float e = 0.03f;
+            LWJGLRenderLogic.addBox(info,
+                    new Point3f(minx - e, miny - e, minz - e),
+                    new Point3f(maxx + e, maxy + e, maxz + e),
+                    SELECT_FACE_COLORS);
+        }
+        JGLObj obj = null;
+        if (!info.verts.isEmpty()) {
+            obj = LWJGLRenderLogic.infoToObj(info);
+            // Wireframe so it reads as an empty frame and never hides the blocks
+            // (the axis-coloured edges also hint at orientation).
+            obj.setWireframe(true);
+        }
+        synchronized (mSelection) {
+            mSelection.getChildren().clear();
+            if (obj != null) {
+                mSelection.add(obj);
+            }
+        }
     }
 
     public void updateAxis() {
@@ -250,42 +324,9 @@ public class LWJGLRenderPanel extends RenderPanel {
     }
 
     public Point3i getPointAt(double x, double y) {
-        Point3f pointMap = new Point3f((float) x, (float) y, 0);
-        System.out.print(pointMap + " ->");
-        mBlocks.setData("pointMap", pointMap);
-        Point3f pointMapped = null;
-        for (;;) {
-            pointMapped = (Point3f) mBlocks.getData("pointMapped");
-            if (pointMapped != null) {
-                break;
-            }
-            try {
-                Thread.sleep(1000 / 24);
-            } catch (InterruptedException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-        }
-        System.out.println(" " + pointMapped);
-        return null;
-        /*
-         Matrix3f rot = new Matrix3f();
-         mUniverse.getCamera().get(rot);
-         Point3f trans = new Point3f(mUniverse.getCamera().getLocation());
-         rot.invert();
-         System.out.println("Trans: "+trans+"\nRot^-1:\n"+rot);
-         Point3f eye = mCanvas.getEyeRay();
-         System.out.print(eye);
-         Point3f model = new Point3f(eye);
-         model.x += trans.x; model.y -= trans.y; model.z -= trans.z;
-         System.out.print(" -> "+model);
-         rot.transform(model);
-         Point3i p = new Point3i(model);
-         System.out.println(" -> "+model+" -> "+p);
-         if (!StarMadeLogic.getModel().contains(p))
-         return null;
-         return p;
-         */
+        // (x, y) are LWJGL window coords (origin bottom-left), matching what the
+        // GL viewport/gluUnProject expect. Ray-cast into the voxel grid.
+        return RaycastPicker.pick((float) x, (float) y, mPickMatrices.snapshot(), StarMadeLogic.getModel());
     }
 
     @Override

@@ -23,6 +23,18 @@ public class NodeDrawHandler implements IDrawHandler {
         GL11.glMatrixMode(GL11.GL_MODELVIEW);
         GL11.glPushMatrix();
         GL11.glMultMatrix(Matrix4fLogic.toFloatBuffer(t));
+        // With the node's transform applied, the modelview is the view matrix used
+        // to draw it. Stash it (+ projection/viewport) for screen->world picking.
+        Object capture = obj.getData("pickCapture");
+        if (capture instanceof smc.smedit.ui.lwjgl.PickMatrices) {
+            FloatBuffer mv = BufferUtils.createFloatBuffer(16);
+            FloatBuffer proj = BufferUtils.createFloatBuffer(16);
+            FloatBuffer vp = BufferUtils.createFloatBuffer(16);
+            GL11.glGetFloat(GL11.GL_MODELVIEW_MATRIX, mv);
+            GL11.glGetFloat(GL11.GL_PROJECTION_MATRIX, proj);
+            GL11.glGetFloat(GL11.GL_VIEWPORT, vp);
+            ((smc.smedit.ui.lwjgl.PickMatrices) capture).capture(mv, proj, vp);
+        }
         return t;
     }
 

@@ -33,6 +33,8 @@ public class StatusPanel extends JPanel {
     private final JPanel contentPanel;
     private final JPanel southPanel;
     private final JPanel midPanel;
+    /** Right-aligned slot in the status bar (e.g. the memory-usage bar). */
+    private final JPanel rightPanel = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 4, 0));
     private final ToolPanel toolBar;
     private final LabelLogHandler handler;
     private final Font font;
@@ -51,6 +53,7 @@ public class StatusPanel extends JPanel {
         Logger.getLogger("").addHandler(handler);
         
         southPanel.add(new JLabel(new TriangleSquareWindowsCornerIcon()), BorderLayout.EAST);
+        southPanel.add(rightPanel, BorderLayout.CENTER);
         
         handler.label.setBorder(javax.swing.BorderFactory.createTitledBorder(" App Events "));
         handler.label.setFont(new Font(font.getFamily(), Font.BOLD, font.getSize()));
@@ -61,8 +64,13 @@ public class StatusPanel extends JPanel {
         contentPanel.add(southPanel, BorderLayout.SOUTH);
 
         add(contentPanel, BorderLayout.CENTER);
-        
+
     }
-    
+
+    /** Adds a component to the bottom-right of the status bar (left of the resize grip). */
+    public void addRightComponent(java.awt.Component c) {
+        rightPanel.add(c);
+        rightPanel.revalidate();
+    }
 }
 

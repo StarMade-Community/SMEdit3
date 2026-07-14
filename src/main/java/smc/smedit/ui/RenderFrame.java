@@ -21,10 +21,7 @@ package smc.smedit.ui;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.Font;
 import java.awt.Insets;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
@@ -34,7 +31,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.Action;
 import javax.swing.Box;
-import javax.swing.ImageIcon;
+import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JFrame;
@@ -43,7 +40,6 @@ import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JToolBar;
@@ -52,7 +48,6 @@ import smc.smedit.log.TextAreaLogHandler;
 import smc.smedit.logic.BlueprintLogic;
 import smc.smedit.logic.RunnableLogic;
 import smc.smedit.logic.StarMadeLogic;
-import smc.smedit.mods.IBlocksPlugin;
 import smc.smedit.mods.IPluginCallback;
 import smc.smedit.mods.IRunnableWithProgress;
 import smc.smedit.ui.act.Shot;
@@ -70,17 +65,15 @@ import smc.smedit.ui.act.file.SaveAsBlueprintAction;
 import smc.smedit.ui.act.file.SaveAsBlueprintAction1;
 import smc.smedit.ui.act.file.SaveAsFileAction;
 import smc.smedit.ui.act.file.SaveAsFileAction1;
-import smc.smedit.ui.act.memRefresh;
-import smc.smedit.ui.act.plugin.BlocksPluginAction;
 import smc.smedit.ui.act.view.AxisAction;
 import smc.smedit.ui.act.view.DontDrawAction;
 import smc.smedit.ui.act.view.PlainAction;
-import smc.smedit.ui.logic.MenuLogic;
 import smc.smedit.ui.logic.ShipSpec;
 import smc.smedit.ui.logic.ShipTreeLogic;
 import smc.smedit.ui.lwjgl.LWJGLRenderPanel;
 import smc.smedit.ui.dock.DockPanel;
 import smc.smedit.ui.dock.LayoutPresets;
+import smc.smedit.ui.shelf.ToolShelf;
 import smc.smedit.util.GlobalConfiguration;
 import smc.smedit.util.Paths;
 import smc.smedit.util.Resources;
@@ -97,6 +90,10 @@ import io.github.andrewauclair.moderndocking.app.DockingState;
 import io.github.andrewauclair.moderndocking.app.RootDockingPanel;
 import io.github.andrewauclair.moderndocking.ext.ui.DockingUI;
 import io.github.andrewauclair.moderndocking.layouts.ApplicationLayout;
+
+import org.kordamp.ikonli.Ikon;
+import org.kordamp.ikonli.feather.Feather;
+import org.kordamp.ikonli.swing.FontIcon;
 
 @SuppressWarnings("serial")
 public class RenderFrame extends JFrame {
@@ -160,12 +157,9 @@ public class RenderFrame extends JFrame {
             final String defaultName = firstDefaultBlueprint();
             if (defaultName != null) {
                 final ShipSpec spec = ShipTreeLogic.getBlueprintSpec(defaultName, true);
-                IRunnableWithProgress t = new IRunnableWithProgress() {
-                    @Override
-                    public void run(IPluginCallback cb) {
-                        StarMadeLogic.getInstance().setCurrentModel(spec);
-                        StarMadeLogic.setModel(ShipTreeLogic.loadShip(spec, cb));
-                    }
+                IRunnableWithProgress t = cb -> {
+                    StarMadeLogic.getInstance().setCurrentModel(spec);
+                    StarMadeLogic.setModel(ShipTreeLogic.loadShip(spec, cb));
                 };
                 log.log(Level.INFO, "Loading default blueprint: {0}", defaultName);
                 RunnableLogic.run(f, "Loading...", t);
@@ -250,14 +244,18 @@ public class RenderFrame extends JFrame {
     private JToolBar innerToolBar;
     public final JScrollPane textScroll;
 
-    private JButton mPlugins;
-
     // Dockable (Modern Docking) panels + the default layout, kept for Reset Layout.
     private ApplicationLayout mDefaultLayout;
     private DockPanel mViewportDock;
     private DockPanel mBrushDock;
     private DockPanel mConsoleDock;
+    private DockPanel mBlockInfoDock;
+    private DockPanel mShelfDock;
+    private ToolShelf mShelf;
     private JMenu mWindowMenu;
+
+    /** Split ratio for the Maya-style tool shelf docked across the top. */
+    private static final double SHELF_SPLIT = 0.16;
 
     public RenderFrame(String[] args) {
         setTitle(GlobalConfiguration.NAME + " v" + GlobalConfiguration.VERSION);
@@ -318,7 +316,11 @@ public class RenderFrame extends JFrame {
         innerToolPane.add(innerToolBar, BorderLayout.NORTH);
         outerToolPane.add(outerToolBar, BorderLayout.NORTH);
         getContentPane().add(dockRoot, BorderLayout.CENTER);
-        getContentPane().add(new StatusPanel(), BorderLayout.SOUTH);
+        StatusPanel statusPanel = new StatusPanel();
+        MemProgressBar memBar = new MemProgressBar();
+        memBar.setPreferredSize(new Dimension(200, 20));
+        statusPanel.addRightComponent(memBar);
+        getContentPane().add(statusPanel, BorderLayout.SOUTH);
 
         addWindowListener(new WindowAdapter() {
 
@@ -359,10 +361,19 @@ public class RenderFrame extends JFrame {
         mViewportDock = new DockPanel("viewport", "Viewport", getClient(), false, false, false);
         mBrushDock = new DockPanel("brush", "Brush", editPanel, true, true, true);
         mConsoleDock = new DockPanel("console", "Console", textScroll, true, true, true);
+        mBlockInfoDock = new DockPanel("blockinfo", "Block Info", new BlockInfoPanel(), true, true, true);
+        // Maya-style shelf: every block plugin ("function") as an icon button,
+        // grouped into horizontally-scrollable tabs. Movable/floatable like the rest.
+        mShelf = new ToolShelf(getClient());
+        mShelfDock = new DockPanel("shelf", "Tools", mShelf, true, true, true);
 
         Docking.dock(mViewportDock, this);
         Docking.dock(mBrushDock, this, DockingRegion.WEST, 0.22);
         Docking.dock(mConsoleDock, this, DockingRegion.SOUTH, 0.25);
+        Docking.dock(mBlockInfoDock, this, DockingRegion.EAST, 0.2);
+        // Dock the shelf last so NORTH wraps the whole arrangement — a thin,
+        // full-width tool strip directly under the toolbar.
+        Docking.dock(mShelfDock, this, DockingRegion.NORTH, SHELF_SPLIT);
 
         // Remember this arrangement as the default, restore a saved layout if one
         // exists, then keep the layout persisted across runs (workspace memory).
@@ -375,14 +386,28 @@ public class RenderFrame extends JFrame {
                 AppState.restore();
             }
             AppState.setAutoPersist(true);
+            // If the user picked a default layout preset in Settings, load it.
+            String defaultLayout = StarMadeLogic.getProps().getProperty("layout.default", "");
+            if (!defaultLayout.isEmpty() && LayoutPresets.names().contains(defaultLayout)) {
+                LayoutPresets.load(defaultLayout);
+            }
+            // One-time migration: users upgrading from before the Tools shelf have a
+            // saved layout that doesn't mention it, so restore() leaves it hidden.
+            // Force it into its default place once, then respect the saved state.
+            if (!StarMadeLogic.isProperty("shelf.introduced")) {
+                if (!Docking.isDocked(mShelfDock)) {
+                    Docking.dock(mShelfDock, this, DockingRegion.NORTH, SHELF_SPLIT);
+                }
+                StarMadeLogic.setProperty("shelf.introduced", true);
+            }
         } catch (Exception e) {
             log.log(Level.WARNING, "Could not restore docking layout; using default.", e);
         }
         return dockRoot;
     }
 
-    /** Restores the default panel arrangement (Window > Reset Layout). */
-    private void resetLayout() {
+    /** Restores the default panel arrangement (Window &gt; Reset Layout, Settings &gt; Layout). */
+    public void resetLayout() {
         if (mDefaultLayout != null) {
             DockingState.restoreApplicationLayout(mDefaultLayout);
         }
@@ -394,10 +419,14 @@ public class RenderFrame extends JFrame {
      */
     private void populateWindowMenu() {
         mWindowMenu.removeAll();
+        JCheckBoxMenuItem shelfToggle = panelToggle(mShelfDock, DockingRegion.NORTH, SHELF_SPLIT);
         JCheckBoxMenuItem brushToggle = panelToggle(mBrushDock, DockingRegion.WEST, 0.22);
         JCheckBoxMenuItem consoleToggle = panelToggle(mConsoleDock, DockingRegion.SOUTH, 0.25);
+        JCheckBoxMenuItem blockInfoToggle = panelToggle(mBlockInfoDock, DockingRegion.EAST, 0.2);
+        mWindowMenu.add(shelfToggle);
         mWindowMenu.add(brushToggle);
         mWindowMenu.add(consoleToggle);
+        mWindowMenu.add(blockInfoToggle);
         mWindowMenu.addSeparator();
         JMenuItem reset = new JMenuItem("Reset Layout");
         reset.addActionListener(e -> resetLayout());
@@ -409,8 +438,10 @@ public class RenderFrame extends JFrame {
         // been closed via its header X since the menu was last shown).
         mWindowMenu.addMenuListener(new javax.swing.event.MenuListener() {
             @Override public void menuSelected(javax.swing.event.MenuEvent e) {
+                shelfToggle.setSelected(Docking.isDocked(mShelfDock));
                 brushToggle.setSelected(Docking.isDocked(mBrushDock));
                 consoleToggle.setSelected(Docking.isDocked(mConsoleDock));
+                blockInfoToggle.setSelected(Docking.isDocked(mBlockInfoDock));
             }
             @Override public void menuDeselected(javax.swing.event.MenuEvent e) { }
             @Override public void menuCanceled(javax.swing.event.MenuEvent e) { }
@@ -500,43 +531,17 @@ public class RenderFrame extends JFrame {
         setOuterToolBar(new JToolBar());
         setInnerToolBar(new JToolBar());
 
-        JButton openPrintButton;
-        final ImageIcon op = new ImageIcon(Paths.getIconDirectory() + "/open_print.png");
-        openPrintButton = getDefaultButton(new OpenExistingAction1(this), "open a blueprint", op);
-        outerToolBar.add(openPrintButton);
-
-        JButton openButton;
-        final ImageIcon o = new ImageIcon(Paths.getIconDirectory() + "/open.png");
-        openButton = getDefaultButton(new OpenFileAction1(this), "open a file", o);
-        outerToolBar.add(openButton);
-
-        JButton savePrintButton;
-        final ImageIcon sp = new ImageIcon(Paths.getIconDirectory() + "/save.png");
-        savePrintButton = getDefaultButton(new SaveAsBlueprintAction1(this, false), "Save blueprint", sp);
-        outerToolBar.add(savePrintButton);
-
-        JButton saveButton;
-        final ImageIcon sa = new ImageIcon(Paths.getIconDirectory() + "/save_as.png");
-        saveButton = getDefaultButton(new SaveAsFileAction1(this), "Save file", sa);
-        outerToolBar.add(saveButton);
-
-        JButton screenButton;
-        final ImageIcon s = new ImageIcon(Paths.getIconDirectory() + "/shot.png");
-        screenButton = getDefaultButton(new Shot(this), "Screenshots of work", s);
-        outerToolBar.add(screenButton);
+        outerToolBar.add(getDefaultButton(new OpenExistingAction1(this), "Open BP", "open a blueprint", icon(Feather.FOLDER)));
+        outerToolBar.add(getDefaultButton(new OpenFileAction1(this), "Open", "open a file", icon(Feather.FILE)));
+        outerToolBar.add(getDefaultButton(new SaveAsBlueprintAction1(this, false), "Save BP", "Save blueprint", icon(Feather.SAVE)));
+        outerToolBar.add(getDefaultButton(new SaveAsFileAction1(this), "Save", "Save file", icon(Feather.DOWNLOAD)));
+        outerToolBar.add(getDefaultButton(new Shot(this), "Screenshot", "Screenshots of work", icon(Feather.CAMERA)));
 
         outerToolBar.addSeparator();
         outerToolBar.addSeparator();
 
-        JButton undoButton;
-        final ImageIcon u = new ImageIcon(Paths.getIconDirectory() + "/undo.png");
-        undoButton = getDefaultButton(new UndoActionButton(this), "Undo last action", u);
-        outerToolBar.add(undoButton);
-
-        JButton redoButton;
-        final ImageIcon r = new ImageIcon(Paths.getIconDirectory() + "/redo.png");
-        redoButton = getDefaultButton(new RedoActionButton(this), "Redo last action", r);
-        outerToolBar.add(redoButton);
+        outerToolBar.add(getDefaultButton(new UndoActionButton(this), "Undo", "Undo last action", icon(Feather.ROTATE_CCW)));
+        outerToolBar.add(getDefaultButton(new RedoActionButton(this), "Redo", "Redo last action", icon(Feather.ROTATE_CW)));
 
         outerToolBar.addSeparator();
         JButton resetCamButton = new JButton("Reset View");
@@ -546,22 +551,60 @@ public class RenderFrame extends JFrame {
 
         outerToolBar.add(Box.createHorizontalGlue());
 
-        final ImageIcon p = new ImageIcon(Paths.getIconDirectory() + "/plugins.png");
-        mPlugins = getDefaultActionlessButton("Plugins", "List of avalable plugins", p);
-        outerToolBar.add(mPlugins);
-        mPlugins.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                doPlugin();
+        // Tools/plugins now live in the dockable Maya-style "Tools" shelf below the
+        // toolbar (see setupDocking) rather than in a drop-down button here.
+
+        JButton settingsButton = new JButton(icon(Feather.SETTINGS));
+        settingsButton.setToolTipText("Preferences");
+        settingsButton.setFocusable(false);
+        settingsButton.setMargin(new Insets(6, 3, 6, 3));
+        settingsButton.setBorder(new EmptyBorder(3, 3, 3, 3));
+        settingsButton.setPreferredSize(new Dimension(32, 32));
+        settingsButton.setMaximumSize(new Dimension(32, 32));
+        settingsButton.addActionListener(e -> openSettings());
+        outerToolBar.add(settingsButton);
+        // The memory-usage bar now lives at the bottom-right of the status bar.
+    }
+
+    /** Opens the tabbed Preferences dialog (Edit &gt; Preferences… and the toolbar gear). */
+    private void openSettings() {
+        new SettingsDialog(this).setVisible(true);
+    }
+
+    /** Size (px) of the toolbar glyph icons. */
+    private static final int TOOLBAR_ICON_SIZE = 18;
+
+    /** Builds a toolbar icon from an Ikonli glyph, tinted to the current theme foreground. */
+    private static Icon icon(Ikon glyph) {
+        return FontIcon.of(glyph, TOOLBAR_ICON_SIZE, iconColor());
+    }
+
+    /** The current theme's foreground colour for toolbar glyphs (dark on light themes, light on dark). */
+    private static java.awt.Color iconColor() {
+        java.awt.Color fg = javax.swing.UIManager.getColor("Button.foreground");
+        return fg != null ? fg : new java.awt.Color(0xB8, 0xB8, 0xB8);
+    }
+
+    /**
+     * Re-tints the toolbar glyph icons to the current theme foreground. FontIcons
+     * are coloured at creation, so a live theme switch would otherwise leave them
+     * in the old (e.g. near-invisible) colour.
+     */
+    public void refreshToolbarIcons() {
+        java.awt.Color fg = iconColor();
+        for (java.awt.Component c : outerToolBar.getComponents()) {
+            if (c instanceof javax.swing.AbstractButton) {
+                Icon ic = ((javax.swing.AbstractButton) c).getIcon();
+                if (ic instanceof FontIcon) {
+                    ((FontIcon) ic).setIconColor(fg);
+                }
             }
-        });
-
-        /*add memory ProgressBar*/
-        JButton memButton;
-        final ImageIcon c = new ImageIcon(Paths.getIconDirectory() + "/cpu.png");
-        memButton = getProgressButton(new memRefresh(), "Click to refresh Memory use", c);
-        outerToolBar.add(memButton);
-
+        }
+        outerToolBar.repaint();
+        // The shelf's tool glyphs are also tinted at creation; rebuild to re-tint.
+        if (mShelf != null) {
+            mShelf.rebuild();
+        }
     }
 
     private void setupMenus() {
@@ -572,8 +615,6 @@ public class RenderFrame extends JFrame {
         menuEdit.setMnemonic(KeyEvent.VK_E);
         JMenu menuView = new JMenu("View");
         menuView.setMnemonic(KeyEvent.VK_V);
-        JMenu menuModify = new JMenu("Modify");
-        menuModify.setMnemonic(KeyEvent.VK_M);
         JMenu menuHelp = new JMenu("Help");
         menuHelp.setMnemonic(KeyEvent.VK_H);
         /*layout*/
@@ -588,14 +629,15 @@ public class RenderFrame extends JFrame {
         saveAs.add(new SaveAsBlueprintAction(this, false));
         saveAs.add(new SaveAsBlueprintAction(this, true));
         saveAs.add(new SaveAsFileAction(this));
-        JSeparator menuFileStart = new JSeparator();
-        menuFileStart.setName("pluginsStartHere");
-        menuFile.add(menuFileStart);
         menuFile.add(new JSeparator());
         menuFile.add(new QuitAction(this));
         menuBar.add(menuEdit);
         menuEdit.add(new UndoAction(this));
         menuEdit.add(new RedoAction(this));
+        menuEdit.add(new JSeparator());
+        JMenuItem prefs = new JMenuItem("Preferences…");
+        prefs.addActionListener(e -> openSettings());
+        menuEdit.add(prefs);
         menuEdit.add(new JSeparator());
         menuBar.add(menuView);
         menuView.add(new JCheckBoxMenuItem(new PlainAction(this)));
@@ -607,21 +649,14 @@ public class RenderFrame extends JFrame {
         JCheckBoxMenuItem orthoItem = new JCheckBoxMenuItem("Orthographic");
         orthoItem.addActionListener(e -> getClient().setOrthographic(orthoItem.isSelected()));
         menuView.add(orthoItem);
-        JSeparator viewFileStart = new JSeparator();
-        viewFileStart.setName("pluginsStartHere");
-        menuView.add(viewFileStart);
-        menuBar.add(menuModify);
         // Window menu — items are added in populateWindowMenu() after the docking
         // layout is built (the panel toggles need the dockable instances).
         mWindowMenu = new JMenu("Window");
         mWindowMenu.setMnemonic(KeyEvent.VK_W);
         menuBar.add(mWindowMenu);
         menuBar.add(menuHelp);
-        /*link*/
-        menuFile.addMenuListener(new PluginPopupListener(this, IBlocksPlugin.SUBTYPE_FILE));
-        menuEdit.addMenuListener(new PluginPopupListener(this, IBlocksPlugin.SUBTYPE_EDIT));
-        menuView.addMenuListener(new PluginPopupListener(this, IBlocksPlugin.SUBTYPE_VIEW));
-        menuModify.addMenuListener(new PluginPopupListener(this, IBlocksPlugin.SUBTYPE_MODIFY, IBlocksPlugin.SUBTYPE_GENERATE));
+        // Block plugins ("functions") are no longer injected into these menus; they
+        // live in the dockable "Tools" shelf (see ToolShelf / setupDocking).
     }
 
     /**
@@ -633,111 +668,22 @@ public class RenderFrame extends JFrame {
      * @return a shiny new JButton
      *
      */
-    private JButton getDefaultButton(final Action a, final String tip, final ImageIcon i) {
+    private JButton getDefaultButton(final Action a, final String label, final String tip, final Icon i) {
         final JButton button = new JButton(a);
         button.setToolTipText(tip);
-        button.setIcon(i);
         button.setFocusable(false);
         button.setMargin(new Insets(6, 3, 6, 3));
-        button.setPreferredSize(new Dimension(32, 32));
-        button.setMaximumSize(new Dimension(32, 32));
         button.setBorder(new EmptyBorder(3, 3, 3, 3));
-
+        if (i != null) {
+            button.setIcon(i);
+            button.setText(null);
+            button.setPreferredSize(new Dimension(32, 32));
+            button.setMaximumSize(new Dimension(32, 32));
+        } else {
+            // No icon available — show the text label so the button is still usable.
+            button.setText(label);
+        }
         return button;
-    }
-
-    /**
-     * Makes a JButton with the given icon and tooltop. If the icon cannot be
-     * loaded, then the text will be used instead.
-     *
-     * Adds this RenderFame as an actionListener.
-     *
-     * @return a shiny new JButton
-     *
-     */
-    private JButton getDefaultActionlessButton(final String text, final String tip, final ImageIcon i) {
-        final JButton button = new JButton();
-        button.setText(text);
-        button.setToolTipText(tip);
-        button.setIcon(i);
-        button.setFocusable(false);
-        button.setMargin(new Insets(6, 3, 6, 3));
-        button.setPreferredSize(new Dimension(75, 32));
-        button.setMaximumSize(new Dimension(75, 32));
-        button.setBorder(new EmptyBorder(3, 3, 3, 3));
-        button.setFont(new Font("Tahoma", 0, 10));
-
-        return button;
-    }
-
-    /**
-     * Makes a JButton with the given icon and tooltop. If the icon cannot be
-     * loaded, then the text will be used instead.
-     *
-     * Adds this RenderFame as an actionListener.
-     *
-     * @return a shiny new JButton
-     *
-     */
-    private JButton getProgressButton(final Action a, final String tip, final ImageIcon i) {
-        MemProgressBar mem = new MemProgressBar();
-        mem.setMaximumSize(new Dimension(250, 32));
-        final JButton button = new JButton(a);
-        //button.add(Box.createHorizontalGlue());
-        button.add(mem);
-        button.setToolTipText(tip);
-        button.setIcon(i);
-        button.setFocusable(false);
-
-        button.setPreferredSize(new Dimension(250, 32));
-        button.setMaximumSize(new Dimension(250, 32));
-        button.setBorder(new EmptyBorder(3, 3, 3, 3));
-
-        return button;
-    }
-
-    /**
-     *
-     * @param menu
-     * @param subTypes
-     */
-    public void updatePopup(JMenu menu, int... subTypes) {
-        MenuLogic.clearPluginMenus(menu);
-        ShipSpec spec = StarMadeLogic.getInstance().getCurrentModel();
-        if (spec == null) {
-            return;
-        }
-        int type = spec.getClassification();
-        int lastModIndex = menu.getItemCount();
-        int lastCount = 0;
-        for (int subType : subTypes) {
-            int thisCount = MenuLogic.addPlugins(getClient(), menu, type, subType);
-            if ((thisCount > 0) && (lastCount > 0)) {
-                JSeparator sep = new JSeparator();
-                sep.setName("plugin");
-                menu.add(sep, lastModIndex);
-                lastCount = 0;
-            }
-            lastCount += thisCount;
-            lastModIndex = menu.getItemCount();
-        }
-    }
-
-    public void doPlugin() {
-        JPopupMenu popup = new JPopupMenu();
-        int classification = StarMadeLogic.getInstance().getCurrentModel().getClassification();
-        List<IBlocksPlugin> plugins = StarMadeLogic.getBlocksPlugins(classification, IBlocksPlugin.SUBTYPE_PAINT);
-        if (plugins.isEmpty()) {
-            popup.add("no plugins");
-        }
-
-        for (IBlocksPlugin plugin : plugins) {
-            BlocksPluginAction action = new BlocksPluginAction(getClient(), plugin);
-            JMenuItem men = new JMenuItem(action);
-            popup.add(men);
-        }
-        Dimension d = mPlugins.getSize();
-        popup.show(mPlugins, d.width, d.height);
     }
 
     private boolean safeClose() {
