@@ -100,7 +100,6 @@ public class IntegerUtils {
             return ret;
         } catch (IOException e) {
             log.log(Level.WARNING, "ObjectInputStream failed!", e);
-            e.printStackTrace();
             return null;
         }
     }
@@ -117,7 +116,6 @@ public class IntegerUtils {
             return baos.toByteArray();
         } catch (IOException e) {
             log.log(Level.WARNING, "ByteArrayOutputStream failed!", e);
-            e.printStackTrace();
             return null;
         }
     }

@@ -41,7 +41,10 @@ mouse wheel to zoom.
 (`.smd3` block data plus v5 `header`/`meta` and v0 `logic`), so the game can
 load it.
 
-!!! warning "Known limitation"
-    Saved blueprints currently write an **empty logic map** (block systems are
-    not yet re-linked) and a minimal `meta`. This is being improved — see the
-    [compatibility notes](../STARMADE_COMPATIBILITY.md).
+!!! info "Logic connections"
+    When you open a blueprint and save it back **unedited**, SMEdit now preserves
+    the ship's control map (weapon-computer→module wiring, logic links) exactly —
+    verified byte-for-byte against real StarMade saves. If you edit the blocks
+    (import, plugin transforms, a new ship), it falls back to a valid but **empty**
+    logic map for safety, so systems load unlinked. A minimal `meta` is still
+    written. See the [compatibility notes](../STARMADE_COMPATIBILITY.md).

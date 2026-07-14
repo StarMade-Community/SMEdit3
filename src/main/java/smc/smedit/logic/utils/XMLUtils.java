@@ -133,7 +133,6 @@ public class XMLUtils {
             return builder.parse(u.openStream());
         } catch (IOException | ParserConfigurationException | SAXException e) {
             log.log(Level.WARNING, "readURL failed!", e);
-            e.printStackTrace();
             return null;
         }
     }
@@ -165,7 +164,6 @@ public class XMLUtils {
                 log.log(Level.INFO, "^");
             }
             log.log(Level.INFO, "",e);
-            e.printStackTrace();
             return null;
         }
     }

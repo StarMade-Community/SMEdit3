@@ -185,13 +185,22 @@ an auto-generated Swing dialog).
    cross-type-method surgery that previously produced 182 compile errors. It's pure
    LOC cleanup with no functional payoff, so it's parked until after the initial
    release.
-5. **Swing EDT violations.** Only 2 `invokeLater` in ~94k LOC;
-   `RenderFrame.startup()` builds and `setVisible(true)`s the main frame off the
-   EDT, alongside a separate LWJGL render thread. Latent UI/render races.
-6. **Logging bypassed.** ~330 `System.out/err` prints + 73 `printStackTrace()`
-   across 58 files despite the `smc.smedit.log` framework existing.
-7. **~40 empty/silent catch blocks** across 17 files — systemic error
-   swallowing, especially in config I/O (`Paths`, `OptionScreen`).
+5. 🟡 **Swing EDT — top-level path fixed.** `SMEdit.main` now marshals all Swing
+   startup (look-and-feel, folder chooser, `OptionScreen`) onto the EDT via
+   `SwingUtilities.invokeLater` (`GpuOffload` stays first on the main thread, before
+   any AWT init); `RenderFrame.startup()` is reached only from `OptionScreen`'s
+   EDT button handler, so the frame is now built/shown on the EDT. Remaining: the
+   heavy `preLoad()` still runs on the EDT (a brief freeze, not a race), and the
+   separate LWJGL render thread coexists by design.
+6. 🟡 **Logging — critical paths use the framework; bulk sweep pending.** Config/
+   startup errors now go through `java.util.logging` (routed to the log tab/file by
+   `smc.smedit.log`), and 11 redundant `printStackTrace()`-after-`log.log` calls
+   were removed. A wider sweep of the remaining ~260 `System.out/err` prints +
+   `printStackTrace()` in non-critical paths is a follow-up.
+7. 🟡 **Silent catches — config I/O fixed.** The empty catch blocks in `Paths`
+   (settings read/write) and `OptionScreen`, plus the unchecked `mkdirs()` in
+   `GlobalConfiguration.createDirectories`, now log a warning. Other empty catches
+   in non-critical utilities remain a follow-up.
 8. **Duplication & dead code.** `SparseMatrixNew`/`SparseMatrixOld` (vs the used
    `SparseMatrix`), `*Action`/`*Action1` menu-vs-toolbar duplicate pairs,
    `ent.cmd` CLI tools bundled into the GUI jar, ~294 commented-out statements.
@@ -300,13 +309,24 @@ working build.
 - ✅ Block metadata is driven from `BlockConfig.xml` at runtime, and render colors
   are sampled from the game's block textures (cached to disk — see the
   compatibility doc).
-- Remaining fidelity work: preserve real logic connections on save (currently an
-  empty control-element map).
+- ✅ Logic connections (round-trip): SMEdit reads the modern `logic.smbpl`
+  control map correctly (the reader previously mis-parsed the `-1026` disk marker
+  and returned empty) and preserves it on save. Loading a ship records its control
+  map against the exact grid instance; `saveBlueprint` writes it back only when the
+  model is still that grid, so an edited/imported/new grid safely falls back to an
+  empty map (a wrong map is worse than an empty one). Verified by a byte-exact
+  round-trip (`LogicLogicTest`) and an end-to-end load→save fixture test
+  (`BlueprintSaveTest`), both using the bundled `blueprints/` fixtures.
+- Remaining: *synthesizing* a control map for edited/new ships (vs. preserving a
+  loaded one) still needs the coordinate-space confirmation done in-game; and the
+  meta has no `SEG_MANAGER` tag yet.
 
 **Phase 4 — quality & UX (largely done)**
 - ✅ JUnit test set (round-trip format tests + subsystem coverage) + GitHub Actions
   CI and docs publishing.
 - ✅ FlatLaf dark look-and-feel.
-- Follow-up: route logging through `smc.smedit.log`; fix EDT usage; fix silent
-  catches. Further README items (improved camera/2D modes, cross-sections,
+- 🟡 Stability pass (partial): top-level Swing startup moved onto the EDT; config/
+  startup I/O errors now logged (no longer swallowed); redundant `printStackTrace`
+  removed. Remaining: the bulk `System.out/err`→logger sweep and the non-critical
+  empty catches. Further README items (improved camera/2D modes, cross-sections,
   workspace layouts, scripting) are post-release.

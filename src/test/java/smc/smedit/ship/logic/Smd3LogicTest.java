@@ -24,6 +24,7 @@ import java.util.zip.Deflater;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import smc.smedit.BlueprintFixtures;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.mods.IPluginCallback;
 import smc.smedit.ship.data.Block;
@@ -174,8 +175,11 @@ class Smd3LogicTest {
 
     @Test
     void readsRealIsanthFixtureIfAvailable() throws IOException {
-        File fixture = new File("/home/videogoose/Projects/StarMade/src/main/resources/"
-                + "blueprints-default/Isanth Type-PNR-25-B/DATA/Isanth Type-PNR-25-B.0.0.0.smd3");
+        File bp = BlueprintFixtures.blueprint("Isanth Type-PNR-25-B");
+        File fixture = bp != null
+                ? new File(bp, "DATA/Isanth Type-PNR-25-B.0.0.0.smd3")
+                : new File("/home/videogoose/Projects/StarMade/src/main/resources/"
+                        + "blueprints-default/Isanth Type-PNR-25-B/DATA/Isanth Type-PNR-25-B.0.0.0.smd3");
         assumeTrue(fixture.isFile(), "StarMade fixture not present; skipping");
 
         List<Smd3Segment> segs;

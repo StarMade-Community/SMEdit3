@@ -26,6 +26,7 @@ import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import smc.smedit.ui.StarMadeDirChooser;
@@ -136,7 +137,7 @@ public class Paths {
                         mProps.load(fis);
                     }
                 } catch (IOException e) {
-
+                    log.log(Level.WARNING, "Could not read settings from " + props, e);
                 }
             } else {
                 mProps = new Properties();
@@ -163,7 +164,7 @@ public class Paths {
                     mProps.load(fis);
                 }
             } catch (IOException e) {
-
+                log.log(Level.WARNING, "Could not read settings from " + props, e);
             }
         } else {
             mProps = new Properties();
@@ -251,7 +252,7 @@ public class Paths {
                 mProps.store(fos, "StarMade Utils defaults");
             }
         } catch (IOException e) {
-
+            log.log(Level.WARNING, "Could not save settings to " + props, e);
         }
     }
 

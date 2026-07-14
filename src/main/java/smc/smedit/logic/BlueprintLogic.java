@@ -151,21 +151,27 @@ public class BlueprintLogic {
                 }
             }
             // header.smbph, logic.smbpl, meta.smbpm all in the modern format so
-            // StarMade can load the blueprint (logic is written with an empty
-            // control-element map for now — see Smbp5Logic#writeLogic).
+            // StarMade can load the blueprint.
             try (OutputStream headerOut = new FileOutputStream(new File(baseDir, "header.smbph"))) {
                 Smbp5Logic.writeHeader(grid, headerOut);
             }
+            // Preserve the ship's control map when we're saving the same grid we
+            // loaded it with; otherwise (edited/imported/new grid) fall back to a
+            // valid but empty map rather than risk writing a stale one.
+            Logic preservedLogic = StarMadeLogic.getInstance().getLogicFor(grid);
             try (OutputStream logicOut = new FileOutputStream(new File(baseDir, "logic.smbpl"))) {
-                Smbp5Logic.writeLogic(logicOut);
+                if (preservedLogic != null && !preservedLogic.getControllers().isEmpty()) {
+                    LogicLogic.writeFile(preservedLogic, logicOut, false);
+                } else {
+                    Smbp5Logic.writeLogic(logicOut);
+                }
             }
             try (OutputStream metaOut = new FileOutputStream(new File(baseDir, "meta.smbpm"))) {
                 Smbp5Logic.writeMeta(metaOut);
             }
-            // data files: modern .smd3 (32³, v6). NOTE: header/logic/meta above are
-            // still written in the legacy format, so SMEdit can reopen its own
-            // saves, but StarMade itself needs v5 header/meta to load them — that
-            // metadata-write modernization is a follow-up.
+            // data files: modern .smd3 (32³, v6). Together with the v5
+            // header/meta and v0 logic written above, this is a full
+            // StarMade-loadable blueprint.
             File dataDir = new File(baseDir, "DATA");
             if (!dataDir.exists()) {
                 dataDir.mkdir();
@@ -173,7 +179,6 @@ public class BlueprintLogic {
             Smd3Logic.writeFiles(grid, dataDir, spec.getName());
         } catch (IOException e1) {
             log.log(Level.WARNING, "saveBlueprint failed!", e1);
-            e1.printStackTrace();
         }
     }
 

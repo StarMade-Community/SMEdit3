@@ -28,6 +28,7 @@ import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Properties;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import static javax.swing.BorderFactory.createEtchedBorder;
 import static javax.swing.BorderFactory.createTitledBorder;
@@ -471,7 +472,7 @@ public class OptionScreen extends JFrame {
                     mProps.load(fis);
                 }
             } catch (IOException e) {
-
+                log.log(Level.WARNING, "Could not read settings from " + props, e);
             }
         } else {
             mProps = new Properties();
@@ -494,8 +495,8 @@ public class OptionScreen extends JFrame {
                 mProps.store(fos, "StarMade Utils defaults");
             }
         } catch (IOException e) {
-
-        }       
+            log.log(Level.WARNING, "Could not save settings to " + props, e);
+        }
     }
 
     

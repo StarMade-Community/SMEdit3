@@ -129,7 +129,6 @@ public class StarMadeLogic {
             return true;
         } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
             log.log(Level.WARNING, "plugin failed!", e);
-            e.printStackTrace();
             return false;
         }
 
@@ -149,7 +148,6 @@ public class StarMadeLogic {
             return true;
         } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
             log.log(Level.WARNING, "pluginFactory failed!", e);
-            e.printStackTrace();
             return false;
         }
 
@@ -190,7 +188,6 @@ public class StarMadeLogic {
                         }
                     } catch (IOException e) {
                         log.log(Level.WARNING, "plugins failed!", e);
-                        e.printStackTrace();
                     }
                 }
             }
@@ -244,7 +241,6 @@ public class StarMadeLogic {
             }
         } catch (Exception e) {
             log.log(Level.WARNING, "plugins failed!", e);
-            e.printStackTrace();
         }
         return false;
     }

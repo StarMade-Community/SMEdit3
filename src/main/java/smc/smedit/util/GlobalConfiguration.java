@@ -35,7 +35,9 @@ import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Properties;
 import java.util.logging.FileHandler;
+import java.util.logging.Level;
 import java.util.logging.LogManager;
+import java.util.logging.Logger;
 
 import javax.imageio.ImageIO;
 
@@ -52,6 +54,7 @@ import smc.smedit.log.TextAreaLogHandler;
 @SuppressWarnings({"CallToPrintStackTrace", "null"})
 public class GlobalConfiguration {
 
+    private static final Logger log = Logger.getLogger(GlobalConfiguration.class.getName());
 
     public static final String NAME = "SMEdit";
     public static final String NAME_LOWERCASE = NAME.toLowerCase();
@@ -123,8 +126,8 @@ public class GlobalConfiguration {
         dirs.add(Paths.getIsanthDataDirectory());   
         for (final String name : dirs) {
             final File dir = new File(name);
-            if (!dir.exists()) {
-                dir.mkdirs();
+            if (!dir.exists() && !dir.mkdirs()) {
+                log.log(Level.WARNING, "Could not create application directory: {0}", dir);
             }
         }
     }

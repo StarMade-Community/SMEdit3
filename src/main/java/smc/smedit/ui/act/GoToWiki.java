@@ -18,7 +18,7 @@
 package smc.smedit.ui.act;
 
 import smc.smedit.util.URLs;
-import smc.smedit.util.io.HttpClient;
+import smc.smedit.util.io.BrowserLauncher;
 
 /**
  * @author Robert Barefoot
@@ -33,7 +33,7 @@ public class GoToWiki extends Base{
 
     @Override
 	public void actionPerformed(final java.awt.event.ActionEvent e) {
-		HttpClient.openURL(URLs.WIKI);
+		BrowserLauncher.openURL(URLs.WIKI);
 	}
 
     

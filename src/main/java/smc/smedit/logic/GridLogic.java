@@ -126,7 +126,6 @@ public class GridLogic {
             return baos.toByteArray();
         } catch (IOException e) {
             log.log(Level.WARNING, "ByteArrayOutputStream failed!", e);
-            e.printStackTrace();
             return new byte[0];
         }
     }
@@ -142,7 +141,6 @@ public class GridLogic {
             return fromString(new String(os.toByteArray()));
         } catch (IOException e) {
             log.log(Level.WARNING, "ByteArrayOutputStream failed!", e);
-            e.printStackTrace();
             return null;
         }
     }

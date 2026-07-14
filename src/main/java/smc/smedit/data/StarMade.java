@@ -25,6 +25,7 @@ import java.util.Properties;
 import smc.smedit.mods.IBlocksPlugin;
 import smc.smedit.mods.IStarMadePluginFactory;
 import smc.smedit.ship.data.Block;
+import smc.smedit.ship.data.Logic;
 import smc.smedit.ui.logic.ShipSpec;
 import smc.smedit.vecmath.Point3i;
 
@@ -48,6 +49,9 @@ public class StarMade extends PCSBean {
     private IBlocksPlugin mViewFilter;
     private ShipSpec mCurrentModel;
     private SparseMatrix<Block> mModel;
+    /** Control map from the loaded blueprint, and the exact grid it belongs to. */
+    private Logic mLoadedLogic;
+    private SparseMatrix<Block> mLoadedLogicModel;
 
     public StarMade() {
         mBlocksPlugins = new ArrayList<>();
@@ -171,6 +175,28 @@ public class StarMade extends PCSBean {
         queuePropertyChange("model", mModel, model);
         mModel = model;
         firePropertyChange();
+    }
+
+    /**
+     * Records the control map loaded with a blueprint, tied to the exact grid it
+     * describes. On save the logic is only reused when the current model is still
+     * that same grid instance (see {@link #getLogicFor}), so an imported, new, or
+     * plugin-replaced grid never inherits a stale ship's wiring.
+     */
+    public void setLoadedLogic(Logic logic, SparseMatrix<Block> model) {
+        mLoadedLogic = logic;
+        mLoadedLogicModel = model;
+    }
+
+    /**
+     * @return the loaded control map iff {@code model} is the very grid it was
+     *         loaded with; otherwise {@code null} (write an empty, valid map).
+     */
+    public Logic getLogicFor(SparseMatrix<Block> model) {
+        if (mLoadedLogic != null && mLoadedLogicModel == model) {
+            return mLoadedLogic;
+        }
+        return null;
     }
 
     public List<IStarMadePluginFactory> getPluginFactories() {

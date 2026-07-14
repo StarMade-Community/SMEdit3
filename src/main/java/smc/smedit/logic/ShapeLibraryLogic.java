@@ -73,7 +73,6 @@ public class ShapeLibraryLogic {
                 updateEntry(entry);
             } catch (IOException e) {
                 log.log(Level.WARNING, "ShapeLibrary failed!", e);
-                e.printStackTrace();
             }
             mEntries.add(entry);
         }

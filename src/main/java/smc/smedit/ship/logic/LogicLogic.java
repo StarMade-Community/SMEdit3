@@ -50,8 +50,20 @@ public class LogicLogic {
             dis = new DataInputStream(is);
         }
         Logic logic = new Logic();
+        // structureVersion (0). In the legacy format this was labelled "unknown1".
         logic.setUnknown1(dis.readInt());
-        int numControllers = dis.readInt();
+        // Modern StarMade writes an on-disk marker here: -(1024 + serializationVersion).
+        // The real controller count then follows. Legacy files have no marker, so a
+        // non-negative value IS the count. (See StarMade ControlElementMap#serializeForDisk.)
+        int markerOrCount = dis.readInt();
+        int numControllers;
+        if (markerOrCount < 0) {
+            logic.setControlMapMarker(markerOrCount);
+            numControllers = dis.readInt();
+        } else {
+            logic.setControlMapMarker(0); // legacy: no marker present
+            numControllers = markerOrCount;
+        }
         for (int i = 0; i < numControllers; i++) {
             ControllerEntry controller = new ControllerEntry();
             controller.setPosition(IOLogic.readPoint3s(dis));
@@ -81,6 +93,12 @@ public class LogicLogic {
             dos = new DataOutputStream(os);
         }
         dos.writeInt(logic.getUnknown1());
+        // Emit the modern on-disk marker when present, so this is a faithful
+        // inverse of readFile (a byte-exact round-trip for modern files). A
+        // marker of 0 means the source was legacy/markerless.
+        if (logic.getControlMapMarker() != 0) {
+            dos.writeInt(logic.getControlMapMarker());
+        }
         dos.writeInt(logic.getControllers().size());
         for (ControllerEntry controller : logic.getControllers()) {
             IOLogic.writePoint3s(dos, controller.getPosition());

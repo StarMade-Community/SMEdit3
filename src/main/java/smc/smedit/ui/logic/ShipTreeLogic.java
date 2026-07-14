@@ -142,22 +142,14 @@ public class ShipTreeLogic {
             if (spec.getType() == ShipSpec.BLUEPRINT) {
                 Blueprint blueprint = BlueprintLogic.readBlueprint(spec.getName(), cb);
                 SparseMatrix<Block> grid = ShipLogic.getBlocks(blueprint.getData());
-                //System.out.println("Original:");
-                //HeaderLogic.dump(blueprint.getHeader());
-                //LogicLogic.dump(blueprint.getLogic(), grid);
-                //System.out.println("Loopback:");
-                //HeaderLogic.dump(HeaderLogic.make(grid));
-                //LogicLogic.dump(LogicLogic.make(grid), grid);
+                // Keep the loaded control map so save can preserve the ship's
+                // wiring (tied to this exact grid — see StarMade#getLogicFor).
+                StarMadeLogic.getInstance().setLoadedLogic(blueprint.getLogic(), grid);
                 return grid;
             } else if (spec.getType() == ShipSpec.DEFAULT_BLUEPRINT) {
                 Blueprint blueprint = BlueprintLogic.readDefaultBlueprint(spec.getName(), cb);
                 SparseMatrix<Block> grid = ShipLogic.getBlocks(blueprint.getData());
-                //System.out.println("Original:");
-                //HeaderLogic.dump(blueprint.getHeader());
-                //LogicLogic.dump(blueprint.getLogic(), grid);
-                //System.out.println("Loopback:");
-                //HeaderLogic.dump(HeaderLogic.make(grid));
-                //LogicLogic.dump(LogicLogic.make(grid), grid);
+                StarMadeLogic.getInstance().setLoadedLogic(blueprint.getLogic(), grid);
                 return grid;
             } else if (spec.getType() == ShipSpec.ENTITY) {
                 Entity e = spec.getEntity();

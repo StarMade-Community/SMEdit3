@@ -7,6 +7,7 @@ import java.io.File;
 
 import org.junit.jupiter.api.Test;
 
+import smc.smedit.BlueprintFixtures;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.mods.IPluginCallback;
 import smc.smedit.ship.data.Block;
@@ -21,14 +22,23 @@ import smc.smedit.ship.logic.ShipLogic;
  */
 class BlueprintLoadTest {
 
-    private static final File ISANTH = new File("/home/videogoose/Projects/StarMade/src/main/"
-            + "resources/blueprints-default/Isanth Type-PNR-25-B");
+    /** Prefer the bundled fixture (runs in CI); fall back to a local StarMade source tree. */
+    private static File isanthDir() {
+        File bundled = BlueprintFixtures.blueprint("Isanth Type-PNR-25-B");
+        if (bundled != null) {
+            return bundled;
+        }
+        return new File("/home/videogoose/Projects/StarMade/src/main/"
+                + "resources/blueprints-default/Isanth Type-PNR-25-B");
+    }
 
     @Test
     void opensModernBlueprintDirectory() throws Exception {
-        assumeTrue(new File(ISANTH, "DATA").isDirectory(), "StarMade blueprint fixture not present; skipping");
+        File isanth = isanthDir();
+        assumeTrue(isanth != null && new File(isanth, "DATA").isDirectory(),
+                "StarMade blueprint fixture not present; skipping");
 
-        Blueprint bp = BlueprintLogic.readBlueprint(ISANTH, new NoopCallback());
+        Blueprint bp = BlueprintLogic.readBlueprint(isanth, new NoopCallback());
         SparseMatrix<Block> grid = ShipLogic.getBlocks(bp.getData());
 
         assertTrue(grid.size() > 10, "expected a real ship, got " + grid.size() + " blocks");

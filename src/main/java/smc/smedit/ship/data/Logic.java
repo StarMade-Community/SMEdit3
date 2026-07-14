@@ -38,7 +38,17 @@ import java.util.List;
  */
 public class Logic {
 
+    /** Default on-disk control-map marker: {@code -(1024 + SERIALIZATION_VERSION)}, version 2. */
+    public static final int DEFAULT_CONTROL_MAP_MARKER = -(1024 + 2);
+
     private int mUnknown1;
+    /**
+     * The {@code int} that modern StarMade writes immediately after
+     * {@code structureVersion}: {@code -(1024 + serializationVersion)}. Legacy
+     * (pre-marker) files have no such field; {@link LogicLogic#readFile} records
+     * {@code 0} for them so the writer can round-trip either shape.
+     */
+    private int mControlMapMarker = DEFAULT_CONTROL_MAP_MARKER;
     private List<ControllerEntry> mControllers;
 
     public Logic() {
@@ -51,6 +61,15 @@ public class Logic {
 
     public void setUnknown1(int unknown1) {
         mUnknown1 = unknown1;
+    }
+
+    /** @return the modern control-map marker, or {@code 0} for legacy (no-marker) files. */
+    public int getControlMapMarker() {
+        return mControlMapMarker;
+    }
+
+    public void setControlMapMarker(int controlMapMarker) {
+        mControlMapMarker = controlMapMarker;
     }
 
     public List<ControllerEntry> getControllers() {

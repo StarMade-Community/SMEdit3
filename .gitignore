@@ -1,14 +1,3 @@
-/jo_plugin/JoFileMods/nbproject/private/
-/jo_sm/nbproject/private/
-/SMEdit/nbproject/private/
-/jo_sm/build/
-/jo_sm/dist/
-/jo_plugin/JoFileMods/build/
-/jo_plugin/JoFileMods/dist/
-/SMEdit/dist/
-/SMEdit/build/
-
-# Gradle
 .gradle/
 build/
 !gradle-wrapper.jar
@@ -22,3 +11,5 @@ build/
 bin
 target
 /.idea/
+*.DS_Store
+default-blueprints
