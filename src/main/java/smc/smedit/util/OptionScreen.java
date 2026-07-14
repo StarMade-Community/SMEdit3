@@ -1,14 +1,14 @@
 /**
- * Copyright 2014 
+ * Copyright 2014
  * SMEdit https://github.com/StarMade/SMEdit
  * SMTools https://github.com/StarMade/SMTools
- *
+ * <p>
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -17,8 +17,11 @@
  */
 package smc.smedit.util;
 
-import java.awt.Color;
-import java.awt.Font;
+import smc.smedit.ui.RenderFrame;
+import smc.smedit.ui.StarMadeDirChooser;
+
+import javax.swing.*;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
@@ -27,41 +30,25 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import static javax.swing.BorderFactory.createEtchedBorder;
 import static javax.swing.BorderFactory.createTitledBorder;
-import javax.swing.DefaultComboBoxModel;
-import javax.swing.GroupLayout;
-import static javax.swing.GroupLayout.Alignment.BASELINE;
-import static javax.swing.GroupLayout.Alignment.LEADING;
-import static javax.swing.GroupLayout.Alignment.TRAILING;
+import static javax.swing.GroupLayout.Alignment.*;
 import static javax.swing.GroupLayout.DEFAULT_SIZE;
 import static javax.swing.GroupLayout.PREFERRED_SIZE;
-import javax.swing.ImageIcon;
-import javax.swing.JButton;
-import javax.swing.JComboBox;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JSpinner;
-import javax.swing.JTextField;
 import static javax.swing.LayoutStyle.ComponentPlacement.RELATED;
 import static javax.swing.LayoutStyle.ComponentPlacement.UNRELATED;
-import javax.swing.SpinnerNumberModel;
-import javax.swing.SwingConstants;
-import javax.swing.WindowConstants;
-
-import smc.smedit.ui.RenderFrame;
-import smc.smedit.ui.StarMadeDirChooser;
 
 public class OptionScreen extends JFrame {
 
     private static final long serialVersionUID = 1L;
-    private static String[] mArgs;
     //public final static String fileName = Paths.getOptsFile();
     private static final Logger log = Logger.getLogger(OptionScreen.class.getName());
+    private static String[] mArgs;
     private Properties mProps;
     private File mStarMadeDir;
 
@@ -70,11 +57,9 @@ public class OptionScreen extends JFrame {
     private JButton jButton2;
     private JButton jButton3;
     private JButton jButtonBrowse;
-    private JComboBox jComboBox2;
     private JLabel jLabel1;
     private JLabel jLabel3;
     private JLabel jLabel4;
-    private JLabel jLabel5;
     private JLabel jLabel6;
     private JLabel jLabel7;
     private JLabel jLabel8;
@@ -84,22 +69,22 @@ public class OptionScreen extends JFrame {
     private JPanel jPanel4;
     private JSpinner jSpinner1;
     private JTextField jTextField1;
-    
+
     @SuppressWarnings("unchecked")
-    public OptionScreen(final String[] args) {
+    public OptionScreen(String[] args) {
 
         loadJosmProps();
 
         mArgs = args;
         setIconImage(GlobalConfiguration.getImage(Resources.ICON));
-        setTitle(GlobalConfiguration.NAME + " version 1.0" + ((float) GlobalConfiguration.getVersion() / 100));
-        setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        setTitle(GlobalConfiguration.NAME + " v" + GlobalConfiguration.VERSION);
+        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         setResizable(false);
 
         addWindowListener(new WindowAdapter() {
 
             @Override
-            public void windowClosing(final WindowEvent e) {
+            public void windowClosing(WindowEvent e) {
                 System.exit(0);
             }
         });
@@ -118,7 +103,6 @@ public class OptionScreen extends JFrame {
         jSpinner1 = new JSpinner(new SpinnerNumberModel(1, 1, 32, 1));
         jLabel4 = new JLabel();
         jPanel3 = new JPanel();
-        jLabel5 = new JLabel();
         jLabel6 = new JLabel();
         jPanel4 = new JPanel();
         jLabel7 = new JLabel();
@@ -127,7 +111,7 @@ public class OptionScreen extends JFrame {
         jButton2 = new JButton();
         jButton3 = new javax.swing.JButton();
 
-        final ImageIcon icon = new ImageIcon();
+        ImageIcon icon = new ImageIcon();
         icon.setImage(GlobalConfiguration.getImage(Resources.SPLASH));
         jLabel1.setIcon(icon);
         jLabel1.setHorizontalAlignment(SwingConstants.CENTER);
@@ -242,20 +226,8 @@ public class OptionScreen extends JFrame {
 
         javax.swing.GroupLayout jPanel1Layout = new GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
-        jPanel1Layout.setHorizontalGroup(
-                jPanel1Layout.createParallelGroup(LEADING)
-                .addGroup(jPanel1Layout.createSequentialGroup()
-                        .addContainerGap()
-                        .addComponent(jLabel1, PREFERRED_SIZE, 400, PREFERRED_SIZE)
-                        .addContainerGap(DEFAULT_SIZE, Short.MAX_VALUE))
-        );
-        jPanel1Layout.setVerticalGroup(
-                jPanel1Layout.createParallelGroup(LEADING)
-                .addGroup(jPanel1Layout.createSequentialGroup()
-                        .addContainerGap()
-                        .addComponent(jLabel1, PREFERRED_SIZE, 218, PREFERRED_SIZE)
-                        .addContainerGap(DEFAULT_SIZE, Short.MAX_VALUE))
-        );
+        jPanel1Layout.setHorizontalGroup(jPanel1Layout.createParallelGroup(LEADING).addGroup(jPanel1Layout.createSequentialGroup().addContainerGap().addComponent(jLabel1, PREFERRED_SIZE, 400, PREFERRED_SIZE).addContainerGap(DEFAULT_SIZE, Short.MAX_VALUE)));
+        jPanel1Layout.setVerticalGroup(jPanel1Layout.createParallelGroup(LEADING).addGroup(jPanel1Layout.createSequentialGroup().addContainerGap().addComponent(jLabel1, PREFERRED_SIZE, 218, PREFERRED_SIZE).addContainerGap(DEFAULT_SIZE, Short.MAX_VALUE)));
 
         jPanel2.setBorder(createTitledBorder("* System Settings *"));
 
@@ -263,24 +235,8 @@ public class OptionScreen extends JFrame {
 
         javax.swing.GroupLayout jPanel2Layout = new GroupLayout(jPanel2);
         jPanel2.setLayout(jPanel2Layout);
-        jPanel2Layout.setHorizontalGroup(
-                jPanel2Layout.createParallelGroup(LEADING)
-                .addGroup(jPanel2Layout.createSequentialGroup()
-                        .addContainerGap()
-                        .addComponent(jLabel3, PREFERRED_SIZE, 217, PREFERRED_SIZE)
-                        .addPreferredGap(UNRELATED)
-                        .addComponent(jSpinner1)
-                        .addContainerGap())
-        );
-        jPanel2Layout.setVerticalGroup(
-                jPanel2Layout.createParallelGroup(LEADING)
-                .addGroup(jPanel2Layout.createSequentialGroup()
-                        .addGap(12, 12, 12)
-                        .addGroup(jPanel2Layout.createParallelGroup(LEADING, false)
-                                .addComponent(jSpinner1)
-                                .addComponent(jLabel3, DEFAULT_SIZE, DEFAULT_SIZE, Short.MAX_VALUE))
-                        .addContainerGap(DEFAULT_SIZE, Short.MAX_VALUE))
-        );
+        jPanel2Layout.setHorizontalGroup(jPanel2Layout.createParallelGroup(LEADING).addGroup(jPanel2Layout.createSequentialGroup().addContainerGap().addComponent(jLabel3, PREFERRED_SIZE, 217, PREFERRED_SIZE).addPreferredGap(UNRELATED).addComponent(jSpinner1).addContainerGap()));
+        jPanel2Layout.setVerticalGroup(jPanel2Layout.createParallelGroup(LEADING).addGroup(jPanel2Layout.createSequentialGroup().addGap(12, 12, 12).addGroup(jPanel2Layout.createParallelGroup(LEADING, false).addComponent(jSpinner1).addComponent(jLabel3, DEFAULT_SIZE, DEFAULT_SIZE, Short.MAX_VALUE)).addContainerGap(DEFAULT_SIZE, Short.MAX_VALUE)));
 
         jLabel4.setFont(new Font("Tahoma", 0, 12)); // NOI18N
         jLabel4.setForeground(new Color(255, 0, 0));
@@ -288,77 +244,27 @@ public class OptionScreen extends JFrame {
 
         jPanel3.setBorder(createTitledBorder("* Folder Settings *"));
 
-        jLabel5.setText("Desired texture pack to use?");
-
         jLabel6.setText("StarMade game folder directory?");
-
-        //jComboBox2 = new JComboBox<>(new DefaultComboBoxModel<>(new String[]{"Cartoon", "OldStyle", "Pixel", "Realistic", "Custom"}));
-        jComboBox2 = new JComboBox<>(new DefaultComboBoxModel<>(new String[]{"Default", "Pixel", "Realistic"}));
-        jComboBox2.setBorder(createEtchedBorder());
-        if (null != mProps.getProperty("texture", "")) {
-            switch (mProps.getProperty("texture", "")) {
-                case "Default":
-                    jComboBox2.setSelectedIndex(1);
-                    break;
-                case "Pixel":
-                    jComboBox2.setSelectedIndex(2);
-                    break;
-                case "Realistic":
-                    jComboBox2.setSelectedIndex(3);
-                    break;
-            }
-        }
 
         jTextField1 = new JTextField(mProps.getProperty("starmade.home", ""));
         mStarMadeDir = new File(jTextField1.getText());
 
         jButtonBrowse = new JButton("Browse…");
-        jButtonBrowse.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                File initial = (mStarMadeDir != null && mStarMadeDir.isDirectory()) ? mStarMadeDir : null;
-                File chosen = StarMadeDirChooser.choose(OptionScreen.this, initial);
-                if (chosen != null) {
-                    jTextField1.setText(chosen.getAbsolutePath());
-                    mStarMadeDir = chosen;
-                }
+        jButtonBrowse.addActionListener(e -> {
+            File initial = (mStarMadeDir != null && mStarMadeDir.isDirectory()) ? mStarMadeDir : null;
+            File chosen = StarMadeDirChooser.choose(OptionScreen.this, initial);
+            if (chosen != null) {
+                jTextField1.setText(chosen.getAbsolutePath());
+                mStarMadeDir = chosen;
             }
         });
 
         javax.swing.GroupLayout jPanel3Layout = new GroupLayout(jPanel3);
         jPanel3.setLayout(jPanel3Layout);
-        jPanel3Layout.setHorizontalGroup(
-                jPanel3Layout.createParallelGroup(LEADING)
-                .addGroup(TRAILING, jPanel3Layout.createSequentialGroup()
-                        .addContainerGap()
-                        .addGroup(jPanel3Layout.createParallelGroup(TRAILING)
-                                .addComponent(jLabel6, LEADING, DEFAULT_SIZE, DEFAULT_SIZE, Short.MAX_VALUE)
-                                .addComponent(jLabel5, DEFAULT_SIZE, DEFAULT_SIZE, Short.MAX_VALUE))
-                        .addPreferredGap(RELATED)
-                        .addGroup(jPanel3Layout.createParallelGroup(TRAILING, false)
-                                .addGroup(jPanel3Layout.createSequentialGroup()
-                                        .addComponent(jTextField1, DEFAULT_SIZE, 169, Short.MAX_VALUE)
-                                        .addPreferredGap(RELATED)
-                                        .addComponent(jButtonBrowse))
-                                .addComponent(jComboBox2, 0, DEFAULT_SIZE, Short.MAX_VALUE))
-                        .addContainerGap())
-        );
-        jPanel3Layout.setVerticalGroup(
-                jPanel3Layout.createParallelGroup(LEADING)
-                .addGroup(jPanel3Layout.createSequentialGroup()
-                        .addContainerGap()
-                        .addGroup(jPanel3Layout.createParallelGroup(LEADING, false)
-                                .addComponent(jComboBox2)
-                                .addComponent(jLabel5, DEFAULT_SIZE, DEFAULT_SIZE, Short.MAX_VALUE))
-                        .addPreferredGap(RELATED)
-                        .addGroup(jPanel3Layout.createParallelGroup(LEADING, false)
-                                .addComponent(jTextField1)
-                                .addComponent(jButtonBrowse)
-                                .addComponent(jLabel6, DEFAULT_SIZE, DEFAULT_SIZE, Short.MAX_VALUE))
-                        .addContainerGap(DEFAULT_SIZE, Short.MAX_VALUE))
-        );
-        
-        jPanel4.setBorder(javax.swing.BorderFactory.createTitledBorder("* Start Up Instructions *"));
+        jPanel3Layout.setHorizontalGroup(jPanel3Layout.createParallelGroup(LEADING).addGroup(TRAILING, jPanel3Layout.createSequentialGroup().addContainerGap().addGroup(jPanel3Layout.createParallelGroup(TRAILING).addComponent(jLabel6, LEADING, DEFAULT_SIZE, DEFAULT_SIZE, Short.MAX_VALUE)).addPreferredGap(RELATED).addGroup(jPanel3Layout.createParallelGroup(TRAILING, false).addGroup(jPanel3Layout.createSequentialGroup().addComponent(jTextField1, DEFAULT_SIZE, 169, Short.MAX_VALUE).addPreferredGap(RELATED).addComponent(jButtonBrowse))).addContainerGap()));
+        jPanel3Layout.setVerticalGroup(jPanel3Layout.createParallelGroup(LEADING).addGroup(jPanel3Layout.createSequentialGroup().addContainerGap().addGroup(jPanel3Layout.createParallelGroup(LEADING, false)).addPreferredGap(RELATED).addGroup(jPanel3Layout.createParallelGroup(LEADING, false).addComponent(jTextField1).addComponent(jButtonBrowse).addComponent(jLabel6, DEFAULT_SIZE, DEFAULT_SIZE, Short.MAX_VALUE)).addContainerGap(DEFAULT_SIZE, Short.MAX_VALUE)));
+
+        jPanel4.setBorder(createTitledBorder("* Start Up Instructions *"));
 
         jLabel7.setText("Be sure to apply any changes before starting the main SMEdit app.");
 
@@ -366,97 +272,31 @@ public class OptionScreen extends JFrame {
 
         javax.swing.GroupLayout jPanel4Layout = new javax.swing.GroupLayout(jPanel4);
         jPanel4.setLayout(jPanel4Layout);
-        jPanel4Layout.setHorizontalGroup(
-            jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel4Layout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                    .addComponent(jLabel8, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(jLabel7, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                .addContainerGap())
-        );
-        jPanel4Layout.setVerticalGroup(
-            jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel4Layout.createSequentialGroup()
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addComponent(jLabel7, javax.swing.GroupLayout.PREFERRED_SIZE, 24, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jLabel8, javax.swing.GroupLayout.PREFERRED_SIZE, 22, javax.swing.GroupLayout.PREFERRED_SIZE))
-        );
+        jPanel4Layout.setHorizontalGroup(jPanel4Layout.createParallelGroup(LEADING).addGroup(TRAILING, jPanel4Layout.createSequentialGroup().addContainerGap().addGroup(jPanel4Layout.createParallelGroup(TRAILING).addComponent(jLabel8, DEFAULT_SIZE, DEFAULT_SIZE, Short.MAX_VALUE).addComponent(jLabel7, DEFAULT_SIZE, DEFAULT_SIZE, Short.MAX_VALUE)).addContainerGap()));
+        jPanel4Layout.setVerticalGroup(jPanel4Layout.createParallelGroup(LEADING).addGroup(jPanel4Layout.createSequentialGroup().addContainerGap(DEFAULT_SIZE, Short.MAX_VALUE).addComponent(jLabel7, PREFERRED_SIZE, 24, PREFERRED_SIZE).addPreferredGap(RELATED).addComponent(jLabel8, PREFERRED_SIZE, 22, PREFERRED_SIZE)));
 
         jButton1.setText("Apply");
-        jButton1.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                saveProps();
-            }
-        });
+        jButton1.addActionListener(e -> saveProps());
 
         jButton2.setText("Cancel");
-        jButton2.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                System.exit(0);
-            }
-        });
-        
+        jButton2.addActionListener(e -> System.exit(0));
+
         jButton3.setText("Start SMEdit");
-        jButton3.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                saveProps();
-                dispose();
-                RenderFrame.main(mArgs);
-            }
+        jButton3.addActionListener(e -> {
+            saveProps();
+            dispose();
+            RenderFrame.main(mArgs);
         });
-        
+
 
         javax.swing.GroupLayout layout = new GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
-        layout.setHorizontalGroup(
-                layout.createParallelGroup(LEADING)
-                .addComponent(jPanel2, DEFAULT_SIZE, DEFAULT_SIZE, Short.MAX_VALUE)
-                .addGroup(layout.createSequentialGroup()
-                        .addComponent(jPanel1, PREFERRED_SIZE, DEFAULT_SIZE, PREFERRED_SIZE)
-                        .addGap(0, 0, Short.MAX_VALUE))
-                .addComponent(jPanel3, DEFAULT_SIZE, DEFAULT_SIZE, Short.MAX_VALUE)
-                .addGroup(TRAILING, layout.createSequentialGroup()
-                        .addContainerGap()
-                        
-                        .addGroup(layout.createParallelGroup(LEADING)
-                    .addComponent(jLabel4, TRAILING, DEFAULT_SIZE, DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addGroup(TRAILING, layout.createSequentialGroup()
-                        .addGap(0, 0, Short.MAX_VALUE)
-                        .addGroup(layout.createParallelGroup(LEADING, false)
-                            .addComponent(jButton3, TRAILING, DEFAULT_SIZE, DEFAULT_SIZE, Short.MAX_VALUE)
-                            .addGroup(TRAILING, layout.createSequentialGroup()
-                                .addComponent(jButton1)
-                                .addPreferredGap(RELATED)
-                                .addComponent(jButton2)))))
+        layout.setHorizontalGroup(layout.createParallelGroup(LEADING).addComponent(jPanel2, DEFAULT_SIZE, DEFAULT_SIZE, Short.MAX_VALUE).addGroup(layout.createSequentialGroup().addComponent(jPanel1, PREFERRED_SIZE, DEFAULT_SIZE, PREFERRED_SIZE).addGap(0, 0, Short.MAX_VALUE)).addComponent(jPanel3, DEFAULT_SIZE, DEFAULT_SIZE, Short.MAX_VALUE).addGroup(TRAILING, layout.createSequentialGroup().addContainerGap()
 
-                        .addContainerGap())
-                .addComponent(jPanel4, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-        );
-        layout.setVerticalGroup(
-                layout.createParallelGroup(LEADING)
-                .addGroup(layout.createSequentialGroup()
-                        .addComponent(jPanel1, PREFERRED_SIZE, DEFAULT_SIZE, PREFERRED_SIZE)
-                        .addGap(2, 2, 2)
-                        .addComponent(jLabel4)
-                        .addPreferredGap(RELATED)
-                        .addComponent(jPanel2, PREFERRED_SIZE, DEFAULT_SIZE, PREFERRED_SIZE)
-                        .addPreferredGap(RELATED, DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addComponent(jPanel3, PREFERRED_SIZE, DEFAULT_SIZE, PREFERRED_SIZE)
-                        .addPreferredGap(RELATED)
-                        .addComponent(jPanel4, PREFERRED_SIZE, DEFAULT_SIZE, PREFERRED_SIZE)
-                        .addPreferredGap(RELATED)
-                        .addGroup(layout.createParallelGroup(BASELINE)
-                                .addComponent(jButton1)
-                                .addComponent(jButton2))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jButton3)
-                        .addGap(12, 12, 12))
-        );
+                .addGroup(layout.createParallelGroup(LEADING).addComponent(jLabel4, TRAILING, DEFAULT_SIZE, DEFAULT_SIZE, Short.MAX_VALUE).addGroup(TRAILING, layout.createSequentialGroup().addGap(0, 0, Short.MAX_VALUE).addGroup(layout.createParallelGroup(LEADING, false).addComponent(jButton3, TRAILING, DEFAULT_SIZE, DEFAULT_SIZE, Short.MAX_VALUE).addGroup(TRAILING, layout.createSequentialGroup().addComponent(jButton1).addPreferredGap(RELATED).addComponent(jButton2)))))
+
+                .addContainerGap()).addComponent(jPanel4, DEFAULT_SIZE, DEFAULT_SIZE, Short.MAX_VALUE));
+        layout.setVerticalGroup(layout.createParallelGroup(LEADING).addGroup(layout.createSequentialGroup().addComponent(jPanel1, PREFERRED_SIZE, DEFAULT_SIZE, PREFERRED_SIZE).addGap(2, 2, 2).addComponent(jLabel4).addPreferredGap(RELATED).addComponent(jPanel2, PREFERRED_SIZE, DEFAULT_SIZE, PREFERRED_SIZE).addPreferredGap(RELATED, DEFAULT_SIZE, Short.MAX_VALUE).addComponent(jPanel3, PREFERRED_SIZE, DEFAULT_SIZE, PREFERRED_SIZE).addPreferredGap(RELATED).addComponent(jPanel4, PREFERRED_SIZE, DEFAULT_SIZE, PREFERRED_SIZE).addPreferredGap(RELATED).addGroup(layout.createParallelGroup(BASELINE).addComponent(jButton1).addComponent(jButton2)).addPreferredGap(RELATED).addComponent(jButton3).addGap(12, 12, 12)));
 
         pack();
 
@@ -484,21 +324,18 @@ public class OptionScreen extends JFrame {
             return;
         }
         if (mStarMadeDir != null) {
-            mProps.put("memory", jSpinner1.getValue().toString());
-            mProps.put("texture", jComboBox2.getSelectedItem().toString());
-            mProps.put("starmade.home", jTextField1.getText());
+            mProps.setProperty("memory", jSpinner1.getValue().toString());
+            mProps.setProperty("texture", "Default");
+            mProps.setProperty("starmade.home", jTextField1.getText());
         }
         File uHome = new File(System.getProperty("user.home"));
         File props = new File(uHome, ".josm");
         try {
-            try (FileWriter fos = new FileWriter(props)) {
+            try (FileWriter fos = new FileWriter(props, StandardCharsets.UTF_8)) {
                 mProps.store(fos, "StarMade Utils defaults");
             }
         } catch (IOException e) {
             log.log(Level.WARNING, "Could not save settings to " + props, e);
         }
     }
-
-    
-
 }

@@ -46,10 +46,10 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
-import javax.swing.JTabbedPane;
 import javax.swing.JToolBar;
 import javax.swing.border.EmptyBorder;
 import smc.smedit.log.TextAreaLogHandler;
+import smc.smedit.logic.BlueprintLogic;
 import smc.smedit.logic.RunnableLogic;
 import smc.smedit.logic.StarMadeLogic;
 import smc.smedit.mods.IBlocksPlugin;
@@ -79,10 +79,24 @@ import smc.smedit.ui.logic.MenuLogic;
 import smc.smedit.ui.logic.ShipSpec;
 import smc.smedit.ui.logic.ShipTreeLogic;
 import smc.smedit.ui.lwjgl.LWJGLRenderPanel;
+import smc.smedit.ui.dock.DockPanel;
+import smc.smedit.ui.dock.LayoutPresets;
 import smc.smedit.util.GlobalConfiguration;
 import smc.smedit.util.Paths;
 import smc.smedit.util.Resources;
 import smc.smedit.util.SplashScreen;
+
+import java.io.File;
+import java.util.EnumSet;
+
+import io.github.andrewauclair.moderndocking.DockingRegion;
+import io.github.andrewauclair.moderndocking.ui.ToolbarLocation;
+import io.github.andrewauclair.moderndocking.app.AppState;
+import io.github.andrewauclair.moderndocking.app.Docking;
+import io.github.andrewauclair.moderndocking.app.DockingState;
+import io.github.andrewauclair.moderndocking.app.RootDockingPanel;
+import io.github.andrewauclair.moderndocking.ext.ui.DockingUI;
+import io.github.andrewauclair.moderndocking.layouts.ApplicationLayout;
 
 @SuppressWarnings("serial")
 public class RenderFrame extends JFrame {
@@ -139,11 +153,13 @@ public class RenderFrame extends JFrame {
         final RenderFrame f = new RenderFrame(args);
         f.setVisible(true);
         try {
-            /*Chenage the commented line to change the default loaded blueprint*/
-            /*method updated as of SMEdit v1.06*/
-            final ShipSpec spec = ShipTreeLogic.getBlueprintSpec("Omen-Navy-Class", true);
-            //final ShipSpec spec = ShipTreeLogic.getBlueprintSpec("Isanth-VI", true);
-            if (spec != null) {
+            // Load the first available default blueprint (e.g. an Isanth from the
+            // install's blueprints-default) rather than a hardcoded name — the old
+            // "Omen-Navy-Class" was an empty auto-created folder that crashed the
+            // renderer. Start with an empty editor if none are present.
+            final String defaultName = firstDefaultBlueprint();
+            if (defaultName != null) {
+                final ShipSpec spec = ShipTreeLogic.getBlueprintSpec(defaultName, true);
                 IRunnableWithProgress t = new IRunnableWithProgress() {
                     @Override
                     public void run(IPluginCallback cb) {
@@ -151,15 +167,37 @@ public class RenderFrame extends JFrame {
                         StarMadeLogic.setModel(ShipTreeLogic.loadShip(spec, cb));
                     }
                 };
-                log.log(Level.INFO, "Loading Ship!");
+                log.log(Level.INFO, "Loading default blueprint: {0}", defaultName);
                 RunnableLogic.run(f, "Loading...", t);
             } else {
-                log.log(Level.WARNING, "Could not find the ship your asking to load!");
+                log.log(Level.INFO, "No default blueprint found; starting with an empty editor.");
             }
         } catch (Exception e) {
             log.log(Level.WARNING, "Ship load failed!", e);
         }
         log.config("Main application started: " + GlobalConfiguration.NAME);
+    }
+
+    /**
+     * Picks a default blueprint to open on startup: the first valid blueprint in
+     * the install's {@code blueprints-default} (one with a {@code header.smbph}),
+     * preferring an "Isanth". Returns {@code null} if none are available.
+     */
+    private static String firstDefaultBlueprint() {
+        try {
+            List<String> names = BlueprintLogic.getDefaultBlueprintNames();
+            if (names != null && !names.isEmpty()) {
+                for (String n : names) {
+                    if (n.toLowerCase().contains("isanth")) {
+                        return n;
+                    }
+                }
+                return names.get(0);
+            }
+        } catch (Exception e) {
+            log.log(Level.WARNING, "Could not list default blueprints.", e);
+        }
+        return null;
     }
 
     /**
@@ -210,13 +248,19 @@ public class RenderFrame extends JFrame {
     private RenderPanel mClient;
     private JToolBar outerToolBar;
     private JToolBar innerToolBar;
-    private final JTabbedPane ClientWindows;
     public final JScrollPane textScroll;
 
     private JButton mPlugins;
 
+    // Dockable (Modern Docking) panels + the default layout, kept for Reset Layout.
+    private ApplicationLayout mDefaultLayout;
+    private DockPanel mViewportDock;
+    private DockPanel mBrushDock;
+    private DockPanel mConsoleDock;
+    private JMenu mWindowMenu;
+
     public RenderFrame(String[] args) {
-        setTitle(GlobalConfiguration.NAME + " version 1.0" + ((float) GlobalConfiguration.getVersion() / 100));
+        setTitle(GlobalConfiguration.NAME + " v" + GlobalConfiguration.VERSION);
         mArgs = args;
         setIconImage(GlobalConfiguration.getImage(Resources.ICON));
         setSize(1024, 768);
@@ -257,25 +301,23 @@ public class RenderFrame extends JFrame {
         setupMenus();
         setupToolbars();
 
-        cp.setLayout(new BorderLayout());
-        JPanel main = new JPanel(new BorderLayout());
-        main.add(new EditPanel(getClient(), this), BorderLayout.WEST);
-        main.add(getClient(), BorderLayout.CENTER);
         textScroll = new JScrollPane(TextAreaLogHandler.TEXT_AREA,
                 JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
                 JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         textScroll.setBorder(null);
         textScroll.setVisible(true);
-        ClientWindows = new JTabbedPane();
-        ClientWindows.setFont(new Font("Futura Md BT", 0, 10));
-        ClientWindows.addTab("Edit Window", main);
-        ClientWindows.setFont(new Font("Futura Md BT", 0, 10));
-        ClientWindows.addTab("Log Window", textScroll);
+
+        // Paint-program-style dockable layout (Modern Docking): the viewport,
+        // brush palette and console are dockable / floating / collapsible panels,
+        // and the arrangement is remembered between runs.
+        EditPanel editPanel = new EditPanel(getClient(), this);
+        RootDockingPanel dockRoot = setupDocking(editPanel);
+        populateWindowMenu();
 
         /* Toolbar placement */
         innerToolPane.add(innerToolBar, BorderLayout.NORTH);
         outerToolPane.add(outerToolBar, BorderLayout.NORTH);
-        getContentPane().add(ClientWindows, BorderLayout.CENTER);
+        getContentPane().add(dockRoot, BorderLayout.CENTER);
         getContentPane().add(new StatusPanel(), BorderLayout.SOUTH);
 
         addWindowListener(new WindowAdapter() {
@@ -294,6 +336,164 @@ public class RenderFrame extends JFrame {
                 getClient().requestFocusInWindow();
             }
         });
+    }
+
+    /**
+     * Builds the dockable layout: registers the viewport, brush and console as
+     * dockables, arranges a sensible default (viewport centre, brush left,
+     * console bottom), then restores any previously-saved layout and enables
+     * auto-persistence. The default is remembered for {@code Window > Reset
+     * Layout}. The viewport is neither closable nor floatable — tearing the
+     * heavyweight OpenGL canvas into a separate window would break its context.
+     */
+    private RootDockingPanel setupDocking(EditPanel editPanel) {
+        Docking.initialize(this);
+        DockingUI.initialize(); // FlatLaf-styled dock headers
+        // Enable the pin/collapse toolbars on the left, right and bottom edges so
+        // panels can be minimized (auto-hidden) to an edge and re-expanded.
+        RootDockingPanel dockRoot = new RootDockingPanel(this,
+                EnumSet.of(ToolbarLocation.WEST, ToolbarLocation.EAST, ToolbarLocation.SOUTH));
+
+        // args: closable, floatable, collapsible(auto-hide). The viewport stays
+        // put — it's the main editing surface (and a heavyweight GL canvas).
+        mViewportDock = new DockPanel("viewport", "Viewport", getClient(), false, false, false);
+        mBrushDock = new DockPanel("brush", "Brush", editPanel, true, true, true);
+        mConsoleDock = new DockPanel("console", "Console", textScroll, true, true, true);
+
+        Docking.dock(mViewportDock, this);
+        Docking.dock(mBrushDock, this, DockingRegion.WEST, 0.22);
+        Docking.dock(mConsoleDock, this, DockingRegion.SOUTH, 0.25);
+
+        // Remember this arrangement as the default, restore a saved layout if one
+        // exists, then keep the layout persisted across runs (workspace memory).
+        mDefaultLayout = DockingState.getApplicationLayout();
+        try {
+            File layoutFile = new File(Paths.getSettingsDirectory(), "layout.xml");
+            AppState.setPersistFile(layoutFile);
+            AppState.setDefaultApplicationLayout(mDefaultLayout);
+            if (layoutFile.isFile()) {
+                AppState.restore();
+            }
+            AppState.setAutoPersist(true);
+        } catch (Exception e) {
+            log.log(Level.WARNING, "Could not restore docking layout; using default.", e);
+        }
+        return dockRoot;
+    }
+
+    /** Restores the default panel arrangement (Window > Reset Layout). */
+    private void resetLayout() {
+        if (mDefaultLayout != null) {
+            DockingState.restoreApplicationLayout(mDefaultLayout);
+        }
+    }
+
+    /**
+     * Fills the Window menu: a show/hide toggle per collapsible panel, Reset
+     * Layout, and the named-preset submenu. Called after {@link #setupDocking}.
+     */
+    private void populateWindowMenu() {
+        mWindowMenu.removeAll();
+        JCheckBoxMenuItem brushToggle = panelToggle(mBrushDock, DockingRegion.WEST, 0.22);
+        JCheckBoxMenuItem consoleToggle = panelToggle(mConsoleDock, DockingRegion.SOUTH, 0.25);
+        mWindowMenu.add(brushToggle);
+        mWindowMenu.add(consoleToggle);
+        mWindowMenu.addSeparator();
+        JMenuItem reset = new JMenuItem("Reset Layout");
+        reset.addActionListener(e -> resetLayout());
+        mWindowMenu.add(reset);
+        mWindowMenu.addSeparator();
+        mWindowMenu.add(buildLayoutsMenu());
+
+        // Keep the checkboxes in sync with the real docked state (a panel may have
+        // been closed via its header X since the menu was last shown).
+        mWindowMenu.addMenuListener(new javax.swing.event.MenuListener() {
+            @Override public void menuSelected(javax.swing.event.MenuEvent e) {
+                brushToggle.setSelected(Docking.isDocked(mBrushDock));
+                consoleToggle.setSelected(Docking.isDocked(mConsoleDock));
+            }
+            @Override public void menuDeselected(javax.swing.event.MenuEvent e) { }
+            @Override public void menuCanceled(javax.swing.event.MenuEvent e) { }
+        });
+    }
+
+    /**
+     * A checkbox item that shows/hides a dockable. Re-docking a closed panel is
+     * done explicitly to its home region (and it is re-registered first if the
+     * close deregistered it), so re-enabling always brings the panel back.
+     */
+    private JCheckBoxMenuItem panelToggle(DockPanel dock, DockingRegion region, double split) {
+        JCheckBoxMenuItem item = new JCheckBoxMenuItem(dock.getTabText(), Docking.isDocked(dock));
+        item.addActionListener(e -> {
+            if (item.isSelected()) {
+                if (!Docking.isDockableRegistered(dock.getPersistentID())) {
+                    Docking.registerDockable(dock);
+                }
+                if (!Docking.isDocked(dock)) {
+                    Docking.dock(dock, this, region, split);
+                } else {
+                    Docking.bringToFront(dock);
+                }
+            } else if (Docking.isDocked(dock)) {
+                Docking.undock(dock);
+            }
+        });
+        return item;
+    }
+
+    /** Builds the "Layouts" submenu (named workspace presets), rebuilt on open. */
+    private JMenu buildLayoutsMenu() {
+        JMenu menu = new JMenu("Layouts");
+        menu.addMenuListener(new javax.swing.event.MenuListener() {
+            @Override public void menuSelected(javax.swing.event.MenuEvent e) { rebuildLayoutsMenu(menu); }
+            @Override public void menuDeselected(javax.swing.event.MenuEvent e) { }
+            @Override public void menuCanceled(javax.swing.event.MenuEvent e) { }
+        });
+        rebuildLayoutsMenu(menu);
+        return menu;
+    }
+
+    private void rebuildLayoutsMenu(JMenu menu) {
+        menu.removeAll();
+        JMenuItem saveAs = new JMenuItem("Save Current Layout As…");
+        saveAs.addActionListener(e -> {
+            String name = JOptionPane.showInputDialog(this, "Layout preset name:",
+                    "Save Layout", JOptionPane.PLAIN_MESSAGE);
+            if (name != null && !name.trim().isEmpty()) {
+                try {
+                    LayoutPresets.save(name);
+                } catch (Exception ex) {
+                    log.log(Level.WARNING, "Could not save layout preset", ex);
+                    JOptionPane.showMessageDialog(this, "Could not save layout: " + ex.getMessage(),
+                            "Save Layout", JOptionPane.WARNING_MESSAGE);
+                }
+            }
+        });
+        menu.add(saveAs);
+
+        List<String> names = LayoutPresets.names();
+        if (!names.isEmpty()) {
+            menu.addSeparator();
+            for (String name : names) {
+                JMenuItem load = new JMenuItem(name);
+                load.addActionListener(e -> {
+                    try {
+                        LayoutPresets.load(name);
+                    } catch (Exception ex) {
+                        log.log(Level.WARNING, "Could not load layout preset '" + name + "'", ex);
+                    }
+                });
+                menu.add(load);
+            }
+            menu.addSeparator();
+            JMenu delete = new JMenu("Delete");
+            for (String name : names) {
+                JMenuItem del = new JMenuItem(name);
+                del.addActionListener(e -> LayoutPresets.delete(name));
+                delete.add(del);
+            }
+            menu.add(delete);
+        }
     }
 
     private void setupToolbars() {
@@ -399,6 +599,11 @@ public class RenderFrame extends JFrame {
         viewFileStart.setName("pluginsStartHere");
         menuView.add(viewFileStart);
         menuBar.add(menuModify);
+        // Window menu — items are added in populateWindowMenu() after the docking
+        // layout is built (the panel toggles need the dockable instances).
+        mWindowMenu = new JMenu("Window");
+        mWindowMenu.setMnemonic(KeyEvent.VK_W);
+        menuBar.add(mWindowMenu);
         menuBar.add(menuHelp);
         /*link*/
         menuFile.addMenuListener(new PluginPopupListener(this, IBlocksPlugin.SUBTYPE_FILE));

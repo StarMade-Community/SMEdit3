@@ -33,8 +33,13 @@ dependencies {
     implementation "org.lwjgl.lwjgl:lwjgl:${lwjglVersion}"
     implementation "org.lwjgl.lwjgl:lwjgl_util:${lwjglVersion}"
 
-    // Modern Swing look-and-feel.
-    implementation 'com.formdev:flatlaf:3.4.1'
+    // Modern Swing look-and-feel (3.7.1 to match what modern-docking-ui pulls in).
+    implementation 'com.formdev:flatlaf:3.7.1'
+
+    // Dockable / floating / collapsible panels (paint-program-style layout) with
+    // layout persistence. modern-docking-ui adds FlatLaf integration.
+    implementation 'io.github.andrewauclair:modern-docking-single-app:1.4.9'
+    implementation 'io.github.andrewauclair:modern-docking-ui:1.4.9'
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -57,4 +62,20 @@ jar {
     manifest {
         attributes 'Main-Class': 'smc.smedit.SMEdit'
     }
+    // Build a runnable "fat" jar so the app can be launched with `java -jar`:
+    // bundle the runtime dependencies' classes (FlatLaf, Modern Docking, LWJGL).
+    // LWJGL *natives* are still loaded from the StarMade install at runtime, so
+    // they are deliberately not bundled.
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from {
+        configurations.runtimeClasspath.findAll { it.name.endsWith('.jar') }
+                .collect { zipTree(it) }
+    }
+    // Don't drag in the dependencies' own manifests, signatures or module-info
+    // (they'd clash on the flattened classpath). Our own META-INF/services files
+    // come from the source set, so they're preserved.
+    exclude 'META-INF/MANIFEST.MF'
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+    exclude 'module-info.class'
+    exclude 'META-INF/versions/*/module-info.class'
 }

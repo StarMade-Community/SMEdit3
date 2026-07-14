@@ -90,6 +90,15 @@ public class JGLObj extends JGLNode {
     // must have their byte order set to native order
     public void setVertices(float[] vertices) {
         synchronized (this) {
+            if (vertices == null || vertices.length < 3) {
+                // No geometry — don't index an empty array (below) or crash the
+                // render thread; leave this obj empty.
+                mVertexBuffer = ByteBuffer.allocateDirect(0).order(ByteOrder.nativeOrder()).asFloatBuffer();
+                mLowBounds = new Point3f(0, 0, 0);
+                mHighBounds = new Point3f(0, 0, 0);
+                mVertices = 0;
+                return;
+            }
             ByteBuffer vbb = ByteBuffer.allocateDirect(vertices.length * 4);
             vbb.order(ByteOrder.nativeOrder());
             mVertexBuffer = vbb.asFloatBuffer();
@@ -110,6 +119,10 @@ public class JGLObj extends JGLNode {
     }
 
     public void setVertices(Collection<?> vertices) {
+        if (vertices == null || vertices.isEmpty()) {
+            setVertices(new float[0]);
+            return;
+        }
         Object first = vertices.iterator().next();
         if (first instanceof Point3f) {
             float[] cs = new float[vertices.size() * 3];

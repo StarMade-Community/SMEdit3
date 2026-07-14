@@ -101,7 +101,9 @@ public class JGLTextureCache {
             return mLoadedCache.get(textureID);
         }
         if (!mSpecCache.containsKey(textureID)) {
-            throw new IllegalArgumentException("Unknown texture ID=" + textureID);
+            // Unknown/absent texture (e.g. id -1 for a block with no texture) —
+            // bind the default texture rather than crashing the render thread.
+            return 0;
         }
         int texture = genTexture();
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture);
@@ -110,7 +112,6 @@ public class JGLTextureCache {
         ByteBuffer tex = readPixels(img, storeAlphaChannel);
         makeRGBTexture(tex, img.getWidth(), img.getHeight(), storeAlphaChannel);
         mLoadedCache.put(textureID, texture);
-        System.out.println("Binding texture ID#" + textureID + " to gl#" + texture);
         return texture;
     }
 

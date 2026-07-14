@@ -197,7 +197,11 @@ public class JGLCanvas extends Canvas {
 
     private void doRenderLoop() {
         try {
-            while (!isDisplayable()) {
+            // Wait until the canvas is realized AND has a real size. Creating the
+            // LWJGL Display against a 0x0 canvas fails with an X CreateWindow
+            // BadValue — which happens with a docking layout that sizes the
+            // heavyweight canvas a frame later than a plain BorderLayout did.
+            while (!isDisplayable() || getWidth() <= 0 || getHeight() <= 0) {
                 Thread.sleep(50);
             }
             Display.setParent(this);
