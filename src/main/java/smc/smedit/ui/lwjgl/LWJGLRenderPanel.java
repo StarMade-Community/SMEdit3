@@ -60,14 +60,6 @@ public class LWJGLRenderPanel extends RenderPanel {
     private AxisAnchor mAxisAnchor = AxisAnchor.SCENE;
     private boolean mShowGrid;
 
-    /** How the mouse drives the camera. */
-    public enum CameraMode {
-        /** Turntable: right-drag swings around the ship centre. */
-        ORBIT,
-        /** Free-look: right-drag turns the camera in place (WASD to fly). */
-        FIRST_PERSON
-    }
-
     private CameraMode mCameraMode = CameraMode.ORBIT;
 
     private static final Color3f AXIS_X = new Color3f(0.90f, 0.25f, 0.25f);
@@ -141,10 +133,12 @@ public class LWJGLRenderPanel extends RenderPanel {
         StarMadeLogic.getInstance().getSelection().addListener(this::onSelectionChanged);
     }
 
+    @Override
     public CameraMode getCameraMode() {
         return mCameraMode;
     }
 
+    @Override
     public void setCameraMode(CameraMode mode) {
         if (mode != null) {
             mCameraMode = mode;
@@ -152,6 +146,7 @@ public class LWJGLRenderPanel extends RenderPanel {
     }
 
     /** Flips between orbit (turntable) and first-person (free-look) control. */
+    @Override
     public void toggleCameraMode() {
         mCameraMode = (mCameraMode == CameraMode.ORBIT)
                 ? CameraMode.FIRST_PERSON : CameraMode.ORBIT;

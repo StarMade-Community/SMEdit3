@@ -82,6 +82,26 @@ public abstract class RenderPanel extends JPanel {
     public void setGrid(boolean grid) {
     }
 
+    /** How the mouse drives the camera in the 3D viewport. */
+    public enum CameraMode {
+        /** Turntable: right-drag swings around the ship centre. */
+        ORBIT,
+        /** Free-look: right-drag turns the camera in place (WASD to fly). */
+        FIRST_PERSON
+    }
+
+    /** The active camera-control style. The software renderer only orbits. */
+    public CameraMode getCameraMode() {
+        return CameraMode.ORBIT;
+    }
+
+    public void setCameraMode(CameraMode mode) {
+    }
+
+    /** Flips between orbit and first-person control (no-op where unsupported). */
+    public void toggleCameraMode() {
+    }
+
     public abstract boolean isDontDraw();
 
     public abstract void setDontDraw(boolean dontDraw);

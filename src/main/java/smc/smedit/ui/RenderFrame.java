@@ -73,6 +73,7 @@ import smc.smedit.ui.act.file.SaveAsBlueprintAction1;
 import smc.smedit.ui.act.file.SaveAsFileAction;
 import smc.smedit.ui.act.file.SaveAsFileAction1;
 import smc.smedit.ui.act.view.AxisAction;
+import smc.smedit.ui.act.view.CameraModeAction;
 import smc.smedit.ui.act.view.GridAction;
 import smc.smedit.ui.logic.ShipSpec;
 import smc.smedit.ui.logic.ShipTreeLogic;
@@ -857,6 +858,24 @@ public class RenderFrame extends JFrame {
         JMenuItem resetCamItem = new JMenuItem("Reset Camera");
         resetCamItem.addActionListener(e -> getClient().resetCamera());
         menuView.add(resetCamItem);
+        JCheckBoxMenuItem fpItem = new JCheckBoxMenuItem(new CameraModeAction(this));
+        menuView.add(fpItem);
+        // Camera mode also toggles from the viewport ('C'), so re-sync the tick each
+        // time the menu opens rather than leaving it stale.
+        menuView.addMenuListener(new javax.swing.event.MenuListener() {
+            @Override
+            public void menuSelected(javax.swing.event.MenuEvent e) {
+                fpItem.setSelected(getClient().getCameraMode() == RenderPanel.CameraMode.FIRST_PERSON);
+            }
+
+            @Override
+            public void menuDeselected(javax.swing.event.MenuEvent e) {
+            }
+
+            @Override
+            public void menuCanceled(javax.swing.event.MenuEvent e) {
+            }
+        });
         JCheckBoxMenuItem orthoItem = new JCheckBoxMenuItem("Orthographic");
         orthoItem.addActionListener(e -> getClient().setOrthographic(orthoItem.isSelected()));
         menuView.add(orthoItem);
