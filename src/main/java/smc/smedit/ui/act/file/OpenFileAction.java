@@ -33,6 +33,7 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.logic.StarMadeLogic;
 import smc.smedit.logic.utils.DebugLogic;
+import smc.smedit.mods.IRunnableWithProgress;
 import smc.smedit.mods.IBlocksPlugin;
 import smc.smedit.ship.data.Block;
 import smc.smedit.ship.data.Data;
@@ -86,6 +87,12 @@ public class OpenFileAction extends GenericAction {
         File smb2 = chooser.getSelectedFile();
         StarMadeLogic.getProps().setProperty("open.file.dir", smb2.getParent());
         StarMadeLogic.saveProps();
+        // Read + install the model on the background loader so the UI stays responsive.
+        mFrame.loadInBackground("Opening " + smb2.getName() + "…", cb -> loadFile(smb2));
+    }
+
+    /** Reads a StarMade {@code .smd2} / {@code .sment} file and installs it as the current model. */
+    private void loadFile(File smb2) {
         String name = smb2.getName();
         try {
             Header header = null;

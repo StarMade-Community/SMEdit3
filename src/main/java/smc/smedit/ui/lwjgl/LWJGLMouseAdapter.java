@@ -22,7 +22,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
 
-import smc.smedit.logic.StarMadeLogic;
+import smc.smedit.ui.tool.ToolController;
 import smc.smedit.vecmath.Point3f;
 import smc.smedit.vecmath.Point3i;
 import smc.smedit.vecmath.logic.TransformEye;
@@ -38,6 +38,7 @@ public class LWJGLMouseAdapter extends MouseAdapter {
     private static final int MOUSE_MODE_NULL = 0;
     private static final int MOUSE_MODE_PIVOT = 1; // orbit around the ship centre
     private static final int MOUSE_MODE_PAN = 3;
+    private static final int MOUSE_MODE_TOOL = 4;  // left-drag drives the active tool
 
     private final LWJGLRenderPanel mPanel;
 
@@ -51,7 +52,7 @@ public class LWJGLMouseAdapter extends MouseAdapter {
 
     @Override
     public void mousePressed(MouseEvent ev) {
-        doMouseDown(ev.getPoint(), ev.getModifiers(), ev.getButton());
+        doMouseDown(ev.getPoint(), ev.getModifiers(), ev.getButton(), ev.getClickCount());
     }
 
     @Override
@@ -71,7 +72,9 @@ public class LWJGLMouseAdapter extends MouseAdapter {
         doMouseWheel(e.getWheelRotation());
     }
 
-    private void doMouseDown(Point p, int modifiers, int button) {
+    private void doMouseDown(Point p, int modifiers, int button, int clickCount) {
+        // Clicking the viewport claims keyboard focus so the fly-camera keys work.
+        mPanel.requestViewportFocus();
         mMouseDownAt = p;
         if (button == MouseEvent.BUTTON3) {
             // Right-drag orbits around the ship centre.
@@ -80,14 +83,19 @@ public class LWJGLMouseAdapter extends MouseAdapter {
             // Middle-drag pans the view.
             mMouseMode = MOUSE_MODE_PAN;
         } else {
-            // Left-click selects the block under the cursor. Shift/Ctrl forces
-            // additive (toggle) selection regardless of the active mode.
-            mMouseMode = MOUSE_MODE_NULL;
+            // Left-click is the ACTIVE TOOL's action (paint / erase / select / …),
+            // routed through the ToolController — no longer an implicit select.
+            // The controller reads the modifiers itself (Alt = pick, Shift/Ctrl =
+            // additive select). Left-drag then continues the tool (e.g. painting).
+            mMouseMode = MOUSE_MODE_TOOL;
             Point3i hit = mPanel.getPointAt(p.x, p.y);
-            boolean additive = (modifiers
-                    & (java.awt.event.InputEvent.SHIFT_MASK | java.awt.event.InputEvent.CTRL_MASK)) != 0;
-            StarMadeLogic.getInstance().getSelection()
-                    .applyPick(hit, StarMadeLogic.getModel(), additive);
+            if (clickCount >= 2) {
+                // Double-click = flood-select the contiguous same-type region (Select tool).
+                ToolController.get().onDoubleClick(hit);
+            } else {
+                Point3i place = mPanel.getPlacementAt(p.x, p.y);
+                ToolController.get().onPress(hit, place, mPanel, modifiers);
+            }
         }
     }
 
@@ -113,14 +121,22 @@ public class LWJGLMouseAdapter extends MouseAdapter {
                 mPanel.mUniverse.getCamera().moveUp(dy * PAN_SPEED);
                 mPanel.updateTransform();
             }
+        } else if (mMouseMode == MOUSE_MODE_TOOL) {
+            // Drag-paint / drag-erase / drag-build: re-pick under the cursor and
+            // continue the stroke (the controller ignores drags for non-stroke tools).
+            Point3i hit = mPanel.getPointAt(p.x, p.y);
+            Point3i place = mPanel.getPlacementAt(p.x, p.y);
+            ToolController.get().onDrag(hit, place, mPanel);
         }
     }
 
     private void doMouseUp(Point p, int modifiers) {
         if (mMouseMode == MOUSE_MODE_PIVOT) {
             doMouseMove(p, modifiers);
-            mMouseDownAt = null;
+        } else if (mMouseMode == MOUSE_MODE_TOOL) {
+            ToolController.get().onRelease();
         }
+        mMouseDownAt = null;
         mMouseMode = MOUSE_MODE_NULL;
     }
 

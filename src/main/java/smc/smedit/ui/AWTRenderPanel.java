@@ -411,6 +411,12 @@ public class AWTRenderPanel extends RenderPanel {
     }
 
     @Override
+    public Point3i getPlacementAt(double x, double y) {
+        // The software renderer doesn't compute face normals for placement yet.
+        return null;
+    }
+
+    @Override
     public boolean isPlainGraphics() {
         return mPlainGraphics;
     }

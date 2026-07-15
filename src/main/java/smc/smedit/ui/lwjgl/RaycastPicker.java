@@ -25,12 +25,34 @@ public final class RaycastPicker {
     private static final int MAX_STEPS = 8192;
 
     /**
+     * The outcome of a pick: the block the ray hit ({@link #cell}) and the empty
+     * cell just outside the face it entered through ({@link #place}, for building —
+     * {@code null} when the ray started inside the hit cell).
+     */
+    public static final class Hit {
+        public final Point3i cell;
+        public final Point3i place;
+
+        Hit(Point3i cell, Point3i place) {
+            this.cell = cell;
+            this.place = place;
+        }
+    }
+
+    /**
      * Picks the first block along the ray through screen pixel (screenX, screenY),
      * in LWJGL/GL window space (origin bottom-left — matches {@code Mouse.getEventX/Y}).
      *
      * @return the hit grid position, or {@code null} on a miss.
      */
     public static Point3i pick(float screenX, float screenY, PickMatrices.Snapshot snap,
+            SparseMatrix<Block> grid) {
+        Hit h = pickHit(screenX, screenY, snap, grid);
+        return h == null ? null : h.cell;
+    }
+
+    /** As {@link #pick} but also returns the adjacent empty cell for block placement. */
+    public static Hit pickHit(float screenX, float screenY, PickMatrices.Snapshot snap,
             SparseMatrix<Block> grid) {
         if (snap == null || grid == null) {
             return null;
@@ -66,7 +88,7 @@ public final class RaycastPicker {
      * spans [b-0.5, b+0.5], so we shift the ray origin by +0.5 to get unit cells
      * [n, n+1) whose floor is the block index.
      */
-    private static Point3i walk(float[] near, float[] far, SparseMatrix<Block> grid) {
+    private static Hit walk(float[] near, float[] far, SparseMatrix<Block> grid) {
         double ox = near[0] + 0.5, oy = near[1] + 0.5, oz = near[2] + 0.5;
         double dx = far[0] - near[0], dy = far[1] - near[1], dz = far[2] - near[2];
         double len = Math.sqrt(dx * dx + dy * dy + dz * dz);
@@ -84,22 +106,37 @@ public final class RaycastPicker {
         double tDeltaY = dy != 0 ? Math.abs(1.0 / dy) : Double.POSITIVE_INFINITY;
         double tDeltaZ = dz != 0 ? Math.abs(1.0 / dz) : Double.POSITIVE_INFINITY;
 
+        // Entry normal: the axis of the last step, negated — points back to the empty
+        // cell the ray came from (where a Build tool places a block). Zero until we
+        // step, so a hit on the very first (origin) cell has no placement cell.
+        int nx = 0, ny = 0, nz = 0;
         for (int i = 0; i < MAX_STEPS; i++) {
             Block hit = grid.get(x, y, z);
             if (hit != null && hitsCell(hit, x, y, z, near, dx, dy, dz, len)) {
-                return new Point3i(x, y, z);
+                Point3i cell = new Point3i(x, y, z);
+                Point3i place = (nx | ny | nz) != 0 ? new Point3i(x + nx, y + ny, z + nz) : null;
+                return new Hit(cell, place);
             }
             double tNext;
             if (tMaxX <= tMaxY && tMaxX <= tMaxZ) {
                 x += stepX;
+                nx = -stepX;
+                ny = 0;
+                nz = 0;
                 tNext = tMaxX;
                 tMaxX += tDeltaX;
             } else if (tMaxY <= tMaxZ) {
                 y += stepY;
+                ny = -stepY;
+                nx = 0;
+                nz = 0;
                 tNext = tMaxY;
                 tMaxY += tDeltaY;
             } else {
                 z += stepZ;
+                nz = -stepZ;
+                nx = 0;
+                ny = 0;
                 tNext = tMaxZ;
                 tMaxZ += tDeltaZ;
             }

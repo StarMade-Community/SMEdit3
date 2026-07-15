@@ -18,6 +18,7 @@
 package smc.smedit.ui.lwjgl;
 
 import java.awt.BorderLayout;
+import java.awt.Dimension;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.event.MouseAdapter;
@@ -88,13 +89,28 @@ public class LWJGLRenderPanel extends RenderPanel {
         mCanvas.setScene(mScene);
         setLayout(new BorderLayout());
         add("Center", mCanvas);
+        // The GL canvas is a heavyweight java.awt.Canvas, which reports its current
+        // size as its minimum — so a docking split divider can't shrink the viewport
+        // and neighbouring panels (e.g. the Brush palette) can't be grown by dragging
+        // it. Pin a small minimum so the viewport yields space on demand.
+        Dimension minView = new Dimension(80, 80);
+        mCanvas.setMinimumSize(minView);
+        setMinimumSize(minView);
         MouseAdapter ma = new LWJGLMouseAdapter(this);
         mCanvas.addMouseListener(ma);
         mCanvas.addMouseMotionListener(ma);
         mCanvas.addMouseWheelListener(ma);
-//        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(
-//        		new LWJGLKeyEventDispatcher(this));
-        mCanvas.addKeyListener(new LWJGLKeyEventDispatcher(this));
+        // Fly-camera keys. JGLCanvas polls the LWJGL keyboard on its render thread
+        // (the embedded LWJGL Display captures input, so AWT's KeyboardFocusManager
+        // never sees these keys) and forwards them — plus any AWT key events — to its
+        // KeyListeners. So register here as a listener. LWJGL only reports keys while
+        // the Display has focus, which we grab on a viewport click (see requestViewportFocus).
+        // Also a focus listener, so held keys are cleared when the viewport loses focus.
+        LWJGLKeyEventDispatcher keys = new LWJGLKeyEventDispatcher(this);
+        mCanvas.addKeyListener(keys);
+        mCanvas.addFocusListener(keys);
+        // Single-key tool shortcuts (V/B/P/…) via the same canvas key path.
+        mCanvas.addKeyListener(new smc.smedit.ui.tool.ToolKeyListener());
         StarMadeLogic.getInstance().addPropertyChangeListener("model", ev -> setLookAt(new Point3f(0, 0, -1)));
         // Refresh the viewport highlight whenever the selection changes.
         StarMadeLogic.getInstance().getSelection().addListener(this::updateSelectionHighlight);
@@ -327,6 +343,22 @@ public class LWJGLRenderPanel extends RenderPanel {
         // (x, y) are LWJGL window coords (origin bottom-left), matching what the
         // GL viewport/gluUnProject expect. Ray-cast into the voxel grid.
         return RaycastPicker.pick((float) x, (float) y, mPickMatrices.snapshot(), StarMadeLogic.getModel());
+    }
+
+    /**
+     * Gives the GL canvas keyboard focus so the LWJGL keyboard (fly-camera keys)
+     * starts reporting events. Called on a viewport click — clicking to interact
+     * is the natural point to claim focus.
+     */
+    public void requestViewportFocus() {
+        mCanvas.requestFocusInWindow();
+    }
+
+    @Override
+    public Point3i getPlacementAt(double x, double y) {
+        RaycastPicker.Hit hit = RaycastPicker.pickHit((float) x, (float) y,
+                mPickMatrices.snapshot(), StarMadeLogic.getModel());
+        return hit == null ? null : hit.place;
     }
 
     @Override

@@ -44,6 +44,7 @@ import javax.swing.JTextField;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
+import smc.smedit.ui.BlockIcons;
 import smc.smedit.data.BlockTypes;
 import smc.smedit.plugins.ship.imp.HullCatalog;
 import smc.smedit.ui.BlockTypeColors;
@@ -125,7 +126,7 @@ public class PaletteEditorDialog extends JDialog {
             }
             allAvailable.add(id);
         }
-        allAvailable.sort(Comparator.comparing(PaletteBlocks::name, String.CASE_INSENSITIVE_ORDER));
+        allAvailable.sort(Comparator.comparing(BlockIcons::name, String.CASE_INSENSITIVE_ORDER));
         for (HullCatalog.Tier tier : HullCatalog.Tier.values()) {
             for (Short id : HullCatalog.blocks(tier, false)) {
                 tierOf.put(id, tier);
@@ -255,7 +256,7 @@ public class PaletteEditorDialog extends JDialog {
             if (!matchesTier(id, filter)) {
                 continue;
             }
-            if (!text.isEmpty() && !PaletteBlocks.name(id).toLowerCase(Locale.ROOT).contains(text)) {
+            if (!text.isEmpty() && !BlockIcons.name(id).toLowerCase(Locale.ROOT).contains(text)) {
                 continue;
             }
             availableModel.addElement(id);
@@ -297,8 +298,8 @@ public class PaletteEditorDialog extends JDialog {
                 boolean isSelected, boolean cellHasFocus) {
             super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
             Short id = (Short) value;
-            setText(PaletteBlocks.name(id));
-            setIcon(PaletteBlocks.icon(id, 20));
+            setText(BlockIcons.name(id));
+            setIcon(BlockIcons.icon(id, 20));
             return this;
         }
     }

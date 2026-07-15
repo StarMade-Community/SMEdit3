@@ -162,4 +162,15 @@ public final class SelectionModel {
         selectAll(grid);
         fireChanged();
     }
+
+    /** Replaces the selection with the given cells (e.g. a flood-fill by type). */
+    public void select(java.util.Collection<Point3i> cells) {
+        mSelected.clear();
+        for (Point3i p : cells) {
+            if (p != null) {
+                mSelected.add(new Point3i(p));
+            }
+        }
+        fireChanged();
+    }
 }

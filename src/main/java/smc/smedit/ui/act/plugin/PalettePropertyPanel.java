@@ -36,6 +36,7 @@ import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 import javax.swing.ToolTipManager;
 
+import smc.smedit.ui.BlockIcons;
 import smc.smedit.plugins.ship.imp.ConversionPalette;
 import smc.smedit.plugins.ship.imp.HullCatalog;
 
@@ -201,7 +202,7 @@ public class PalettePropertyPanel extends JPanel {
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
             for (int i = 0; i < ids.size(); i++) {
-                Icon icon = PaletteBlocks.icon(ids.get(i), SW - 2);
+                Icon icon = BlockIcons.icon(ids.get(i), SW - 2);
                 icon.paintIcon(this, g, i * SW + 1, 1);
             }
         }
@@ -210,7 +211,7 @@ public class PalettePropertyPanel extends JPanel {
         public String getToolTipText(MouseEvent e) {
             int idx = e.getX() / SW;
             if (idx >= 0 && idx < ids.size()) {
-                return PaletteBlocks.name(ids.get(idx));
+                return BlockIcons.name(ids.get(idx));
             }
             return null;
         }

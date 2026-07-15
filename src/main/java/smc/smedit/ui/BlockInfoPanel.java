@@ -2,6 +2,7 @@ package smc.smedit.ui;
 
 import java.awt.BorderLayout;
 import java.awt.Component;
+import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -55,6 +56,10 @@ public class BlockInfoPanel extends JPanel {
     public BlockInfoPanel() {
         super(new BorderLayout(4, 4));
         setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
+        // Don't let the FlowLayout control row dictate a wide minimum — otherwise,
+        // when tabbed with the Brush panel, the whole group can't be shrunk. The
+        // controls wrap to more rows when the panel is narrow.
+        setMinimumSize(new Dimension(150, 0));
         buildControls();
         mTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         add(new JScrollPane(mTable), BorderLayout.CENTER);

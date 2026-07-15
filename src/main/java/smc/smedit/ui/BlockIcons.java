@@ -1,7 +1,6 @@
 /**
- * Copyright 2014
- * SMEdit https://github.com/StarMade/SMEdit
- * SMTools https://github.com/StarMade/SMTools
+ * Copyright 2014 SMEdit https://github.com/StarMade/SMEdit SMTools
+ * https://github.com/StarMade/SMTools
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -14,8 +13,8 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
- **/
-package smc.smedit.ui.act.plugin;
+ */
+package smc.smedit.ui;
 
 import java.awt.Color;
 import java.awt.Component;
@@ -29,30 +28,33 @@ import javax.swing.Icon;
 import javax.swing.ImageIcon;
 
 import smc.smedit.data.BlockTypes;
-import smc.smedit.ui.BlockTypeColors;
 
 /**
- * Shared lookups for the block-palette editor UI, all sourced from the live
- * StarMade install: a block's display name ({@link BlockTypes#BLOCK_NAMES}), its
- * StarMade build icon ({@link BlockTypeColors#getBuildIconImage}), and — as a
- * fallback when no icon is available — its approximated fill color
+ * Shared block-icon lookups, sourced from the live StarMade install: a block's
+ * display name ({@link BlockTypes#BLOCK_NAMES}), its StarMade build icon
+ * ({@link BlockTypeColors#getBuildIconImage}), and — as a fallback when no icon
+ * is available — a swatch of its approximated fill colour
  * ({@link BlockTypeColors#getFillColor}).
  *
- * @author SMEdit3
- **/
-final class PaletteBlocks {
+ * <p>This is the one place block icons are produced, so the block-palette editor,
+ * the selection/view filters and the brush palette all render blocks identically.
+ * Icons are cached by (block id, size), so repeated paints don't rescale.
+ */
+public final class BlockIcons {
 
-    /** Scaled icons cached by (block id, size) so lists/strips don't rescale each paint. */
+    /** Scaled icons cached by (block id, size) so lists/strips/grids don't rescale each paint. */
     private static final Map<Long, Icon> ICON_CACHE = new HashMap<>();
 
-    private PaletteBlocks() {
+    private BlockIcons() {
     }
 
-    static Color color(Short id) {
+    /** A block's approximated fill colour (grey when unknown). */
+    public static Color color(Short id) {
         return id == null ? Color.GRAY : BlockTypeColors.getFillColor(id);
     }
 
-    static String name(Short id) {
+    /** A block's display name, falling back to {@code "Block #id"}. */
+    public static String name(Short id) {
         if (id == null) {
             return "";
         }
@@ -62,9 +64,9 @@ final class PaletteBlocks {
 
     /**
      * A {@code size}×{@code size} icon for a block: its StarMade build icon when
-     * available, otherwise a swatch of its approximated color.
+     * available, otherwise a swatch of its approximated colour.
      */
-    static Icon icon(Short id, int size) {
+    public static Icon icon(Short id, int size) {
         if (id == null) {
             return new SwatchIcon(Color.GRAY, size);
         }
@@ -79,18 +81,19 @@ final class PaletteBlocks {
             Image scaled = bi.getScaledInstance(size, size, Image.SCALE_SMOOTH);
             icon = new ImageIcon(scaled);
         } else {
-            icon = new SwatchIcon(color(id), size);
+            Color c = color(id);
+            icon = new SwatchIcon(c != null ? c : Color.GRAY, size);
         }
         ICON_CACHE.put(key, icon);
         return icon;
     }
 
     /** A small filled square, used when a block has no build icon. */
-    static final class SwatchIcon implements Icon {
+    public static final class SwatchIcon implements Icon {
         private final Color color;
         private final int size;
 
-        SwatchIcon(Color color, int size) {
+        public SwatchIcon(Color color, int size) {
             this.color = color;
             this.size = size;
         }

@@ -17,7 +17,8 @@
  **/
 package smc.smedit.ui.lwjgl;
 
-import java.awt.KeyEventDispatcher;
+import java.awt.event.FocusEvent;
+import java.awt.event.FocusListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.util.Collections;
@@ -39,7 +40,7 @@ import smc.smedit.vecmath.logic.TransformEye;
  * vertical (so "up" is always up, whatever angle you've orbited to). Hold Shift
  * to move faster.
  */
-public class LWJGLKeyEventDispatcher implements KeyEventDispatcher, KeyListener {
+public class LWJGLKeyEventDispatcher implements KeyListener, FocusListener {
 
     private static final int MOVE_FORWARD = 'W';
     private static final int MOVE_BACK = 'S';
@@ -66,21 +67,19 @@ public class LWJGLKeyEventDispatcher implements KeyEventDispatcher, KeyListener 
         mMoveTimer.setCoalesce(true);
     }
 
-    @Override
-    public boolean dispatchKeyEvent(KeyEvent ev) {
-        if (!isFocused()) {
-            return false;
-        }
-        if (ev.getID() == KeyEvent.KEY_PRESSED) {
-            keyPressed(ev);
-        } else if (ev.getID() == KeyEvent.KEY_RELEASED) {
-            keyReleased(ev);
-        }
-        return false;
+    /** True when a text component (search box, console, editable combo) owns focus. */
+    private static boolean isTypingInTextField() {
+        java.awt.Component fo = java.awt.KeyboardFocusManager
+                .getCurrentKeyboardFocusManager().getFocusOwner();
+        return fo instanceof javax.swing.text.JTextComponent;
     }
 
     @Override
     public void keyPressed(KeyEvent e) {
+        // Don't drive the camera while typing in a text field (search / console).
+        if (isTypingInTextField()) {
+            return;
+        }
         mShiftDown = e.isShiftDown();
         int code = e.getKeyCode();
         if (MOVE_KEYS.contains(code)) {
@@ -104,10 +103,22 @@ public class LWJGLKeyEventDispatcher implements KeyEventDispatcher, KeyListener 
     public void keyTyped(KeyEvent e) {
     }
 
+    @Override
+    public void focusGained(FocusEvent e) {
+    }
+
+    @Override
+    public void focusLost(FocusEvent e) {
+        // Losing viewport focus (e.g. clicking a panel) means LWJGL won't deliver the
+        // key releases, so clear held keys to avoid a stuck, endlessly-moving camera.
+        mPressed.clear();
+        mShiftDown = false;
+        mMoveTimer.stop();
+    }
+
     /** Applies one frame of movement for all currently-held keys (runs on the EDT). */
     private void tick() {
-        if (mPressed.isEmpty() || !isFocused()) {
-            mPressed.clear();
+        if (mPressed.isEmpty()) {
             mMoveTimer.stop();
             return;
         }
@@ -139,13 +150,5 @@ public class LWJGLKeyEventDispatcher implements KeyEventDispatcher, KeyListener 
             cam.setLocation(loc);
         }
         mPanel.updateTransform();
-    }
-
-    private boolean isFocused() {
-        // Only move while the app window is active. Use the actual window ancestor
-        // (the docking framework nests the viewport deep, so walking for a JFrame
-        // by hand is fragile).
-        java.awt.Window w = javax.swing.SwingUtilities.getWindowAncestor(mPanel);
-        return w != null && w.isActive();
     }
 }

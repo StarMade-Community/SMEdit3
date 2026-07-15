@@ -368,39 +368,39 @@ public class JGLCanvas extends Canvas {
             //System.out.println("doKeys("+eventKey+")");
             if (eventKey == Keyboard.KEY_LSHIFT) {
                 if (eventState) {
-                    mModifiers |= KeyEvent.VK_SHIFT;
+                    mModifiers |= KeyEvent.SHIFT_MASK;
                 } else {
-                    mModifiers &= ~KeyEvent.VK_SHIFT;
+                    mModifiers &= ~KeyEvent.SHIFT_MASK;
                 }
             } else if (eventKey == Keyboard.KEY_RSHIFT) {
                 if (eventState) {
-                    mModifiers |= KeyEvent.VK_SHIFT;
+                    mModifiers |= KeyEvent.SHIFT_MASK;
                 } else {
-                    mModifiers &= ~KeyEvent.VK_SHIFT;
+                    mModifiers &= ~KeyEvent.SHIFT_MASK;
                 }
             } else if (eventKey == Keyboard.KEY_LCONTROL) {
                 if (eventState) {
-                    mModifiers |= KeyEvent.VK_CONTROL;
+                    mModifiers |= KeyEvent.CTRL_MASK;
                 } else {
-                    mModifiers &= ~KeyEvent.VK_CONTROL;
+                    mModifiers &= ~KeyEvent.CTRL_MASK;
                 }
             } else if (eventKey == Keyboard.KEY_RCONTROL) {
                 if (eventState) {
-                    mModifiers |= KeyEvent.VK_CONTROL;
+                    mModifiers |= KeyEvent.CTRL_MASK;
                 } else {
-                    mModifiers &= ~KeyEvent.VK_CONTROL;
+                    mModifiers &= ~KeyEvent.CTRL_MASK;
                 }
             } else if (eventKey == Keyboard.KEY_LMENU) {
                 if (eventState) {
-                    mModifiers |= KeyEvent.VK_ALT;
+                    mModifiers |= KeyEvent.ALT_MASK;
                 } else {
-                    mModifiers &= ~KeyEvent.VK_ALT;
+                    mModifiers &= ~KeyEvent.ALT_MASK;
                 }
             } else if (eventKey == Keyboard.KEY_RMENU) {
                 if (eventState) {
-                    mModifiers |= KeyEvent.VK_ALT;
+                    mModifiers |= KeyEvent.ALT_MASK;
                 } else {
-                    mModifiers &= ~KeyEvent.VK_ALT;
+                    mModifiers &= ~KeyEvent.ALT_MASK;
                 }
             }
             if (KEY_LWJGL_TO_AWT.containsKey(eventKey)) {

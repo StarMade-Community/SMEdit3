@@ -22,6 +22,7 @@ import javax.swing.JPanel;
 import smc.smedit.data.RenderPoly;
 import smc.smedit.data.UndoBuffer;
 import smc.smedit.ship.data.Block;
+import smc.smedit.vecmath.Point3i;
 
 @SuppressWarnings("serial")
 public abstract class RenderPanel extends JPanel {
@@ -41,6 +42,14 @@ public abstract class RenderPanel extends JPanel {
     public abstract RenderPoly getTileAt(double x, double y);
 
     public abstract Block getBlockAt(double x, double y);
+
+    /**
+     * The empty grid cell a new block would be placed in for a click at screen
+     * (x, y) — the cell just outside the face of the block under the cursor. Returns
+     * {@code null} on a miss or when placement can't be determined. Used by the
+     * Build tool. The software renderer may not support this.
+     */
+    public abstract Point3i getPlacementAt(double x, double y);
 
     public abstract boolean isPlainGraphics();
 

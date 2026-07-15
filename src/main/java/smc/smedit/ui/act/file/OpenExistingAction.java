@@ -20,7 +20,6 @@ package smc.smedit.ui.act.file;
 import java.awt.event.ActionEvent;
 
 import smc.smedit.data.SparseMatrix;
-import smc.smedit.logic.RunnableLogic;
 import smc.smedit.logic.StarMadeLogic;
 import smc.smedit.mods.IPluginCallback;
 import smc.smedit.mods.IRunnableWithProgress;
@@ -64,7 +63,7 @@ public class OpenExistingAction extends GenericAction {
                 }
             }
         };
-        RunnableLogic.run(mFrame, "Open " + spec.getName(), t);
+        mFrame.loadInBackground("Opening " + spec.getName() + "…", t);
     }
 
 }

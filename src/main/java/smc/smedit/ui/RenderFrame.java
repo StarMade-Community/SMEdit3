@@ -21,6 +21,7 @@ package smc.smedit.ui;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.Insets;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
@@ -33,8 +34,11 @@ import javax.swing.Action;
 import javax.swing.Box;
 import javax.swing.Icon;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JCheckBoxMenuItem;
+import javax.swing.JComboBox;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
@@ -47,7 +51,7 @@ import javax.swing.JToolBar;
 import javax.swing.border.EmptyBorder;
 import smc.smedit.log.TextAreaLogHandler;
 import smc.smedit.logic.BlueprintLogic;
-import smc.smedit.logic.RunnableLogic;
+import smc.smedit.logic.SelectionModel;
 import smc.smedit.logic.StarMadeLogic;
 import smc.smedit.mods.IPluginCallback;
 import smc.smedit.mods.IRunnableWithProgress;
@@ -73,6 +77,9 @@ import smc.smedit.ui.lwjgl.LWJGLRenderPanel;
 import smc.smedit.ui.dock.DockPanel;
 import smc.smedit.ui.dock.LayoutPresets;
 import smc.smedit.ui.shelf.ToolShelf;
+import smc.smedit.ui.tool.EditorTool;
+import smc.smedit.ui.tool.ToolController;
+import smc.smedit.ui.tool.ToolRail;
 import smc.smedit.util.GlobalConfiguration;
 import smc.smedit.util.Paths;
 import smc.smedit.util.Resources;
@@ -163,7 +170,7 @@ public class RenderFrame extends JFrame {
                     StarMadeLogic.setModel(ShipTreeLogic.loadShip(spec, cb));
                 };
                 log.log(Level.INFO, "Loading default blueprint: {0}", defaultName);
-                RunnableLogic.run(f, "Loading...", t);
+                f.loadInBackground("Loading " + defaultName + "…", t);
             } else {
                 log.log(Level.INFO, "No default blueprint found; starting with an empty editor.");
             }
@@ -254,9 +261,10 @@ public class RenderFrame extends JFrame {
     private DockPanel mShelfDock;
     private ToolShelf mShelf;
     private JMenu mWindowMenu;
+    private StatusPanel mStatusPanel;
 
-    /** Split ratio for the Maya-style tool shelf docked across the top. */
-    private static final double SHELF_SPLIT = 0.16;
+    /** Split ratio for the tool shelf docked across the top — a thin, full-width strip. */
+    private static final double SHELF_SPLIT = 0.10;
 
     public RenderFrame(String[] args) {
         setTitle(GlobalConfiguration.NAME + " v" + GlobalConfiguration.VERSION);
@@ -305,23 +313,41 @@ public class RenderFrame extends JFrame {
                 JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         textScroll.setBorder(null);
         textScroll.setVisible(true);
+        // Route application logging into the Console panel (the status bar no longer
+        // shows an "App Events" label).
+        Logger.getLogger("").addHandler(new TextAreaLogHandler());
 
         // Paint-program-style dockable layout (Modern Docking): the viewport,
         // brush palette and console are dockable / floating / collapsible panels,
         // and the arrangement is remembered between runs.
-        EditPanel editPanel = new EditPanel(getClient(), this);
-        RootDockingPanel dockRoot = setupDocking(editPanel);
+        BrushPanel brushPanel = new BrushPanel();
+        RootDockingPanel dockRoot = setupDocking(brushPanel);
         populateWindowMenu();
 
-        /* Toolbar placement */
-        innerToolPane.add(innerToolBar, BorderLayout.NORTH);
-        outerToolPane.add(outerToolBar, BorderLayout.NORTH);
+        /* Toolbar placement: the main toolbar on top, and the per-tool options
+         * (context) bar directly beneath it — it changes with the active tool. */
+        JPanel northBar = new JPanel(new BorderLayout());
+        northBar.add(outerToolBar, BorderLayout.NORTH);
+        innerToolBar.setFloatable(false);
+        northBar.add(innerToolBar, BorderLayout.SOUTH);
+        getContentPane().add(northBar, BorderLayout.NORTH);
         getContentPane().add(dockRoot, BorderLayout.CENTER);
-        StatusPanel statusPanel = new StatusPanel();
+        // Fixed left tool rail (paint/modelling-tool "active tool" column). It is
+        // deliberately chrome, not a dockable, so it can't be torn off or hidden.
+        getContentPane().add(new ToolRail(), BorderLayout.WEST);
+        // Keep the context bar in sync with the active tool.
+        ToolController.get().addListener(this::updateContextBar);
+        updateContextBar(ToolController.get().getActive());
+        mStatusPanel = new StatusPanel();
         MemProgressBar memBar = new MemProgressBar();
         memBar.setPreferredSize(new Dimension(200, 20));
-        statusPanel.addRightComponent(memBar);
-        getContentPane().add(statusPanel, BorderLayout.SOUTH);
+        mStatusPanel.addRightComponent(memBar);
+        getContentPane().add(mStatusPanel, BorderLayout.SOUTH);
+
+        // The GL viewport is a heavyweight canvas; Modern Docking's split dividers
+        // default to a thin strip that's hard to grab next to it. Fatten them (and
+        // keep continuous layout) so panels like the Brush palette can be resized.
+        javax.swing.SwingUtilities.invokeLater(() -> tuneSplitPanes(getContentPane()));
 
         addWindowListener(new WindowAdapter() {
 
@@ -349,7 +375,7 @@ public class RenderFrame extends JFrame {
      * Layout}. The viewport is neither closable nor floatable — tearing the
      * heavyweight OpenGL canvas into a separate window would break its context.
      */
-    private RootDockingPanel setupDocking(EditPanel editPanel) {
+    private RootDockingPanel setupDocking(BrushPanel brushPanel) {
         Docking.initialize(this);
         DockingUI.initialize(); // FlatLaf-styled dock headers
 
@@ -371,7 +397,7 @@ public class RenderFrame extends JFrame {
         // args: closable, floatable, collapsible(auto-hide). The viewport stays
         // put — it's the main editing surface (and a heavyweight GL canvas).
         mViewportDock = new DockPanel("viewport", "Viewport", getClient(), false, false, false);
-        mBrushDock = new DockPanel("brush", "Brush", editPanel, true, true, true);
+        mBrushDock = new DockPanel("brush", "Brush", brushPanel, true, true, true);
         mConsoleDock = new DockPanel("console", "Console", textScroll, true, true, true);
         mBlockInfoDock = new DockPanel("blockinfo", "Selection", new BlockInfoPanel(), true, true, true);
         // Maya-style shelf: every block plugin ("function") as an icon button,
@@ -379,13 +405,18 @@ public class RenderFrame extends JFrame {
         mShelf = new ToolShelf(getClient());
         mShelfDock = new DockPanel("shelf", "Tools", mShelf, true, true, true);
 
+        // Clean "cross" default layout: a thin, full-width tool shelf on top and a
+        // full-width console on the bottom (both docked to the window root), with the
+        // Brush and Selection panels flanking the viewport in the middle band. The
+        // side panels are docked RELATIVE TO THE VIEWPORT, not the window, so they
+        // only split the middle band and leave the shelf/console spanning full width
+        // (docking them to the window root instead nests the console under the brush,
+        // squashing the palette — the old, awful default).
         Docking.dock(mViewportDock, this);
-        Docking.dock(mBrushDock, this, DockingRegion.WEST, 0.22);
-        Docking.dock(mConsoleDock, this, DockingRegion.SOUTH, 0.25);
-        Docking.dock(mBlockInfoDock, this, DockingRegion.EAST, 0.2);
-        // Dock the shelf last so NORTH wraps the whole arrangement — a thin,
-        // full-width tool strip directly under the toolbar.
         Docking.dock(mShelfDock, this, DockingRegion.NORTH, SHELF_SPLIT);
+        Docking.dock(mConsoleDock, this, DockingRegion.SOUTH, 0.22);
+        Docking.dock(mBrushDock, mViewportDock, DockingRegion.WEST, 0.20);
+        Docking.dock(mBlockInfoDock, mViewportDock, DockingRegion.EAST, 0.22);
 
         // Remember this arrangement as the default, restore a saved layout if one
         // exists, then keep the layout persisted across runs (workspace memory).
@@ -418,6 +449,25 @@ public class RenderFrame extends JFrame {
         return dockRoot;
     }
 
+    /**
+     * Recursively fattens every docking split divider and forces continuous
+     * layout, so dividers are grabbable and resize live — important next to the
+     * heavyweight GL canvas, whose peer otherwise makes a thin lightweight divider
+     * awkward to drag. Best-effort: called after the initial layout is built.
+     */
+    private static void tuneSplitPanes(java.awt.Container root) {
+        for (java.awt.Component c : root.getComponents()) {
+            if (c instanceof javax.swing.JSplitPane) {
+                javax.swing.JSplitPane sp = (javax.swing.JSplitPane) c;
+                sp.setContinuousLayout(true);
+                sp.setDividerSize(9);
+            }
+            if (c instanceof java.awt.Container) {
+                tuneSplitPanes((java.awt.Container) c);
+            }
+        }
+    }
+
     /** Restores the default panel arrangement (Window &gt; Reset Layout, Settings &gt; Layout). */
     public void resetLayout() {
         if (mDefaultLayout != null) {
@@ -432,7 +482,7 @@ public class RenderFrame extends JFrame {
     private void populateWindowMenu() {
         mWindowMenu.removeAll();
         JCheckBoxMenuItem shelfToggle = panelToggle(mShelfDock, DockingRegion.NORTH, SHELF_SPLIT);
-        JCheckBoxMenuItem brushToggle = panelToggle(mBrushDock, DockingRegion.WEST, 0.22);
+        JCheckBoxMenuItem brushToggle = panelToggle(mBrushDock, DockingRegion.WEST, 0.20);
         JCheckBoxMenuItem consoleToggle = panelToggle(mConsoleDock, DockingRegion.SOUTH, 0.25);
         JCheckBoxMenuItem blockInfoToggle = panelToggle(mBlockInfoDock, DockingRegion.EAST, 0.2);
         mWindowMenu.add(shelfToggle);
@@ -581,6 +631,139 @@ public class RenderFrame extends JFrame {
     /** Opens the tabbed Preferences dialog (Edit &gt; Preferences… and the toolbar gear). */
     private void openSettings() {
         new SettingsDialog(this).setVisible(true);
+    }
+
+    /**
+     * Runs a model-load task on a background thread with a non-modal status-bar
+     * progress bar, so the UI stays interactive during the load (unlike the modal
+     * {@link RunnableLogic}). The mesh build runs on this thread too — the model
+     * property change fires synchronously on whatever thread calls {@code setModel}.
+     */
+    public void loadInBackground(String title, IRunnableWithProgress task) {
+        mStatusPanel.showLoading(title);
+        Thread th = new Thread(title) {
+            @Override
+            public void run() {
+                try {
+                    task.run(new StatusBarCallback());
+                } catch (Throwable t) {
+                    log.log(Level.WARNING, "Background load failed", t);
+                } finally {
+                    javax.swing.SwingUtilities.invokeLater(mStatusPanel::hideLoading);
+                }
+            }
+        };
+        th.setDaemon(true);
+        th.start();
+    }
+
+    /** Minimal {@link IPluginCallback} that reports status to the status-bar loading bar. */
+    private final class StatusBarCallback implements IPluginCallback {
+        @Override
+        public void setStatus(String status) {
+            javax.swing.SwingUtilities.invokeLater(() -> mStatusPanel.setLoadingText(status));
+        }
+
+        @Override
+        public void startTask(int size) {
+        }
+
+        @Override
+        public void workTask(int amnt) {
+        }
+
+        @Override
+        public void endTask() {
+        }
+
+        @Override
+        public boolean isPleaseCancel() {
+            return false;
+        }
+
+        @Override
+        public void setErrorTitle(String title) {
+        }
+
+        @Override
+        public void setErrorDescription(String desc) {
+        }
+
+        @Override
+        public void setError(Throwable t) {
+            log.log(Level.WARNING, "Load error", t);
+        }
+    }
+
+    /**
+     * Rebuilds the per-tool options bar for the active tool. Most brush settings
+     * live in the Brush panel; this surfaces the active tool's name and its few
+     * tool-specific quick options (e.g. the Select mode).
+     */
+    private void updateContextBar(EditorTool tool) {
+        innerToolBar.removeAll();
+        JLabel name = new JLabel(tool.getDisplayName(),
+                FontIcon.of(tool.getIcon(), 16, iconColor()), JLabel.LEFT);
+        name.setFont(name.getFont().deriveFont(Font.BOLD));
+        name.setBorder(new EmptyBorder(2, 6, 2, 10));
+        innerToolBar.add(name);
+        innerToolBar.addSeparator();
+        switch (tool) {
+            case SELECT:
+                SelectionModel sel = StarMadeLogic.getInstance().getSelection();
+                innerToolBar.add(new JLabel("Mode: "));
+                JComboBox<SelectionModel.Mode> modeBox = new JComboBox<>(SelectionModel.Mode.values());
+                modeBox.setSelectedItem(sel.getMode());
+                modeBox.setMaximumSize(modeBox.getPreferredSize());
+                modeBox.addActionListener(e -> {
+                    SelectionModel.Mode m = (SelectionModel.Mode) modeBox.getSelectedItem();
+                    sel.setMode(m);
+                    if (m == SelectionModel.Mode.ENTITY) {
+                        sel.selectEntity(StarMadeLogic.getModel());
+                    }
+                });
+                innerToolBar.add(modeBox);
+                innerToolBar.addSeparator();
+                innerToolBar.add(hint("Double-click a block to select its whole connected type."));
+                break;
+            case FILL:
+                innerToolBar.add(hint("Click to repaint the selection — or the connected same-type region — with the brush material."));
+                break;
+            case BUILD:
+                innerToolBar.add(hint("Left-click a block face to place the active block."));
+                break;
+            case PAINT:
+                innerToolBar.add(hint("Left-click to recolour. Select a region to confine painting to it."));
+                innerToolBar.addSeparator();
+                JCheckBox convert = new JCheckBox("Convert equivalent shapes",
+                        ToolController.get().isConvertShapes());
+                convert.setFocusable(false);
+                convert.setToolTipText("Keep the painted block's shape / slab in the new material where possible.");
+                convert.addActionListener(e -> ToolController.get().setConvertShapes(convert.isSelected()));
+                innerToolBar.add(convert);
+                break;
+            case ERASE:
+                innerToolBar.add(hint("Left-click (or drag) to remove blocks."));
+                break;
+            case PICKER:
+                innerToolBar.add(hint("Click a block to load its type into the brush (Alt-click works from any tool)."));
+                break;
+            default:
+                innerToolBar.add(hint(tool.getTooltip()));
+                break;
+        }
+        innerToolBar.revalidate();
+        innerToolBar.repaint();
+    }
+
+    /** A muted, non-interactive hint label for the context bar. */
+    private static JLabel hint(String text) {
+        JLabel l = new JLabel(text);
+        java.awt.Color fg = javax.swing.UIManager.getColor("Label.disabledForeground");
+        if (fg != null) {
+            l.setForeground(fg);
+        }
+        return l;
     }
 
     /** Size (px) of the toolbar glyph icons. */

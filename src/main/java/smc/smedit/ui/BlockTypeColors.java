@@ -981,6 +981,22 @@ public class BlockTypeColors {
     /** BlockConfig &lt;Slab&gt; per block id: 1/2/3 = quarter-step partial-height (absent = full). */
     public static final Map<Short, Integer> BLOCK_SLAB = new HashMap<>();
 
+    /** BlockConfig &lt;SlabIds&gt; per <em>full</em> block id: its slab variant ids (levels 1/2/3). */
+    public static final Map<Short, short[]> BLOCK_SLAB_IDS = new HashMap<>();
+
+    /**
+     * The block's category path from BlockConfig.xml — the element nesting it lives
+     * under (e.g. {@code [General, Hulls, Basic, Grey]}), minus the structural roots.
+     * This is StarMade's own categorisation, used to build the brush palette tree.
+     */
+    public static final Map<Short, String[]> BLOCK_CATEGORY = new HashMap<>();
+
+    /** Any shape-family block id → its base cube (from BlockConfig {@code <SourceReference>}). */
+    public static final Map<Short, Short> BLOCK_SHAPE_BASE = new HashMap<>();
+
+    /** Base cube id → {@code STYLE_* → variant id} — the block's shape variants, config-driven. */
+    public static final Map<Short, Map<Integer, Short>> BLOCK_SHAPE_VARIANTS = new HashMap<>();
+
     /** @return the slab level for a block id (0 = full block). */
     public static int getBlockSlab(short blockID) {
         Integer s = BLOCK_SLAB.get(blockID);
@@ -1203,6 +1219,10 @@ public class BlockTypeColors {
                 int blockStyle = IntegerUtils.parseInt(XMLUtils.getTextTag(n, "BlockStyle"));
                 // <Slab> 0=full, 1/2/3 = quarter-step partial-height block.
                 int slab = IntegerUtils.parseInt(XMLUtils.getTextTag(n, "Slab"));
+                // <SlabIds> on the full block lists its slab variant ids (1/4,1/2,3/4).
+                String slabIdsTag = XMLUtils.getTextTag(n, "SlabIds");
+                // <SourceReference> = the base block a shape variant derives from (0 = it IS a base).
+                int sourceRef = IntegerUtils.parseInt(XMLUtils.getTextTag(n, "SourceReference"));
                 // <Transparency> glass/lights: rendered blended and never occlude
                 // their neighbours (else you see straight through into the ship).
                 String transparencyTag = XMLUtils.getTextTag(n, "Transparency");
@@ -1232,6 +1252,21 @@ public class BlockTypeColors {
                 String lodShape = XMLUtils.getTextTag(n, "LodShape");
 
                 BlockTypes.BLOCK_NAMES.put(id, name);
+                // Capture the block's category path from its ancestor elements (the
+                // config nests each block under its category), minus the structural
+                // roots — StarMade's real categorisation for the palette tree.
+                java.util.List<String> catPath = new java.util.ArrayList<>();
+                for (org.w3c.dom.Node anc = n.getParentNode(); anc != null; anc = anc.getParentNode()) {
+                    if (anc.getNodeType() == org.w3c.dom.Node.ELEMENT_NODE) {
+                        String tag = anc.getNodeName();
+                        if (!"Config".equals(tag) && !"Element".equals(tag)) {
+                            catPath.add(0, tag);
+                        }
+                    }
+                }
+                if (!catPath.isEmpty()) {
+                    BLOCK_CATEGORY.put(id, catPath.toArray(new String[0]));
+                }
                 BLOCK_HITPOINTS.put(id, hitPoints);
                 BLOCK_TEXTURE_IDS.put(id, textureID);
                 if (buildIcon >= 0) {
@@ -1247,6 +1282,30 @@ public class BlockTypeColors {
                 BLOCK_STYLE.put(id, blockStyle);
                 if (slab > 0) {
                     BLOCK_SLAB.put(id, slab);
+                }
+                // Only the full block (slab 0) carries the canonical variant list.
+                if (slab == 0 && slabIdsTag != null && !slabIdsTag.trim().isEmpty()) {
+                    String[] sp = slabIdsTag.split(",");
+                    short[] arr = new short[sp.length];
+                    for (int si = 0; si < sp.length; si++) {
+                        arr[si] = ShortUtils.parseShort(sp[si].trim());
+                    }
+                    BLOCK_SLAB_IDS.put(id, arr);
+                }
+                // Shape family (config-driven, covers ALL blocks with shapes — not just
+                // the hardcoded standard-colour HULL_COLOR_MAP). A base (SourceReference
+                // 0) registers its cube; each shaped variant maps its base → style → id.
+                if (slab == 0) {
+                    if (sourceRef == 0) {
+                        BLOCK_SHAPE_BASE.put(id, id);
+                        BLOCK_SHAPE_VARIANTS.computeIfAbsent(id, k -> new HashMap<>())
+                                .put(STYLE_NORMAL, id);
+                    } else if (blockStyle != STYLE_NORMAL) {
+                        short base = (short) sourceRef;
+                        BLOCK_SHAPE_BASE.put(id, base);
+                        BLOCK_SHAPE_VARIANTS.computeIfAbsent(base, k -> new HashMap<>())
+                                .put(blockStyle, id);
+                    }
                 }
                 if (transparent) {
                     BLOCK_TRANSPARENT.add(id);
