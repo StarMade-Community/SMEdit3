@@ -99,4 +99,28 @@ public enum EditorTool {
     public String getTooltip() {
         return tooltip;
     }
+
+    /**
+     * The operation categories (see {@code PluginCategories}) whose one-shot
+     * plugins are surfaced in this tool's context bar. Categories with no tool
+     * home (Import, Export, Macro, …) are reached from the Operations menu / the
+     * context bar's overflow instead. Empty for tools that carry no operations.
+     */
+    public String[] operationCategories() {
+        switch (this) {
+            case SELECT:
+                return new String[]{"Select"};
+            case BUILD:
+                return new String[]{"Build", "Shape", "Generate"};
+            case FILL:
+                return new String[]{"Build"};
+            case PAINT:
+                return new String[]{"Paint", "Surface"};
+            case MOVE:
+            case MIRROR:
+                return new String[]{"Transform"};
+            default:
+                return new String[0];
+        }
+    }
 }

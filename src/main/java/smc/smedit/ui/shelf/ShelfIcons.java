@@ -89,7 +89,7 @@ public final class ShelfIcons {
         {"filter", Feather.FILTER},
     };
 
-    /** Fallback glyph per shelf category (see {@link ToolShelf#categoryOf}). */
+    /** Fallback glyph per operation category (see {@link PluginCategories#categoryOf}). */
     private static final Map<String, Ikon> CATEGORY_GLYPHS = new LinkedHashMap<>();
 
     static {

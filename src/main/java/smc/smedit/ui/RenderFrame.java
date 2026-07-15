@@ -27,6 +27,7 @@ import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -46,8 +47,10 @@ import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
+import javax.swing.SwingConstants;
 import javax.swing.JTabbedPane;
 import javax.swing.JToolBar;
 import javax.swing.border.EmptyBorder;
@@ -55,9 +58,11 @@ import smc.smedit.log.TextAreaLogHandler;
 import smc.smedit.logic.BlueprintLogic;
 import smc.smedit.logic.SelectionModel;
 import smc.smedit.logic.StarMadeLogic;
+import smc.smedit.mods.IBlocksPlugin;
 import smc.smedit.mods.IPluginCallback;
 import smc.smedit.mods.IRunnableWithProgress;
 import smc.smedit.ui.act.Shot;
+import smc.smedit.ui.act.plugin.BlocksPluginAction;
 import smc.smedit.ui.act.edit.RedoAction;
 import smc.smedit.ui.act.edit.RedoActionButton;
 import smc.smedit.ui.act.edit.UndoAction;
@@ -80,7 +85,8 @@ import smc.smedit.ui.logic.ShipTreeLogic;
 import smc.smedit.ui.lwjgl.LWJGLRenderPanel;
 import smc.smedit.ui.dock.DockPanel;
 import smc.smedit.ui.dock.LayoutPresets;
-import smc.smedit.ui.shelf.ToolShelf;
+import smc.smedit.ui.shelf.PluginCategories;
+import smc.smedit.ui.shelf.ShelfIcons;
 import smc.smedit.ui.tool.EditorTool;
 import smc.smedit.ui.tool.ToolController;
 import smc.smedit.ui.tool.ToolRail;
@@ -263,13 +269,10 @@ public class RenderFrame extends JFrame {
     private DockPanel mConsoleDock;
     private DockPanel mBlockInfoDock;
     private DockPanel mLayersDock;
-    private DockPanel mShelfDock;
-    private ToolShelf mShelf;
     private JMenu mWindowMenu;
+    /** Menu bar home for one-shot operations (plugins) with no left-rail tool. */
+    private JMenu mOperationsMenu;
     private StatusPanel mStatusPanel;
-
-    /** Split ratio for the tool shelf docked across the top — a thin, full-width strip. */
-    private static final double SHELF_SPLIT = 0.10;
 
     public RenderFrame(String[] args) {
         setTitle(GlobalConfiguration.NAME + " v" + GlobalConfiguration.VERSION);
@@ -343,6 +346,13 @@ public class RenderFrame extends JFrame {
         // Keep the context bar in sync with the active tool.
         ToolController.get().addListener(this::updateContextBar);
         updateContextBar(ToolController.get().getActive());
+        // A different model may expose a different operation set; rebuild the
+        // Operations menu and the active tool's context-bar operations when it changes.
+        StarMadeLogic.getInstance().addPropertyChangeListener("currentModel",
+                e -> javax.swing.SwingUtilities.invokeLater(() -> {
+                    rebuildOperationsMenu();
+                    updateContextBar(ToolController.get().getActive());
+                }));
         mStatusPanel = new StatusPanel();
         MemProgressBar memBar = new MemProgressBar();
         memBar.setPreferredSize(new Dimension(200, 20));
@@ -406,20 +416,16 @@ public class RenderFrame extends JFrame {
         mConsoleDock = new DockPanel("console", "Console", textScroll, true, true, true);
         mBlockInfoDock = new DockPanel("blockinfo", "Inspector", new BlockInfoPanel(), true, true, true);
         mLayersDock = new DockPanel("layers", "Layers", new LayersPanel(getClient()), true, true, true);
-        // Maya-style shelf: every block plugin ("function") as an icon button,
-        // grouped into horizontally-scrollable tabs. Movable/floatable like the rest.
-        mShelf = new ToolShelf(getClient());
-        mShelfDock = new DockPanel("shelf", "Tools", mShelf, true, true, true);
 
-        // Clean "cross" default layout: a thin, full-width tool shelf on top and a
-        // full-width console on the bottom (both docked to the window root), with the
-        // Brush and Selection panels flanking the viewport in the middle band. The
-        // side panels are docked RELATIVE TO THE VIEWPORT, not the window, so they
-        // only split the middle band and leave the shelf/console spanning full width
-        // (docking them to the window root instead nests the console under the brush,
-        // squashing the palette — the old, awful default).
+        // Clean "cross" default layout: a full-width console on the bottom (docked to
+        // the window root), with the Brush and Selection panels flanking the viewport
+        // in the middle band. The side panels are docked RELATIVE TO THE VIEWPORT, not
+        // the window, so they only split the middle band and leave the console spanning
+        // full width (docking them to the window root instead nests the console under
+        // the brush, squashing the palette — the old, awful default). One-shot
+        // operations no longer live in a dockable shelf — they surface in the active
+        // tool's context bar and the Operations menu.
         Docking.dock(mViewportDock, this);
-        Docking.dock(mShelfDock, this, DockingRegion.NORTH, SHELF_SPLIT);
         Docking.dock(mConsoleDock, this, DockingRegion.SOUTH, 0.22);
         Docking.dock(mBrushDock, mViewportDock, DockingRegion.WEST, 0.20);
         Docking.dock(mBlockInfoDock, mViewportDock, DockingRegion.EAST, 0.22);
@@ -442,15 +448,6 @@ public class RenderFrame extends JFrame {
             String defaultLayout = StarMadeLogic.getProps().getProperty("layout.default", "");
             if (!defaultLayout.isEmpty() && LayoutPresets.names().contains(defaultLayout)) {
                 LayoutPresets.load(defaultLayout);
-            }
-            // One-time migration: users upgrading from before the Tools shelf have a
-            // saved layout that doesn't mention it, so restore() leaves it hidden.
-            // Force it into its default place once, then respect the saved state.
-            if (!StarMadeLogic.isProperty("shelf.introduced")) {
-                if (!Docking.isDocked(mShelfDock)) {
-                    Docking.dock(mShelfDock, this, DockingRegion.NORTH, SHELF_SPLIT);
-                }
-                StarMadeLogic.setProperty("shelf.introduced", true);
             }
             // Same one-time migration for the Layers panel: users with a saved
             // layout from before it existed won't have it, so restore() leaves it
@@ -503,12 +500,10 @@ public class RenderFrame extends JFrame {
      */
     private void populateWindowMenu() {
         mWindowMenu.removeAll();
-        JCheckBoxMenuItem shelfToggle = panelToggle(mShelfDock, DockingRegion.NORTH, SHELF_SPLIT);
         JCheckBoxMenuItem brushToggle = panelToggle(mBrushDock, DockingRegion.WEST, 0.20);
         JCheckBoxMenuItem consoleToggle = panelToggle(mConsoleDock, DockingRegion.SOUTH, 0.25);
         JCheckBoxMenuItem blockInfoToggle = panelToggle(mBlockInfoDock, DockingRegion.EAST, 0.2);
         JCheckBoxMenuItem layersToggle = panelToggle(mLayersDock, DockingRegion.EAST, 0.2);
-        mWindowMenu.add(shelfToggle);
         mWindowMenu.add(brushToggle);
         mWindowMenu.add(consoleToggle);
         mWindowMenu.add(blockInfoToggle);
@@ -524,7 +519,6 @@ public class RenderFrame extends JFrame {
         // been closed via its header X since the menu was last shown).
         mWindowMenu.addMenuListener(new javax.swing.event.MenuListener() {
             @Override public void menuSelected(javax.swing.event.MenuEvent e) {
-                shelfToggle.setSelected(Docking.isDocked(mShelfDock));
                 brushToggle.setSelected(Docking.isDocked(mBrushDock));
                 consoleToggle.setSelected(Docking.isDocked(mConsoleDock));
                 blockInfoToggle.setSelected(Docking.isDocked(mBlockInfoDock));
@@ -777,8 +771,76 @@ public class RenderFrame extends JFrame {
                 innerToolBar.add(hint(tool.getTooltip()));
                 break;
         }
+        addToolOperations(tool);
         innerToolBar.revalidate();
         innerToolBar.repaint();
+    }
+
+    /**
+     * Appends the active tool's one-shot operations to the context bar as compact
+     * buttons (e.g. Select → Select All / None / Specific), followed by an
+     * overflow "Operations ▾" button that opens every category regardless of the
+     * active tool. Operations with no tool home are reached from that overflow (or
+     * the Operations menu). The overflow is always added — even for tools that
+     * carry no operations — so every operation stays one click away.
+     */
+    private void addToolOperations(EditorTool tool) {
+        Map<String, List<IBlocksPlugin>> byCategory = PluginCategories.byCategory();
+        for (String category : tool.operationCategories()) {
+            List<IBlocksPlugin> ops = byCategory.get(category);
+            if (ops == null || ops.isEmpty()) {
+                continue;
+            }
+            innerToolBar.addSeparator();
+            for (IBlocksPlugin plugin : ops) {
+                innerToolBar.add(operationButton(plugin, category));
+            }
+        }
+
+        // Push the overflow to the far right; it exposes every operation category so
+        // nothing is more than one click away even without a matching tool.
+        innerToolBar.add(Box.createHorizontalGlue());
+        JButton more = new JButton("Operations", icon(Feather.MORE_HORIZONTAL));
+        more.setToolTipText("All operations, grouped by category");
+        more.setFocusable(false);
+        more.setHorizontalTextPosition(SwingConstants.LEFT);
+        more.setEnabled(!byCategory.isEmpty());
+        more.addActionListener(e -> buildOperationsPopup(byCategory).show(more, 0, more.getHeight()));
+        innerToolBar.add(more);
+    }
+
+    /** A compact icon-over-label context-bar button that runs one operation. */
+    private JButton operationButton(IBlocksPlugin plugin, String category) {
+        JButton button = new JButton(new BlocksPluginAction(getClient(), plugin));
+        button.setText(PluginCategories.shortLabel(plugin.getName()));
+        button.setIcon(ShelfIcons.iconFor(plugin.getName(), category, 18));
+        button.setToolTipText(PluginCategories.tooltip(plugin));
+        button.setVerticalTextPosition(SwingConstants.BOTTOM);
+        button.setHorizontalTextPosition(SwingConstants.CENTER);
+        button.setIconTextGap(2);
+        button.setFocusable(false);
+        button.setFont(button.getFont().deriveFont(Font.PLAIN, 10.0f));
+        button.setMargin(new Insets(2, 6, 2, 6));
+        return button;
+    }
+
+    /** Popup listing every operation category as a submenu (the context-bar overflow). */
+    private JPopupMenu buildOperationsPopup(Map<String, List<IBlocksPlugin>> byCategory) {
+        JPopupMenu popup = new JPopupMenu();
+        for (Map.Entry<String, List<IBlocksPlugin>> entry : byCategory.entrySet()) {
+            JMenu sub = new JMenu(entry.getKey());
+            sub.setIcon(ShelfIcons.iconFor("", entry.getKey(), TOOLBAR_ICON_SIZE));
+            for (IBlocksPlugin plugin : entry.getValue()) {
+                sub.add(operationItem(plugin, entry.getKey()));
+            }
+            popup.add(sub);
+        }
+        if (byCategory.isEmpty()) {
+            JMenuItem none = new JMenuItem("No operations available");
+            none.setEnabled(false);
+            popup.add(none);
+        }
+        return popup;
     }
 
     /** A muted, non-interactive hint label for the context bar. */
@@ -821,10 +883,10 @@ public class RenderFrame extends JFrame {
             }
         }
         outerToolBar.repaint();
-        // The shelf's tool glyphs are also tinted at creation; rebuild to re-tint.
-        if (mShelf != null) {
-            mShelf.rebuild();
-        }
+        // The context bar's operation glyphs and the Operations menu are tinted at
+        // creation too; rebuild them to re-tint for the new theme.
+        rebuildOperationsMenu();
+        updateContextBar(ToolController.get().getActive());
     }
 
     private void setupMenus() {
@@ -900,14 +962,55 @@ public class RenderFrame extends JFrame {
         JCheckBoxMenuItem orthoItem = new JCheckBoxMenuItem("Orthographic");
         orthoItem.addActionListener(e -> getClient().setOrthographic(orthoItem.isSelected()));
         menuView.add(orthoItem);
+        // Operations menu — every one-shot plugin, grouped by category into
+        // submenus. This is the durable home for operations without a left-rail
+        // tool (Import, Export, Macro, …); tool-matched ones also appear here as
+        // well as in the active tool's context bar. Rebuilt when the model changes.
+        mOperationsMenu = new JMenu("Operations");
+        mOperationsMenu.setMnemonic(KeyEvent.VK_O);
+        rebuildOperationsMenu();
+        menuBar.add(mOperationsMenu);
         // Window menu — items are added in populateWindowMenu() after the docking
         // layout is built (the panel toggles need the dockable instances).
         mWindowMenu = new JMenu("Window");
         mWindowMenu.setMnemonic(KeyEvent.VK_W);
         menuBar.add(mWindowMenu);
         menuBar.add(menuHelp);
-        // Block plugins ("functions") are no longer injected into these menus; they
-        // live in the dockable "Tools" shelf (see ToolShelf / setupDocking).
+    }
+
+    /**
+     * Rebuilds the Operations menu from the plugins valid for the current model:
+     * one submenu per {@link PluginCategories} category, each holding that
+     * category's operations. Safe to call on the EDT at any time.
+     */
+    private void rebuildOperationsMenu() {
+        if (mOperationsMenu == null) {
+            return;
+        }
+        mOperationsMenu.removeAll();
+        Map<String, List<IBlocksPlugin>> byCategory = PluginCategories.byCategory();
+        for (Map.Entry<String, List<IBlocksPlugin>> entry : byCategory.entrySet()) {
+            JMenu sub = new JMenu(entry.getKey());
+            sub.setIcon(ShelfIcons.iconFor("", entry.getKey(), TOOLBAR_ICON_SIZE));
+            for (IBlocksPlugin plugin : entry.getValue()) {
+                sub.add(operationItem(plugin, entry.getKey()));
+            }
+            mOperationsMenu.add(sub);
+        }
+        if (mOperationsMenu.getMenuComponentCount() == 0) {
+            JMenuItem none = new JMenuItem("No operations available");
+            none.setEnabled(false);
+            mOperationsMenu.add(none);
+        }
+    }
+
+    /** A menu item that runs one operation (plugin), iconified and short-labelled. */
+    private JMenuItem operationItem(IBlocksPlugin plugin, String category) {
+        JMenuItem item = new JMenuItem(new BlocksPluginAction(getClient(), plugin));
+        item.setText(PluginCategories.shortLabel(plugin.getName()));
+        item.setIcon(ShelfIcons.iconFor(plugin.getName(), category, TOOLBAR_ICON_SIZE));
+        item.setToolTipText(PluginCategories.tooltip(plugin));
+        return item;
     }
 
     /**
