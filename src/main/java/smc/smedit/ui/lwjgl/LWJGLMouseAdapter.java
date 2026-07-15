@@ -34,6 +34,12 @@ public class LWJGLMouseAdapter extends MouseAdapter {
     private static final float ORBIT_SPEED = 0.01f;
     /** World units per pixel when panning (right/middle-drag). */
     private static final float PAN_SPEED = 0.05f;
+    /** Radians per pixel for first-person mouse-look. */
+    private static final float LOOK_SPEED = 0.005f;
+    /** Pitch clamp for first-person look (~87°), so the view can't flip past vertical. */
+    private static final float PITCH_LIMIT = 1.52f;
+    /** World units dollied per wheel notch in first-person mode. */
+    private static final float FP_DOLLY_STEP = 2f;
 
     private static final int MOUSE_MODE_NULL = 0;
     private static final int MOUSE_MODE_PIVOT = 1; // orbit around the ship centre
@@ -106,13 +112,24 @@ public class LWJGLMouseAdapter extends MouseAdapter {
         if (mMouseMode == MOUSE_MODE_PIVOT) {
             mMouseDownAt = p;
             if ((dx != 0) || (dy != 0)) {
-                // Turntable orbit: move the camera around the ship centre, then
-                // re-level it with lookAt so the horizon stays flat (a plain
-                // rotateAround accumulates roll and the view drifts sideways).
                 TransformEye cam = mPanel.mUniverse.getCamera();
-                cam.rotateAround(mPanel.mOrbitCenter,
-                        new Point3f(dx * ORBIT_SPEED, dy * ORBIT_SPEED, 0));
-                cam.lookAt(cam.getLocation(), mPanel.mOrbitCenter);
+                if (mPanel.getCameraMode() == LWJGLRenderPanel.CameraMode.FIRST_PERSON) {
+                    // First-person mouse-look: turn in place (location unchanged).
+                    // Yaw around WORLD up and pitch around the camera's own right
+                    // axis, so the horizon stays level (no roll accumulates), and
+                    // clamp pitch just shy of vertical to avoid flipping over.
+                    cam.rotate(0, 1, 0, -dx * LOOK_SPEED);
+                    float elev = (float) Math.asin(clamp(cam.getForward().y, -1f, 1f));
+                    float want = clamp(elev + (-dy * LOOK_SPEED), -PITCH_LIMIT, PITCH_LIMIT);
+                    cam.pitch(want - elev);
+                } else {
+                    // Turntable orbit: move the camera around the ship centre, then
+                    // re-level it with lookAt so the horizon stays flat (a plain
+                    // rotateAround accumulates roll and the view drifts sideways).
+                    cam.rotateAround(mPanel.mOrbitCenter,
+                            new Point3f(dx * ORBIT_SPEED, dy * ORBIT_SPEED, 0));
+                    cam.lookAt(cam.getLocation(), mPanel.mOrbitCenter);
+                }
                 mPanel.updateTransform();
             }
         } else if (mMouseMode == MOUSE_MODE_PAN) {
@@ -141,8 +158,18 @@ public class LWJGLMouseAdapter extends MouseAdapter {
         mMouseMode = MOUSE_MODE_NULL;
     }
 
+    private static float clamp(float v, float lo, float hi) {
+        return v < lo ? lo : (v > hi ? hi : v);
+    }
+
     private void doMouseWheel(int roll) {
         if (roll == 0) {
+            return;
+        }
+        if (mPanel.getCameraMode() == LWJGLRenderPanel.CameraMode.FIRST_PERSON) {
+            // No orbit centre to scale against — just dolly a fixed step.
+            mPanel.mUniverse.getCamera().moveForward(-roll * FP_DOLLY_STEP);
+            mPanel.updateTransform();
             return;
         }
         // Zoom proportionally to the distance from the ship, so it feels the same

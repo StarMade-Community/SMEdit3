@@ -48,6 +48,8 @@ public class LWJGLKeyEventDispatcher implements KeyListener, FocusListener {
     private static final int MOVE_RIGHT = 'D';
     private static final int MOVE_UP = 'E';
     private static final int MOVE_DOWN = 'Q';
+    /** Toggles between orbit and first-person camera control. */
+    private static final int TOGGLE_CAMERA = 'C';
 
     private static final Set<Integer> MOVE_KEYS = Set.of(
             MOVE_FORWARD, MOVE_BACK, MOVE_LEFT, MOVE_RIGHT, MOVE_UP, MOVE_DOWN);
@@ -98,6 +100,11 @@ public class LWJGLKeyEventDispatcher implements KeyListener, FocusListener {
                 mPanel.redo();
                 return;
             }
+        }
+        // C toggles orbit <-> first-person (ignore Ctrl+C etc. so copy still works).
+        if (code == TOGGLE_CAMERA && !e.isControlDown() && !e.isAltDown() && !e.isMetaDown()) {
+            mPanel.toggleCameraMode();
+            return;
         }
         if (MOVE_KEYS.contains(code)) {
             mPressed.add(code);
