@@ -33,6 +33,7 @@ import java.util.logging.Logger;
 import javax.imageio.ImageIO;
 
 import smc.smedit.logic.utils.FloatUtils;
+import smc.smedit.vecmath.Color3f;
 import smc.smedit.vecmath.Point2f;
 import smc.smedit.vecmath.Point3f;
 import smc.smedit.vecmath.ext.Hull3f;
@@ -121,6 +122,11 @@ public class OBJLogic {
                         tri.setA(points.get(0));
                         tri.setB(points.get(third - 1));
                         tri.setC(points.get(third));
+                        if (material != null && material.getKD() != null) {
+                            // Diffuse color; used as the source color unless the
+                            // triangle also has a texture (colorFor prefers texture).
+                            tri.setColor(new Color3f(material.getKD()));
+                        }
                         if ((uvs.size() > 0) && (material != null)) {
                             tri.setAUV(uvs.get(0));
                             tri.setBUV(uvs.get(third - 1));
