@@ -35,8 +35,17 @@ public class ObjDrawHandler extends NodeDrawHandler {
                 if (obj.getTextureColor() != null) {
                     GL11.glColor4f(obj.getTextureColor().x, obj.getTextureColor().y, obj.getTextureColor().z, obj.getTextureColor().w);
                 }
-                GL11.glEnable(GL11.GL_BLEND);
-                GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+                // Only the transparent pass blends. The opaque block mesh must NOT
+                // alpha-blend: StarMade block textures carry a non-opaque alpha
+                // channel as *material data* (specular/emissive), not transparency.
+                // Blending it makes solid blocks see-through — revealing the faces
+                // behind them (blocks looked like they "borrowed" a neighbour's
+                // texture) and shimmering against them like z-fighting, worst with
+                // the camera inside a solid region between two block layers.
+                if (obj.isTransparent()) {
+                    GL11.glEnable(GL11.GL_BLEND);
+                    GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+                }
                 GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
                 GL11.glBindTexture(GL11.GL_TEXTURE_2D, JGLTextureCache.getTexture(obj.getTextureID()));
             } else if (obj.getColorBuffer() != null) {
@@ -76,7 +85,9 @@ public class ObjDrawHandler extends NodeDrawHandler {
             }
             if (obj.isTextured()) {
                 GL11.glDisableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
-                GL11.glDisable(GL11.GL_BLEND);
+                if (obj.isTransparent()) {
+                    GL11.glDisable(GL11.GL_BLEND);
+                }
             } else if (obj.getColorBuffer() != null) {
                 GL11.glDisableClientState(GL11.GL_COLOR_ARRAY);
                 if (obj.isAnyAlpha()) {

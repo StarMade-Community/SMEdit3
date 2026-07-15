@@ -17,19 +17,89 @@
  **/
 package smc.smedit.plugins.ship.imp;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.PushbackReader;
 import java.io.Reader;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import smc.smedit.logic.utils.FloatUtils;
+import smc.smedit.logic.utils.IntegerUtils;
+import smc.smedit.vecmath.Color3f;
+import smc.smedit.vecmath.Point3f;
+import smc.smedit.vecmath.ext.Hull3f;
+import smc.smedit.vecmath.ext.Triangle3f;
 
 /**
  * @Auther Jo Jaquinta for SMEdit Classic - version 1.0
  **/
 public class VRMLLogic {
     private static final Logger log = Logger.getLogger(VRMLLogic.class.getName());
+
+    /** Reads a VRML/WRL file into a triangle mesh ready for voxelization. */
+    public static Hull3f readHull(File wrlFile) throws IOException {
+        List<VRMLNode> vrml;
+        try (BufferedReader rdr = new BufferedReader(new FileReader(wrlFile))) {
+            vrml = read(rdr);
+        }
+        Hull3f hull = new Hull3f();
+        List<Point3f> verts = new ArrayList<>();
+        Color3f color = new Color3f();
+        readList(vrml, hull, verts, color);
+        return hull;
+    }
+
+    private static void readList(Collection<?> vrml, Hull3f hull, List<Point3f> verts, Color3f color) {
+        for (Object n : vrml) {
+            if (!(n instanceof VRMLNode)) {
+                continue;
+            }
+            VRMLNode node = (VRMLNode) n;
+            if ("point".equalsIgnoreCase(node.getName()) && (node.getValue() instanceof Collection<?>)) {
+                verts.clear();
+                Collection<?> array = (Collection<?>) node.getValue();
+                for (Iterator<?> i = array.iterator(); i.hasNext();) {
+                    Point3f p = new Point3f();
+                    p.x = FloatUtils.parseFloat(i.next());
+                    p.y = FloatUtils.parseFloat(i.next());
+                    p.z = FloatUtils.parseFloat(i.next());
+                    verts.add(p);
+                }
+            } else if ("diffuseColor".equalsIgnoreCase(node.getName()) && (node.getValue() instanceof Collection<?>)) {
+                Collection<?> array = (Collection<?>) node.getValue();
+                Iterator<?> i = array.iterator();
+                color.x = FloatUtils.parseFloat(i.next());
+                color.y = FloatUtils.parseFloat(i.next());
+                color.z = FloatUtils.parseFloat(i.next());
+            } else if ("coordIndex".equalsIgnoreCase(node.getName()) && (node.getValue() instanceof Collection<?>)) {
+                Collection<?> array = (Collection<?>) node.getValue();
+                List<Integer> idx = new ArrayList<>();
+                for (Iterator<?> i = array.iterator(); i.hasNext();) {
+                    int p = IntegerUtils.parseInt((String) i.next());
+                    if (p == -1) {
+                        for (int o = 1; o < idx.size() - 1; o++) {
+                            Triangle3f tri = new Triangle3f(verts.get(idx.get(0)),
+                                    verts.get(idx.get(o)), verts.get(idx.get(o + 1)));
+                            tri.setColor(new Color3f(color));
+                            hull.getTriangles().add(tri);
+                        }
+                        idx.clear();
+                    } else {
+                        idx.add(p);
+                    }
+                }
+            } else if (node.getValue() instanceof Collection<?>) {
+                readList((Collection<?>) node.getValue(), hull, verts, color);
+            }
+        }
+    }
 
     public static List<VRMLNode> read(Reader r) throws IOException {
         PushbackReader rdr;

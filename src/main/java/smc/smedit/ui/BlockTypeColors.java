@@ -809,6 +809,8 @@ public class BlockTypeColors {
 
     public static final Map<Short, Short> BLOCK_HITPOINTS = new HashMap<>();
     public static final Map<Short, Integer> BLOCK_TEXTURE_IDS = new HashMap<>();
+    /** id -&gt; build-icon number (the {@code icon="…"} attribute in BlockConfig.xml). */
+    public static final Map<Short, Integer> BLOCK_BUILD_ICONS = new HashMap<>();
     /**
      * Per-face texture ids for each block, in StarMade's side order
      * [FRONT, BACK, TOP, BOTTOM, RIGHT, LEFT] (Element.java constants) — exactly
@@ -843,17 +845,19 @@ public class BlockTypeColors {
     /** 3-sided blocks: orientation-independent (top/bottom distinct, all four sides share). */
     private static final int[] ORIENT_MAP_3_ROW = {0, 0, 3, 2, 0, 0};
 
-    // ---- In-plane face-texture rotation (StarMade cube.vsh / normalBlock) ----
+    // ---- In-plane face-texture UVs (StarMade cube-3rd.vsh, absolute port) ----
     //
-    // StarMade rotates a NORMAL block's face texture with the block's orientation.
-    // We reproduce it as a corner permutation applied to each cube-face quad's UVs,
-    // computed as the DIFFERENCE between orientation O and orientation 0 — so the
-    // transform is the identity at orientation 0 and cannot alter the (overwhelming)
-    // majority of blocks that are unrotated. Only oriented blocks change.
+    // StarMade assigns each cube-face vertex a texture corner directly from its
+    // texOrder tables — one lookup per (orientation, side, vertex), including
+    // orientation 0. There is no "identity at orientation 0": directional blocks
+    // (and 3-sided/rotated ones) have a non-trivial base arrangement, which is why
+    // the old difference-from-0 scheme couldn't reproduce them. We port the exact
+    // per-vertex output: positions from vertexOrderMap, UVs from texOrder, decoded
+    // with the shader's own quad math (see FACE_CORNER_UV below).
     //
-    // Side index order here matches the shader's sideId (which drives both position
-    // and texcoord): 0=+X, 1=-X, 2=+Y, 3=-Y, 4=+Z, 5=-Z. RenderPoly faces
-    // XP,XM,YP,YM,ZP,ZM (0..5) map to it 1:1.
+    // Table rows below are in StarMade Element side order (FRONT,BACK,TOP,BOTTOM,
+    // RIGHT,LEFT = 0..5) — the same order the config files use. RenderPoly faces
+    // (XP..ZM) map to that sideId via FACE_TO_SIDE.
 
     /** Blocks with &lt;SideTexturesPointToOrientation&gt; use the ORIENT table, others NORMAL. */
     public static final java.util.Set<Short> BLOCK_POINT_TO_ORIENT = new java.util.HashSet<>();
@@ -882,93 +886,75 @@ public class BlockTypeColors {
         {{0, 1, 3, 2}, {0, 1, 3, 2}, {0, 1, 3, 2}, {0, 1, 3, 2}, {1, 3, 2, 0}, {2, 0, 1, 3}},
     };
 
-    /** Identity corner permutation (u+2v corner index -> same). */
-    private static final int[] IDENTITY_UV = {0, 1, 2, 3};
-
-    // Precomputed corner permutations: [table 0=NORMAL/1=ORIENT][side][orientation] -> int[4].
-    private static final int[][][][] UV_TRANSFORM = new int[2][6][6][];
+    // Absolute per-vertex UV lookup, StarMade cube-3rd.vsh exact.
+    //
+    // A cube face's 4 geometric corners are keyed 0..3 with the SAME bit layout as
+    // vertexOrderMap's position codes: cornerKey = axisA_bit + 2*axisB_bit, where
+    // axisA is the face's tangent axis carrying quad-bit 0 and axisB the one
+    // carrying bit 1 (per StarMade's quadPosMark). For each (table, orientation,
+    // side, cornerKey) we store the atlas UV corner index (u + 2*v) StarMade's
+    // shader assigns that corner. Built once from the texOrder tables.
+    private static final int[][][][] FACE_CORNER_UV = new int[2][6][6][4];
 
     static {
-        computeUvTransforms(TEX_ORDER_NORMAL, UV_TRANSFORM[0]);
-        computeUvTransforms(TEX_ORDER_ORIENT, UV_TRANSFORM[1]);
+        buildFaceCornerUv(TEX_ORDER_NORMAL, FACE_CORNER_UV[0]);
+        buildFaceCornerUv(TEX_ORDER_ORIENT, FACE_CORNER_UV[1]);
     }
 
-    private static void computeUvTransforms(int[][][] table, int[][][] out) {
-        for (int s = 0; s < 6; s++) {
-            for (int o = 0; o < 6; o++) {
-                out[s][o] = deriveTransform(table, s, o);
+    private static void buildFaceCornerUv(int[][][] texOrder, int[][][] out) {
+        for (int o = 0; o < 6; o++) {
+            for (int s = 0; s < 6; s++) {
+                for (int i = 0; i < 4; i++) {
+                    // vertexOrderMap gives this vertex's position corner (== cornerKey);
+                    // texOrder gives its texture code, decoded to a tile corner exactly
+                    // as cube-3rd.vsh does: quad.x = floor(mTex*2)%2, quad.y = floor(mTex*4)%2.
+                    int cornerKey = VERTEX_ORDER[s][i];
+                    int tex = texOrder[o][s][i];
+                    int quadX = (tex >> 1) & 1;
+                    int quadY = tex & 1;
+                    out[o][s][cornerKey] = atlasCornerIdx(quadX, quadY);
+                }
             }
         }
     }
 
     /**
-     * The corner permutation mapping the tile UV a NORMAL-block face shows at
-     * orientation 0 to the one it shows at orientation {@code o}, for side {@code s}.
-     * Applied to our (already-correct-at-0) quad UVs. Identity if not derivable.
+     * Maps a StarMade tile corner (quad.x, quad.y) to our atlas UV corner index
+     * (u + 2*v, u=bit0/v=bit1, as {@link LWJGLRenderLogic} emits it). StarMade's
+     * texture v runs top-down while our packed atlas is v-up, so v is flipped and
+     * u kept — the single global convention that aligns our atlas with StarMade's
+     * on-screen result.
      */
-    private static int[] deriveTransform(int[][][] table, int s, int o) {
-        int[] perm = {-1, -1, -1, -1};
-        boolean[] filled = new boolean[4];
-        for (int dex = 0; dex < 4; dex++) {
-            int base = faceCornerUv(table, s, 0, dex);
-            int cur = faceCornerUv(table, s, o, dex);
-            if (base < 0 || perm[base] != -1) {
-                return IDENTITY_UV; // degenerate/ambiguous — leave untouched
-            }
-            perm[base] = cur;
-            filled[base] = true;
-        }
-        for (boolean f : filled) {
-            if (!f) {
-                return IDENTITY_UV;
-            }
-        }
-        return perm;
-    }
-
-    /** The tile corner (index u+2v, 0..3) that face-vertex {@code dex} samples. */
-    private static int faceCornerUv(int[][][] table, int s, int o, int dex) {
-        int v = VERTEX_ORDER[s][dex];
-        int qx = v & 1;
-        int qy = (v >> 1) & 1;
-        int tex = table[o][s][dex];
-        if (((tex >> 1) & 1) == 1) { // mirror bit flips quad.x
-            qx = 1 - qx;
-        }
-        int b = tex & 1; // blockType bit selects the per-side texcoord variant
-        return gSide(s, qx, qy, b);
-    }
-
-    /** StarMade's per-side texcoord formula: (qx,qy,blockType) -&gt; corner index u+2v. */
-    private static int gSide(int s, int qx, int qy, int b) {
-        int u;
-        int val;
-        switch (s) {
-            case 0: u = (b == 0) ? 1 - qx : qx; val = 1 - qy; break;                 // +X
-            case 1: u = (b == 0) ? qx : 1 - qx; val = 1 - qy; break;                 // -X
-            case 2: u = (b == 0) ? 1 - qx : qx; val = (b == 0) ? 1 - qy : qy; break; // +Y
-            case 3: u = 1 - qx; val = (b == 0) ? qy : 1 - qy; break;                 // -Y
-            case 4: u = (b == 0) ? qx : 1 - qx; val = 1 - qy; break;                 // +Z
-            default: u = (b == 0) ? 1 - qx : qx; val = 1 - qy; break;                // -Z
-        }
-        return u + 2 * val;
+    private static int atlasCornerIdx(int quadX, int quadY) {
+        int u = quadX;
+        int v = 1 - quadY;
+        return u + 2 * v;
     }
 
     /**
-     * The UV corner permutation for a cube face, or {@code null} for identity.
-     * {@code renderPolyFace} is a {@link RenderPoly} face (XP..ZM = 0..5). Only
-     * full NORMAL blocks rotate; shaped/NORMAL24 and 3-sided blocks return null.
+     * The atlas UV corner index (u + 2*v) that geometric corner {@code cornerKey}
+     * (0..3) of a cube face samples, for the block's orientation — StarMade-exact,
+     * every orientation including 0. {@code renderPolyFace} is a {@link RenderPoly}
+     * face (XP..ZM). Returns -1 if the face index is out of range.
      */
-    public static int[] getFaceUvTransform(short blockID, int renderPolyFace, int orientation) {
-        if (renderPolyFace < 0 || renderPolyFace >= 6 || getBlockStyle(blockID) != STYLE_NORMAL) {
-            return null;
+    public static int getFaceCornerUvIdx(short blockID, int renderPolyFace, int orientation, int cornerKey) {
+        if (renderPolyFace < 0 || renderPolyFace >= FACE_TO_SIDE.length || cornerKey < 0 || cornerKey >= 4) {
+            return -1;
         }
+        int s = FACE_TO_SIDE[renderPolyFace];
+        int table;
+        int o;
         if (BLOCK_INDIVIDUAL_SIDES.getOrDefault(blockID, 1) == 3) {
-            return null;
+            table = 0;                              // 3-sided: orientation-independent
+            o = 0;
+        } else if (BLOCK_POINT_TO_ORIENT.contains(blockID)) {
+            table = 1;                              // directional blocks
+            o = Math.floorMod(orientation, 6);
+        } else {
+            table = 0;
+            o = Math.floorMod(orientation, 6);
         }
-        int table = BLOCK_POINT_TO_ORIENT.contains(blockID) ? 1 : 0;
-        int[] perm = UV_TRANSFORM[table][renderPolyFace][Math.floorMod(orientation, 6)];
-        return perm == IDENTITY_UV ? null : perm;
+        return FACE_CORNER_UV[table][o][s][cornerKey];
     }
     /** BlockConfig &lt;BlockStyle&gt; per block id (StarMade BlockStyle enum values). */
     public static final Map<Short, Integer> BLOCK_STYLE = new HashMap<>();
@@ -998,6 +984,13 @@ public class BlockTypeColors {
 
     /** Block ids flagged &lt;Transparency&gt;true&lt;/Transparency&gt; in BlockConfig (glass, lights, etc.). */
     public static final java.util.Set<Short> BLOCK_TRANSPARENT = new java.util.HashSet<>();
+    /** Blocks flagged {@code <Deprecated>true} in BlockConfig.xml (removed from the game). */
+    public static final java.util.Set<Short> BLOCK_DEPRECATED = new java.util.HashSet<>();
+
+    /** @return whether a block is deprecated (no longer obtainable in-game). */
+    public static boolean isDeprecated(short blockID) {
+        return BLOCK_DEPRECATED.contains(blockID);
+    }
 
     /** @return whether a block is transparent (renders in the blended, non-occluding pass). */
     public static boolean isTransparent(short blockID) {
@@ -1006,6 +999,11 @@ public class BlockTypeColors {
 
     private static boolean mBlockIconsLoaded = false;
     private static final Map<Short, ImageIcon> mBlockIcons = new HashMap<>();
+    /** Cropped build-icon cell per block id (null value = block has none). */
+    private static final Map<Short, BufferedImage> mBuildIconCache = new HashMap<>();
+    /** Loaded build-icon sheets by layer; {@link #EMPTY_SHEET} marks "tried, missing". */
+    private static final Map<Integer, BufferedImage> mBuildIconSheets = new HashMap<>();
+    private static final BufferedImage EMPTY_SHEET = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
     private static final List<BufferedImage> mTextureMaps = new ArrayList<>();
     public static int mAllTexturesImagesPerSide;
     public static int mAllTexturesPixelsPerImage; // full cell size (inner tile + gutter*2)
@@ -1058,6 +1056,64 @@ public class BlockTypeColors {
         return mBlockIcons.get(blockID);
     }
 
+    /**
+     * StarMade's build-icon image for a block — the isometric preview shown in
+     * the in-game build menu — read from the {@code data/image-resource/
+     * build-icons-NN-16x16-gui-.png} sheets via the block's build-icon number
+     * (the {@code icon} attribute in BlockConfig.xml). Returns {@code null} when
+     * the block has no icon or the sheets are unavailable.
+     */
+    public static BufferedImage getBuildIconImage(short blockID) {
+        loadBlockIcons();
+        if (mBuildIconCache.containsKey(blockID)) {
+            return mBuildIconCache.get(blockID);
+        }
+        BufferedImage cell = null;
+        Integer num = BLOCK_BUILD_ICONS.get(blockID);
+        if (num != null && num >= 0) {
+            int layer = num / 256;
+            int local = num % 256;
+            BufferedImage sheet = loadBuildIconSheet(layer);
+            if (sheet != null) {
+                int cols = 16; // sheets are a 16x16 grid of icons
+                int cellW = sheet.getWidth() / cols;
+                int cellH = sheet.getHeight() / cols;
+                int x = (local % cols) * cellW;
+                int y = (local / cols) * cellH;
+                if (cellW > 0 && cellH > 0 && x + cellW <= sheet.getWidth() && y + cellH <= sheet.getHeight()) {
+                    cell = sheet.getSubimage(x, y, cellW, cellH);
+                }
+            }
+        }
+        mBuildIconCache.put(blockID, cell);
+        return cell;
+    }
+
+    /** {@link #getBuildIconImage} wrapped as a Swing icon, or {@code null}. */
+    public static ImageIcon getBuildIcon(short blockID) {
+        BufferedImage img = getBuildIconImage(blockID);
+        return img == null ? null : new ImageIcon(img);
+    }
+
+    private static BufferedImage loadBuildIconSheet(int layer) {
+        if (mBuildIconSheets.containsKey(layer)) {
+            BufferedImage v = mBuildIconSheets.get(layer);
+            return v == EMPTY_SHEET ? null : v;
+        }
+        BufferedImage img = null;
+        try {
+            File f = new File(StarMadeLogic.getInstance().getBaseDir(),
+                    "data/image-resource/build-icons-" + String.format("%02d", layer) + "-16x16-gui-.png");
+            if (f.exists()) {
+                img = ImageIO.read(f);
+            }
+        } catch (IOException e) {
+            img = null;
+        }
+        mBuildIconSheets.put(layer, img == null ? EMPTY_SHEET : img);
+        return img;
+    }
+
     public static BufferedImage getTextureImage(int textureID) {
         int j = textureID % 256 % 16;
         int k = textureID % 256 / 16;
@@ -1089,7 +1145,11 @@ public class BlockTypeColors {
                     continue;
                 }
                 short id = ShortUtils.parseShort(mBlockTypes.get(type));
-                //int icon = IntegerUtils.parseInt(XMLUtils.getAttribute(n, "icon"));
+                // The build-icon number indexes into the build-icons-NN-16x16-gui-
+                // sheets (StarMade's in-game block preview icons).
+                String iconAttr = XMLUtils.getAttribute(n, "icon");
+                int buildIcon = (iconAttr == null || iconAttr.isEmpty())
+                        ? -1 : IntegerUtils.parseInt(iconAttr.trim());
                 // Modern BlockConfig.xml lists six comma-separated per-face
                 // textures (e.g. "33, 33, 33, 33, 33, 33"); use the first face.
                 String textureAttr = XMLUtils.getAttribute(n, "textureId");
@@ -1126,10 +1186,17 @@ public class BlockTypeColors {
                 }
                 String ptoTag = XMLUtils.getTextTag(n, "SideTexturesPointToOrientation");
                 boolean pointToOrient = ptoTag != null && "true".equalsIgnoreCase(ptoTag.trim());
+                // <Deprecated> blocks are no longer obtainable in-game; tracked so
+                // pickers can hide them.
+                String deprecatedTag = XMLUtils.getTextTag(n, "Deprecated");
+                boolean deprecated = deprecatedTag != null && "true".equalsIgnoreCase(deprecatedTag.trim());
 
                 BlockTypes.BLOCK_NAMES.put(id, name);
                 BLOCK_HITPOINTS.put(id, hitPoints);
                 BLOCK_TEXTURE_IDS.put(id, textureID);
+                if (buildIcon >= 0) {
+                    BLOCK_BUILD_ICONS.put(id, buildIcon);
+                }
                 if (faceTex != null) {
                     BLOCK_TEXTURE_IDS_PER_FACE.put(id, faceTex);
                 }
@@ -1143,6 +1210,9 @@ public class BlockTypeColors {
                 }
                 if (transparent) {
                     BLOCK_TRANSPARENT.add(id);
+                }
+                if (deprecated) {
+                    BLOCK_DEPRECATED.add(id);
                 }
                 try {
                     Field f = BlockTypes.class.getField(type);

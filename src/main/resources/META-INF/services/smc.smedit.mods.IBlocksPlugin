@@ -30,10 +30,8 @@ smc.smedit.plugins.ship.fill.DeckPlugin
 smc.smedit.plugins.ship.fill.FillBlockPlugin
 smc.smedit.plugins.ship.fill.FillPlugin
 smc.smedit.plugins.ship.hull.HullPlugin
-smc.smedit.plugins.ship.imp.ImportBinvoxPlugin
-smc.smedit.plugins.ship.imp.ImportOBJPlugin
+smc.smedit.plugins.ship.imp.ImportModelPlugin
 smc.smedit.plugins.ship.imp.ImportSchematicPlugin
-smc.smedit.plugins.ship.imp.ImportVRMLPlugin
 smc.smedit.plugins.ship.move.MovePlugin
 smc.smedit.plugins.ship.reflect.DuplicatePlugin
 smc.smedit.plugins.ship.reflect.ReflectPlugin

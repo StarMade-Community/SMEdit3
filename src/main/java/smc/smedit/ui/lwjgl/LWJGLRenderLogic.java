@@ -635,18 +635,63 @@ public class LWJGLRenderLogic {
             Rectangle2D.Float rec = (face >= 0)
                     ? BlockTypeColors.getFaceTextureLocation(type, face, orientation)
                     : BlockTypeColors.getAllTextureLocation(type);
-            // Emitted UV order maps to tile-corner indices (u + 2v): c0=(0,0)=0,
-            // c1=(1,0)=1, c2=(1,1)=3, c3=(0,1)=2. The per-face transform rotates the
-            // texture to match the block's orientation (identity for unrotated blocks).
-            int[] cornerIdx = {0, 1, 3, 2};
-            int[] perm = (face >= 0) ? BlockTypeColors.getFaceUvTransform(type, face, orientation) : null;
+            Point3f[] quad = {left, top, right, bottom};
             for (int k = 0; k < 4; k++) {
-                int idx = (perm != null) ? perm[cornerIdx[k]] : cornerIdx[k];
+                int idx;
+                if (face >= 0) {
+                    // Absolute StarMade port: identify which geometric corner of the
+                    // face this vertex is (cornerKey), then look up the exact tile
+                    // corner StarMade's texOrder assigns it for this orientation.
+                    int cornerKey = faceCornerKey(face, quad[k], left, top, right, bottom);
+                    idx = BlockTypeColors.getFaceCornerUvIdx(type, face, orientation, cornerKey);
+                    if (idx < 0) {
+                        idx = SHAPED_CORNER_IDX[k];
+                    }
+                } else {
+                    // Shaped-block face (no cube side): keep the simple corner mapping.
+                    idx = SHAPED_CORNER_IDX[k];
+                }
                 float u = idx & 1;
                 float v = (idx >> 1) & 1;
                 info.uv.add(new Point2f(rec.x + u * rec.width, rec.y + v * rec.height));
             }
         }
+    }
+
+    // Fallback tile-corner indices (u + 2v) for shaped-block faces that don't map
+    // to a cube side: c0=(0,0), c1=(1,0), c2=(1,1), c3=(0,1).
+    private static final int[] SHAPED_CORNER_IDX = {0, 1, 3, 2};
+
+    // Per RenderPoly face (XP..ZM), the two tangent world axes {axisA, axisB}
+    // (0=x,1=y,2=z). axisA carries corner-key bit 0, axisB bit 1 — matching
+    // StarMade's quadPosMark decode, so cornerKey lines up with vertexOrderMap.
+    private static final int[][] FACE_TANGENT_AXES = {
+        {1, 2}, // XP  -> RIGHT  (+X): A=Y, B=Z
+        {1, 2}, // XM  -> LEFT   (-X): A=Y, B=Z
+        {0, 2}, // YP  -> TOP    (+Y): A=X, B=Z
+        {0, 2}, // YM  -> BOTTOM (-Y): A=X, B=Z
+        {1, 0}, // ZP  -> FRONT  (+Z): A=Y, B=X
+        {1, 0}, // ZM  -> BACK   (-Z): A=Y, B=X
+    };
+
+    /**
+     * Which geometric corner of cube face {@code face} the vertex {@code vtx} is:
+     * a key in {@code axisA_bit + 2*axisB_bit} form (bit set = the vertex sits on
+     * the high side of that tangent axis). {@code a,b,c,d} are the face's 4 corners
+     * (used to find the face centre). Matches StarMade's vertexOrderMap corner codes.
+     */
+    private static int faceCornerKey(int face, Point3f vtx, Point3f a, Point3f b, Point3f c, Point3f d) {
+        int axisA = FACE_TANGENT_AXES[face][0];
+        int axisB = FACE_TANGENT_AXES[face][1];
+        float midA = (comp(a, axisA) + comp(b, axisA) + comp(c, axisA) + comp(d, axisA)) * 0.25f;
+        float midB = (comp(a, axisB) + comp(b, axisB) + comp(c, axisB) + comp(d, axisB)) * 0.25f;
+        int aBit = comp(vtx, axisA) > midA ? 1 : 0;
+        int bBit = comp(vtx, axisB) > midB ? 1 : 0;
+        return aBit + 2 * bBit;
+    }
+
+    private static float comp(Point3f p, int axis) {
+        return axis == 0 ? p.x : (axis == 1 ? p.y : p.z);
     }
 
     /**

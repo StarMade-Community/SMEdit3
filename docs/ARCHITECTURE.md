@@ -155,10 +155,12 @@ Maintaining two renderers roughly doubles the rendering surface area
 **Plugin inventory** (45 `IBlocksPlugin` + 4 factories): macro record/run;
 selection ops (all/none/copy/cut/paste/delete); ship edit (harden/smooth/soften);
 fill/deck; hull; move/rotate/scale/reflect; paint (stripes/ombre/text/image);
-terrain generators (dome/causeway/volcano); **importers** OBJ, VRML, Binvox,
-Minecraft `.schematic`; **exporters** OBJ, DAE, Images. Each plugin ships as a
-triad: `XxxPlugin` + `XxxParameters` + `XxxParametersBeanInfo` (the last drives
-an auto-generated Swing dialog).
+terrain generators (dome/causeway/volcano); a unified **Import/3D Model** importer
+(auto-detects OBJ, VRML, DAE, Binvox and voxelizes meshes in-house via
+`smc.smedit.util.voxel`, with an install-driven color-conversion palette),
+Minecraft `.schematic` import; **exporters** OBJ, DAE, Images. Each plugin ships
+as a triad: `XxxPlugin` + `XxxParameters` + `XxxParametersBeanInfo` (the last
+drives an auto-generated Swing dialog).
 
 ---
 

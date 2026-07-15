@@ -15,8 +15,11 @@ current StarMade format.
 - Opens modern StarMade blueprint folders (`.smd3` block data + v5 metadata).
 - Saves blueprints in the current format so StarMade can load them.
 - OpenGL rendering (uses the discrete GPU on hybrid-graphics laptops).
-- Plugin-driven tools: import/export (OBJ, DAE, Binvox, Minecraft schematic),
-  smoothing, hull generation, fill, rotate, mirror, painting, and more.
+- Seamless 3D-model import: one **Import/3D Model** tool auto-detects OBJ, VRML,
+  DAE, and Binvox and voxelizes meshes in-house (no external binvox download),
+  with a configurable block-conversion palette.
+- Plugin-driven tools: export (OBJ, DAE, images), smoothing, hull generation,
+  fill, rotate, mirror, painting, Minecraft-schematic import, and more.
 
 ## Get started
 

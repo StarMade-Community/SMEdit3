@@ -1,5 +1,5 @@
 /**
- * Copyright 2014 
+ * Copyright 2014
  * SMEdit https://github.com/StarMade/SMEdit
  * SMTools https://github.com/StarMade/SMTools
  *
@@ -32,40 +32,53 @@ import javax.swing.JFileChooser;
 
 import smc.smedit.ui.act.plugin.FilePropertyDescriptor;
 import smc.smedit.ui.act.plugin.FilePropertyInfo;
+import smc.smedit.ui.act.plugin.PalettePropertyDescriptor;
 
 /**
- * @Auther Jo Jaquinta for SMEdit Classic - version 1.0
+ * Wires the {@link ImportModelParameters} bean to two custom editors: a file
+ * chooser for {@code file} (accepting every supported model format) and the
+ * block-palette editor for {@code palette}.
+ *
+ * @author SMEdit3
  **/
-public class ImportBinvoxParametersBeanInfo implements BeanInfo {
-    private static final Logger log = Logger.getLogger(ImportBinvoxParametersBeanInfo.class.getName());
+public class ImportModelParametersBeanInfo implements BeanInfo {
+
+    private static final Logger log = Logger.getLogger(ImportModelParametersBeanInfo.class.getName());
 
     private final BeanInfo mRootBeanInfo;
     private final FilePropertyInfo mInfo;
 
-    public ImportBinvoxParametersBeanInfo() throws IntrospectionException {
+    public ImportModelParametersBeanInfo() throws IntrospectionException {
         super();
         mInfo = new FilePropertyInfo();
-        mInfo.setDialogTitle("Import binvox file");
-        mInfo.setFilters(new String[][]{
-            {"Binvox file", "binvox"},});
+        mInfo.setDialogTitle("Import 3D model");
+        mInfo.setFilters(new String[][] {
+            {"3D models (obj, wrl, vrml, dae, binvox)", "obj", "wrl", "vrml", "dae", "binvox"},
+            {"Wavefront OBJ", "obj"},
+            {"VRML", "wrl", "vrml"},
+            {"COLLADA", "dae"},
+            {"Binvox", "binvox"},
+        });
         mInfo.setDialogType(JFileChooser.OPEN_DIALOG);
         mInfo.setApproveButtonText("Open");
-        mInfo.setApproveButtonTooltipText("Select file to import");
-        mRootBeanInfo = Introspector.getBeanInfo(ImportBinvoxParameters.class, Introspector.IGNORE_IMMEDIATE_BEANINFO);
+        mInfo.setApproveButtonTooltipText("Select model to import");
+        mRootBeanInfo = Introspector.getBeanInfo(ImportModelParameters.class, Introspector.IGNORE_IMMEDIATE_BEANINFO);
     }
 
     @Override
     public PropertyDescriptor[] getPropertyDescriptors() {
-        PropertyDescriptor[] props;
-        props = mRootBeanInfo.getPropertyDescriptors();
+        PropertyDescriptor[] props = mRootBeanInfo.getPropertyDescriptors();
         for (int i = 0; i < props.length; i++) {
-            if (props[i].getName().endsWith("ile")) {
-                try {
+            try {
+                if (props[i].getName().equals("file")) {
                     props[i] = new FilePropertyDescriptor(props[i].getName(),
                             props[i].getReadMethod(), props[i].getWriteMethod(), mInfo);
-                } catch (IntrospectionException e) {
-                    log.log(Level.WARNING, "FilePropertyDescriptor failed!", e);
+                } else if (props[i].getName().equals("palette")) {
+                    props[i] = new PalettePropertyDescriptor(props[i].getName(),
+                            props[i].getReadMethod(), props[i].getWriteMethod());
                 }
+            } catch (IntrospectionException e) {
+                log.log(Level.WARNING, "Custom property descriptor failed for " + props[i].getName(), e);
             }
         }
         return props;

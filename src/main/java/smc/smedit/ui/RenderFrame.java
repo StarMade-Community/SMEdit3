@@ -361,7 +361,7 @@ public class RenderFrame extends JFrame {
         mViewportDock = new DockPanel("viewport", "Viewport", getClient(), false, false, false);
         mBrushDock = new DockPanel("brush", "Brush", editPanel, true, true, true);
         mConsoleDock = new DockPanel("console", "Console", textScroll, true, true, true);
-        mBlockInfoDock = new DockPanel("blockinfo", "Block Info", new BlockInfoPanel(), true, true, true);
+        mBlockInfoDock = new DockPanel("blockinfo", "Selection", new BlockInfoPanel(), true, true, true);
         // Maya-style shelf: every block plugin ("function") as an icon button,
         // grouped into horizontally-scrollable tabs. Movable/floatable like the rest.
         mShelf = new ToolShelf(getClient());
