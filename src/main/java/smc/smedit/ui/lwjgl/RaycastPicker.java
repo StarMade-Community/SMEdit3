@@ -8,6 +8,7 @@ import org.lwjgl.util.glu.GLU;
 
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.ship.data.Block;
+import smc.smedit.ui.BlockTypeColors;
 import smc.smedit.vecmath.Point3i;
 
 /**
@@ -84,7 +85,8 @@ public final class RaycastPicker {
         double tDeltaZ = dz != 0 ? Math.abs(1.0 / dz) : Double.POSITIVE_INFINITY;
 
         for (int i = 0; i < MAX_STEPS; i++) {
-            if (grid.contains(x, y, z)) {
+            Block hit = grid.get(x, y, z);
+            if (hit != null && hitsCell(hit, x, y, z, near, dx, dy, dz, len)) {
                 return new Point3i(x, y, z);
             }
             double tNext;
@@ -114,5 +116,80 @@ public final class RaycastPicker {
         }
         double boundary = step > 0 ? cell + 1 : cell;
         return (boundary - origin) / dir;
+    }
+
+    /**
+     * Whether the ray actually intersects the block occupying cell (cx,cy,cz).
+     * Ordinary cube/shape blocks fill the cell, so entering it counts as a hit.
+     * A LOD-model block is only hit if the ray crosses its real mesh — otherwise
+     * the ray passes through the gaps to whatever is behind (matching what's drawn,
+     * so you can click the block behind a thin console/pipe/light).
+     */
+    private static boolean hitsCell(Block b, int cx, int cy, int cz,
+            float[] origin, double dx, double dy, double dz, double maxT) {
+        short id = b.getBlockID();
+        if (!BlockTypeColors.hasLodModel(id)) {
+            return true;
+        }
+        LodModelCache.LodModel model = LodModelCache.getModel(BlockTypeColors.getLodShape(id));
+        if (model == null || model.tris.length == 0) {
+            return true; // model unavailable -> drawn as a cube, so pick as a cube
+        }
+        return rayHitsModel(model, b.getOrientation(), cx, cy, cz,
+                origin[0], origin[1], origin[2], dx, dy, dz, maxT);
+    }
+
+    private static boolean rayHitsModel(LodModelCache.LodModel model, int orient,
+            int cx, int cy, int cz, double ox, double oy, double oz,
+            double dx, double dy, double dz, double maxT) {
+        float[] pos = model.positions;
+        int[] tris = model.tris;
+        float[] a = new float[3], b = new float[3], c = new float[3];
+        for (int i = 0; i + 2 < tris.length; i += 3) {
+            worldVert(pos, tris[i], orient, cx, cy, cz, a);
+            worldVert(pos, tris[i + 1], orient, cx, cy, cz, b);
+            worldVert(pos, tris[i + 2], orient, cx, cy, cz, c);
+            double t = rayTriangle(ox, oy, oz, dx, dy, dz, a, b, c);
+            if (t >= -1e-4 && t <= maxT) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Model vertex → world: rotate by the block orientation, offset by the cell. */
+    private static void worldVert(float[] pos, int idx, int orient, int cx, int cy, int cz, float[] out) {
+        float[] r = new float[3];
+        LodOrientation.rotate(orient, pos[idx * 3], pos[idx * 3 + 1], pos[idx * 3 + 2], r);
+        out[0] = cx + r[0];
+        out[1] = cy + r[1];
+        out[2] = cz + r[2];
+    }
+
+    /**
+     * Möller–Trumbore ray/triangle intersection (double-sided, matching the
+     * cull-off renderer). Returns the ray parameter t, or NaN on a miss.
+     */
+    private static double rayTriangle(double ox, double oy, double oz,
+            double dx, double dy, double dz, float[] a, float[] b, float[] c) {
+        double e1x = b[0] - a[0], e1y = b[1] - a[1], e1z = b[2] - a[2];
+        double e2x = c[0] - a[0], e2y = c[1] - a[1], e2z = c[2] - a[2];
+        double px = dy * e2z - dz * e2y, py = dz * e2x - dx * e2z, pz = dx * e2y - dy * e2x;
+        double det = e1x * px + e1y * py + e1z * pz;
+        if (Math.abs(det) < 1e-12) {
+            return Double.NaN;
+        }
+        double inv = 1.0 / det;
+        double tx = ox - a[0], ty = oy - a[1], tz = oz - a[2];
+        double u = (tx * px + ty * py + tz * pz) * inv;
+        if (u < -1e-5 || u > 1 + 1e-5) {
+            return Double.NaN;
+        }
+        double qx = ty * e1z - tz * e1y, qy = tz * e1x - tx * e1z, qz = tx * e1y - ty * e1x;
+        double v = (dx * qx + dy * qy + dz * qz) * inv;
+        if (v < -1e-5 || u + v > 1 + 1e-5) {
+            return Double.NaN;
+        }
+        return (e2x * qx + e2y * qy + e2z * qz) * inv;
     }
 }

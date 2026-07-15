@@ -855,9 +855,10 @@ public class BlockTypeColors {
     // per-vertex output: positions from vertexOrderMap, UVs from texOrder, decoded
     // with the shader's own quad math (see FACE_CORNER_UV below).
     //
-    // Table rows below are in StarMade Element side order (FRONT,BACK,TOP,BOTTOM,
-    // RIGHT,LEFT = 0..5) — the same order the config files use. RenderPoly faces
-    // (XP..ZM) map to that sideId via FACE_TO_SIDE.
+    // Table rows below are in StarMade shader sideId order (0=+X,1=-X,2=+Y,3=-Y,
+    // 4=+Z,5=-Z) — the order the config files are actually indexed by (their
+    // //FRONT//BACK… labels are legacy/misleading). This equals RenderPoly's
+    // XP..ZM ordinals, so getFaceCornerUvIdx indexes by renderPolyFace directly.
 
     /** Blocks with &lt;SideTexturesPointToOrientation&gt; use the ORIENT table, others NORMAL. */
     public static final java.util.Set<Short> BLOCK_POINT_TO_ORIENT = new java.util.HashSet<>();
@@ -938,10 +939,14 @@ public class BlockTypeColors {
      * face (XP..ZM). Returns -1 if the face index is out of range.
      */
     public static int getFaceCornerUvIdx(short blockID, int renderPolyFace, int orientation, int cornerKey) {
-        if (renderPolyFace < 0 || renderPolyFace >= FACE_TO_SIDE.length || cornerKey < 0 || cornerKey >= 4) {
+        if (renderPolyFace < 0 || renderPolyFace >= 6 || cornerKey < 0 || cornerKey >= 4) {
             return -1;
         }
-        int s = FACE_TO_SIDE[renderPolyFace];
+        // The texOrder tables and vertexOrderMap are indexed by StarMade's shader
+        // sideId (0=+X,1=-X,2=+Y,3=-Y,4=+Z,5=-Z), which is exactly RenderPoly's
+        // XP..ZM ordinal order. (FACE_TO_SIDE remaps to Element order — that's for
+        // per-face texture *selection*, not these sideId-indexed rotation tables.)
+        int s = renderPolyFace;
         int table;
         int o;
         if (BLOCK_INDIVIDUAL_SIDES.getOrDefault(blockID, 1) == 3) {
@@ -980,6 +985,24 @@ public class BlockTypeColors {
     public static int getBlockSlab(short blockID) {
         Integer s = BLOCK_SLAB.get(blockID);
         return s != null ? s : 0;
+    }
+
+    /**
+     * BlockConfig &lt;LodShape&gt; per block id: the name of the StarMade 3D model
+     * ("LOD model") this block is drawn as instead of a textured cube (consoles,
+     * lights, pipes, grates, capsules, …). Resolved to mesh files via
+     * {@link smc.smedit.ui.lwjgl.LodModelCache}. Absent = ordinary cube/shape block.
+     */
+    public static final Map<Short, String> BLOCK_LOD_SHAPE = new HashMap<>();
+
+    /** @return the LOD model name for a block id, or {@code null} if it has none. */
+    public static String getLodShape(short blockID) {
+        return BLOCK_LOD_SHAPE.get(blockID);
+    }
+
+    /** @return whether a block is drawn as a 3D LOD model rather than a cube/shape. */
+    public static boolean hasLodModel(short blockID) {
+        return BLOCK_LOD_SHAPE.containsKey(blockID);
     }
 
     /** Block ids flagged &lt;Transparency&gt;true&lt;/Transparency&gt; in BlockConfig (glass, lights, etc.). */
@@ -1203,6 +1226,10 @@ public class BlockTypeColors {
                 boolean inShop = inShopTag != null && "true".equalsIgnoreCase(inShopTag.trim());
                 int producedInFactory = IntegerUtils.parseInt(XMLUtils.getTextTag(n, "ProducedInFactory"));
                 boolean obtainable = inShop || producedInFactory != 0;
+                // <LodShape> names a StarMade 3D model this block draws as instead
+                // of a cube (consoles, lights, pipes, …). Kept so the renderer can
+                // load and draw the real mesh; absent = ordinary cube/shape block.
+                String lodShape = XMLUtils.getTextTag(n, "LodShape");
 
                 BlockTypes.BLOCK_NAMES.put(id, name);
                 BLOCK_HITPOINTS.put(id, hitPoints);
@@ -1229,6 +1256,9 @@ public class BlockTypeColors {
                 }
                 if (!obtainable) {
                     BLOCK_UNOBTAINABLE.add(id);
+                }
+                if (lodShape != null && !lodShape.trim().isEmpty()) {
+                    BLOCK_LOD_SHAPE.put(id, lodShape.trim());
                 }
                 try {
                     Field f = BlockTypes.class.getField(type);

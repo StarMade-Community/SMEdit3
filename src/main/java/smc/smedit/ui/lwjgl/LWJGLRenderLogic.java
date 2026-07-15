@@ -20,8 +20,10 @@ package smc.smedit.ui.lwjgl;
 import java.awt.Color;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import smc.smedit.data.RenderPoly;
 import smc.smedit.data.SparseMatrix;
@@ -52,19 +54,95 @@ public class LWJGLRenderLogic {
         // through into the ship.
         MeshInfo opaque = newMeshInfo(plain);
         MeshInfo transparent = newMeshInfo(plain);
+        // LOD-model blocks (consoles/lights/pipes/…) are drawn as their real mesh
+        // instead of a cube. Each distinct model texture becomes its own mesh/obj
+        // (StarMade model textures are per-model PNGs, not the block atlas), split
+        // opaque vs transparent so lights blend in the transparent pass.
+        Map<Integer, MeshInfo> modelOpaque = new HashMap<>();
+        Map<Integer, MeshInfo> modelTransparent = new HashMap<>();
         for (Iterator<Point3i> i = grid.iteratorNonNull(); i.hasNext();) {
             Point3i p = i.next();
             Block b = grid.get(p);
             if (b == null) {
                 continue;
             }
-            addBlock(BlockTypeColors.isTransparent(b.getBlockID()) ? transparent : opaque, grid, p);
+            short id = b.getBlockID();
+            boolean trans = BlockTypeColors.isTransparent(id);
+            // Textured render only: in plain (colour) mode fall back to the cube.
+            if (!plain && BlockTypeColors.hasLodModel(id)) {
+                LodModelCache.LodModel model = LodModelCache.getModel(BlockTypeColors.getLodShape(id));
+                if (model != null) {
+                    Map<Integer, MeshInfo> target = trans ? modelTransparent : modelOpaque;
+                    MeshInfo mi = target.computeIfAbsent(model.textureId, k -> newModelMeshInfo());
+                    addLodModel(mi, p, b, model);
+                    continue;
+                }
+                // model unavailable -> fall through and draw the cube (no regression)
+            }
+            addBlock(trans ? transparent : opaque, grid, p);
         }
         group.add(infoToObj(opaque));
+        // Opaque model meshes draw with the opaque pass (after the atlas mesh).
+        for (Map.Entry<Integer, MeshInfo> e : modelOpaque.entrySet()) {
+            group.add(modelInfoToObj(e.getValue(), e.getKey(), false));
+        }
         if (!transparent.verts.isEmpty()) {
             JGLObj transObj = infoToObj(transparent);
             transObj.setTransparent(true);
             group.add(transObj); // added after the opaque mesh so it draws on top
+        }
+        // Transparent model meshes (lights) blend last, over everything.
+        for (Map.Entry<Integer, MeshInfo> e : modelTransparent.entrySet()) {
+            group.add(modelInfoToObj(e.getValue(), e.getKey(), true));
+        }
+    }
+
+    /** A texture-mapped triangle mesh accumulator for LOD models (no per-vertex colour). */
+    private static MeshInfo newModelMeshInfo() {
+        MeshInfo info = new MeshInfo();
+        info.verts = new ArrayList<>();
+        info.indexes = new ArrayList<>();
+        info.uv = new ArrayList<>();
+        return info;
+    }
+
+    /** Builds a textured triangle {@link JGLObj} from a model mesh accumulator. */
+    private static JGLObj modelInfoToObj(MeshInfo info, int textureId, boolean transparent) {
+        JGLObj obj = new JGLObj();
+        obj.setMode(JGLObj.TRIANGLES);
+        obj.setVertices(info.verts);
+        obj.setIndices(info.indexes);
+        obj.setTextures(info.uv);
+        obj.setTextureID(textureId);
+        if (transparent) {
+            obj.setTransparent(true);
+        }
+        return obj;
+    }
+
+    /**
+     * Appends one LOD-model instance at block {@code p} into {@code info}
+     * (triangle mesh). Vertices are the model's block-local positions offset by
+     * the block cell; UVs come straight from the mesh (its own texture, not the
+     * atlas). Indices are offset by the running vertex count so many blocks batch
+     * into one obj.
+     */
+    public static void addLodModel(MeshInfo info, Point3i p, Block b, LodModelCache.LodModel model) {
+        int baseVert = info.verts.size();
+        float[] pos = model.positions;
+        float[] uv = model.uvs;
+        int orient = b.getOrientation();
+        float[] r = new float[3];
+        int n = pos.length / 3;
+        for (int v = 0; v < n; v++) {
+            // StarMade rotates the mesh by the block's orientation before placing
+            // it (Oriencube transform); do the same, then offset to the cell.
+            LodOrientation.rotate(orient, pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2], r);
+            info.verts.add(new Point3f(p.x + r[0], p.y + r[1], p.z + r[2]));
+            info.uv.add(new Point2f(uv[v * 2], uv[v * 2 + 1]));
+        }
+        for (int t = 0; t < model.tris.length; t++) {
+            info.indexes.add(baseVert + model.tris[t]);
         }
     }
 
@@ -442,15 +520,19 @@ public class LWJGLRenderLogic {
     }
 
     /**
-     * Whether {@code id} is a solid, full-size cube that fully covers any face
-     * touching it. Slabs, transparent blocks and shaped blocks (wedge/corner/
-     * tetra/hepta/sprite) don't, so a neighbour's face against them stays visible.
+     * Whether {@code id} fully fills its cell, so it can cover a neighbour's face.
+     * Only a full-size cube (opaque or transparent) does. Slabs, shaped blocks
+     * (wedge/corner/tetra/hepta/sprite) and LOD-model blocks all leave real gaps
+     * in their cell, so a neighbour's face against them must stay drawn — even when
+     * the cell "behind" them is occupied, because that neighbour may itself be
+     * thin. Treating them as fillers culled faces that were actually visible
+     * through the gap, leaving see-through holes into the ship.
      */
-    private static boolean isFullOpaqueCube(short id) {
-        if (BlockTypeColors.getBlockSlab(id) > 0) {
+    private static boolean fillsCell(short id) {
+        if (BlockTypeColors.hasLodModel(id)) {
             return false;
         }
-        if (BlockTypeColors.isTransparent(id)) {
+        if (BlockTypeColors.getBlockSlab(id) > 0) {
             return false;
         }
         int style = BlockTypeColors.getBlockStyle(id);
@@ -461,13 +543,13 @@ public class LWJGLRenderLogic {
      * Whether {@code self}'s face toward the block at (x,y,z) is hidden and can be
      * skipped. Rules:
      * <ul>
-     * <li>A full opaque cube always hides the face.</li>
+     * <li>Only a cell-filling neighbour can hide the face; slabs, shaped blocks and
+     * LOD models never do (their gaps reveal the face behind).</li>
+     * <li>A cell-filling opaque cube always hides the face.</li>
      * <li>Two adjacent transparent blocks of the <em>same</em> id share an
      * internal face neither needs to draw (no overdraw inside a glass volume).</li>
-     * <li>A partial/transparent neighbour (glass, crystal, slab, shaped) only
-     * reveals the face behind it if that neighbour is itself exposed to air. A
-     * neighbour buried inside a solid mass hides the face — so fully-packed cores
-     * (e.g. system-block fill) draw no internal geometry, while a window still
+     * <li>A buried transparent cube (glass fill deep in a solid mass) hides the
+     * face behind it — the interior was already drawn opaque — while a window still
      * shows the hull directly behind the glass.</li>
      * </ul>
      */
@@ -477,11 +559,17 @@ public class LWJGLRenderLogic {
             return false;
         }
         short nid = n.getBlockID();
-        if (isFullOpaqueCube(nid)) {
-            return true;
+        if (!fillsCell(nid)) {
+            return false;
         }
+        if (!BlockTypeColors.isTransparent(nid)) {
+            return true; // solid full cube fully covers the face
+        }
+        // Cell-filling transparent cube (glass): same-id neighbours share an
+        // internal face, and a buried glass block doesn't reveal the interior
+        // behind it (already drawn opaque); an exposed window still does.
         short sid = self.getBlockID();
-        if (sid == nid && BlockTypeColors.isTransparent(sid)) {
+        if (sid == nid) {
             return true;
         }
         return !hasAirNeighbor(grid, x, y, z);
@@ -703,6 +791,11 @@ public class LWJGLRenderLogic {
      */
     public static void sortTransparentQuads(JGLObj obj, Point3f cam) {
         synchronized (obj) {
+            // Only the quad atlas mesh is sorted this way; LOD-model meshes are
+            // TRIANGLES (n/3, not n/4) and would be corrupted by the quad reorder.
+            if (obj.getMode() != JGLObj.QUADS) {
+                return;
+            }
             java.nio.FloatBuffer vb = obj.getVertexBuffer();
             if (vb == null) {
                 return;

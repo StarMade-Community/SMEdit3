@@ -42,6 +42,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
+import javax.swing.JTabbedPane;
 import javax.swing.JToolBar;
 import javax.swing.border.EmptyBorder;
 import smc.smedit.log.TextAreaLogHandler;
@@ -66,8 +67,6 @@ import smc.smedit.ui.act.file.SaveAsBlueprintAction1;
 import smc.smedit.ui.act.file.SaveAsFileAction;
 import smc.smedit.ui.act.file.SaveAsFileAction1;
 import smc.smedit.ui.act.view.AxisAction;
-import smc.smedit.ui.act.view.DontDrawAction;
-import smc.smedit.ui.act.view.PlainAction;
 import smc.smedit.ui.logic.ShipSpec;
 import smc.smedit.ui.logic.ShipTreeLogic;
 import smc.smedit.ui.lwjgl.LWJGLRenderPanel;
@@ -83,6 +82,8 @@ import java.io.File;
 import java.util.EnumSet;
 
 import io.github.andrewauclair.moderndocking.DockingRegion;
+import io.github.andrewauclair.moderndocking.DockableTabPreference;
+import io.github.andrewauclair.moderndocking.settings.Settings;
 import io.github.andrewauclair.moderndocking.ui.ToolbarLocation;
 import io.github.andrewauclair.moderndocking.app.AppState;
 import io.github.andrewauclair.moderndocking.app.Docking;
@@ -351,6 +352,17 @@ public class RenderFrame extends JFrame {
     private RootDockingPanel setupDocking(EditPanel editPanel) {
         Docking.initialize(this);
         DockingUI.initialize(); // FlatLaf-styled dock headers
+
+        // Group panels into tabs by default (Krita / web-browser style). TOP_ALWAYS
+        // gives every docked panel a persistent tab strip along its top edge, so the
+        // common way to combine two panels is to drop one onto the other's tab strip
+        // (or its centre): they merge into a single tabbed group where only one panel
+        // is visible at a time. Dropping on a panel *edge* still splits them side by
+        // side, so a side-by-side arrangement remains available when it's wanted.
+        // SCROLL_TAB_LAYOUT keeps the tab strip usable once several panels are stacked.
+        Settings.setDefaultTabPreference(DockableTabPreference.TOP_ALWAYS);
+        Settings.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
+
         // Enable the pin/collapse toolbars on the left, right and bottom edges so
         // panels can be minimized (auto-hidden) to an edge and re-expanded.
         RootDockingPanel dockRoot = new RootDockingPanel(this,
@@ -640,9 +652,7 @@ public class RenderFrame extends JFrame {
         menuEdit.add(prefs);
         menuEdit.add(new JSeparator());
         menuBar.add(menuView);
-        menuView.add(new JCheckBoxMenuItem(new PlainAction(this)));
         menuView.add(new JCheckBoxMenuItem(new AxisAction(this)));
-        menuView.add(new JCheckBoxMenuItem(new DontDrawAction(this)));
         JMenuItem resetCamItem = new JMenuItem("Reset Camera");
         resetCamItem.addActionListener(e -> getClient().resetCamera());
         menuView.add(resetCamItem);
