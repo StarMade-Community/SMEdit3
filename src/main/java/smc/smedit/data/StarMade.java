@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
+import smc.smedit.logic.LayerModel;
 import smc.smedit.logic.SelectionModel;
 import smc.smedit.mods.IBlocksPlugin;
 import smc.smedit.mods.IStarMadePluginFactory;
@@ -47,6 +48,7 @@ public class StarMade extends PCSBean {
     private Point3i mSelectedUpper;
     private Point3i mSelectedLower;
     private final SelectionModel mSelection = new SelectionModel();
+    private final LayerModel mLayers = new LayerModel();
     private String mStatusMessage;
     private IBlocksPlugin mViewFilter;
     private ShipSpec mCurrentModel;
@@ -120,6 +122,11 @@ public class StarMade extends PCSBean {
     /** The shared block-selection model (selection modes + the current selected set). */
     public SelectionModel getSelection() {
         return mSelection;
+    }
+
+    /** The shared layer/visibility model (block groups that can be hidden in the viewport). */
+    public LayerModel getLayers() {
+        return mLayers;
     }
 
     public short getSelectedBlockType() {

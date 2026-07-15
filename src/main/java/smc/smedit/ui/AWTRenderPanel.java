@@ -106,6 +106,16 @@ public class AWTRenderPanel extends RenderPanel {
             }
 
             @Override
+            public void mouseMoved(MouseEvent ev) {
+                reportHover(ev.getPoint());
+            }
+
+            @Override
+            public void mouseExited(MouseEvent ev) {
+                CursorStatus.get().report(null);
+            }
+
+            @Override
             public void mouseWheelMoved(MouseWheelEvent e) {
                 doMouseWheel(e.getWheelRotation());
             }
@@ -204,6 +214,19 @@ public class AWTRenderPanel extends RenderPanel {
         updateTransform();
     }
 
+    /** Reports the grid cell under the cursor to the status bar (software-renderer pick). */
+    private void reportHover(Point p) {
+        RenderPoly tile = getTileAt(p.x, p.y);
+        if (tile == null) {
+            CursorStatus.get().report(null);
+            return;
+        }
+        Point3i lower = new Point3i();
+        Point3i upper = new Point3i();
+        RenderPolyLogic.getBounds(tile, lower, upper);
+        CursorStatus.get().report(lower);
+    }
+
     private void extendSelection(RenderPoly tile) {
         Point3i lowest = new Point3i();
         Point3i highest = new Point3i();
@@ -283,6 +306,8 @@ public class AWTRenderPanel extends RenderPanel {
             } else {
                 mFilteredGrid = StarMadeLogic.getInstance().getViewFilter().modify(StarMadeLogic.getModel(), null, StarMadeLogic.getInstance(), null);
             }
+            // Drop blocks in hidden layers so face-culling exposes the revealed interior.
+            mFilteredGrid = StarMadeLogic.getInstance().getLayers().applyVisibility(mFilteredGrid);
         }
         RenderPolyLogic.fillPolys(mFilteredGrid, mTiles);
         Point3i lower = StarMadeLogic.getInstance().getSelectedLower();

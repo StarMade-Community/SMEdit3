@@ -1,9 +1,15 @@
 package smc.smedit.ui;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.FlowLayout;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
+import java.awt.RenderingHints;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -11,6 +17,9 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
@@ -20,9 +29,12 @@ import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.RowFilter;
 import javax.swing.RowSorter;
+import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
@@ -33,14 +45,14 @@ import smc.smedit.data.SparseMatrix;
 import smc.smedit.logic.SelectionModel;
 import smc.smedit.logic.StarMadeLogic;
 import smc.smedit.ship.data.Block;
-import smc.smedit.ui.BlockTypeColors;
 import smc.smedit.vecmath.Point3i;
 
 /**
  * Dockable panel that lists data for the current block selection. The selection
- * mode drives what a viewport click selects; the view toggle switches between a
+ * mode drives what a viewport click selects; the group toggle switches between a
  * per-block table and a by-type summary; the detail control widens the columns;
- * the filter narrows visible rows.
+ * the filter narrows visible rows. Summary chips give the running block / type /
+ * HP totals, and the Name column carries a colour dot for the block type.
  */
 @SuppressWarnings("serial")
 public class BlockInfoPanel extends JPanel {
@@ -49,21 +61,27 @@ public class BlockInfoPanel extends JPanel {
     private final JComboBox<String> mViewBox = new JComboBox<>(new String[]{"Per-block", "By type"});
     private final JComboBox<String> mDetailBox = new JComboBox<>(new String[]{"Basic", "Full"});
     private final JTextField mFilter = new JTextField(12);
-    private final JLabel mSummary = new JLabel(" ");
     private final JTable mTable = new JTable();
+    private final Chip mBlocksChip = new Chip();
+    private final Chip mTypesChip = new Chip();
+    private final Chip mHpChip = new Chip();
     private boolean mSyncingMode;
 
     public BlockInfoPanel() {
-        super(new BorderLayout(4, 4));
-        setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
-        // Don't let the FlowLayout control row dictate a wide minimum — otherwise,
-        // when tabbed with the Brush panel, the whole group can't be shrunk. The
-        // controls wrap to more rows when the panel is narrow.
+        super(new BorderLayout(0, 6));
+        setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        // Don't let the header dictate a wide minimum — otherwise, when tabbed with
+        // the Brush panel, the whole group can't be shrunk.
         setMinimumSize(new Dimension(150, 0));
-        buildControls();
+
+        add(buildHeader(), BorderLayout.NORTH);
+
         mTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-        add(new JScrollPane(mTable), BorderLayout.CENTER);
-        add(mSummary, BorderLayout.SOUTH);
+        mTable.setShowVerticalLines(false);
+        mTable.setRowHeight(Math.max(mTable.getRowHeight(), 20));
+        JScrollPane scroll = new JScrollPane(mTable);
+        scroll.setBorder(BorderFactory.createLineBorder(hairline()));
+        add(scroll, BorderLayout.CENTER);
 
         SelectionModel sel = StarMadeLogic.getInstance().getSelection();
         syncModeBox(sel.getMode());
@@ -72,19 +90,52 @@ public class BlockInfoPanel extends JPanel {
         rebuild();
     }
 
-    private void buildControls() {
-        JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
-        top.add(new JLabel("Mode:"));
-        top.add(mModeBox);
-        top.add(new JLabel("View:"));
-        top.add(mViewBox);
-        top.add(new JLabel("Detail:"));
-        top.add(mDetailBox);
-        top.add(new JLabel("Filter:"));
-        top.add(mFilter);
+    private JPanel buildHeader() {
+        JPanel header = new JPanel();
+        header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
+
+        header.add(sectionLabel("Selection"));
+
+        // Mode / Group / Detail in a compact two-column grid so the controls stack
+        // and stay full-width when the dock is narrow.
+        JPanel controls = new JPanel(new GridBagLayout());
+        controls.setAlignmentX(Component.LEFT_ALIGNMENT);
+        GridBagConstraints gc = new GridBagConstraints();
+        gc.insets = new Insets(2, 0, 2, 6);
+        gc.anchor = GridBagConstraints.WEST;
+        addControlRow(controls, gc, 0, "Mode", mModeBox);
+        addControlRow(controls, gc, 1, "Group", mViewBox);
+        addControlRow(controls, gc, 2, "Detail", mDetailBox);
+        controls.setMaximumSize(new Dimension(Integer.MAX_VALUE, controls.getPreferredSize().height));
+        header.add(controls);
+
+        // Summary chips.
+        JPanel chips = new JPanel();
+        chips.setLayout(new BoxLayout(chips, BoxLayout.X_AXIS));
+        chips.setAlignmentX(Component.LEFT_ALIGNMENT);
+        chips.setBorder(BorderFactory.createEmptyBorder(8, 0, 6, 0));
+        chips.add(mBlocksChip);
+        chips.add(Box.createHorizontalStrut(6));
+        chips.add(mTypesChip);
+        chips.add(Box.createHorizontalStrut(6));
+        chips.add(mHpChip);
+        chips.add(Box.createHorizontalGlue());
+        chips.setMaximumSize(new Dimension(Integer.MAX_VALUE, chips.getPreferredSize().height));
+        header.add(chips);
+
+        // Filter row.
+        JPanel filterRow = new JPanel(new BorderLayout(6, 0));
+        filterRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JLabel filterIcon = new JLabel("🔍"); // magnifier
+        filterIcon.setForeground(muted());
+        mFilter.putClientProperty("JTextField.placeholderText", "Filter rows…");
+        filterRow.add(filterIcon, BorderLayout.WEST);
+        filterRow.add(mFilter, BorderLayout.CENTER);
         JButton clear = new JButton("Clear");
-        top.add(clear);
-        add(top, BorderLayout.NORTH);
+        clear.setToolTipText("Clear the selection");
+        filterRow.add(clear, BorderLayout.EAST);
+        filterRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, filterRow.getPreferredSize().height));
+        header.add(filterRow);
 
         mModeBox.addActionListener(e -> {
             if (mSyncingMode) {
@@ -102,6 +153,23 @@ public class BlockInfoPanel extends JPanel {
         mDetailBox.addActionListener(e -> rebuild());
         mFilter.getDocument().addDocumentListener(new SimpleDoc(this::applyFilter));
         clear.addActionListener(e -> StarMadeLogic.getInstance().getSelection().clear());
+
+        return header;
+    }
+
+    private static void addControlRow(JPanel grid, GridBagConstraints gc, int row, String label, Component field) {
+        gc.gridx = 0;
+        gc.gridy = row;
+        gc.weightx = 0;
+        gc.fill = GridBagConstraints.NONE;
+        JLabel l = new JLabel(label.toUpperCase());
+        l.setForeground(muted());
+        l.setFont(l.getFont().deriveFont(l.getFont().getSize() - 1f));
+        grid.add(l, gc);
+        gc.gridx = 1;
+        gc.weightx = 1;
+        gc.fill = GridBagConstraints.HORIZONTAL;
+        grid.add(field, gc);
     }
 
     private void syncModeBox(SelectionModel.Mode mode) {
@@ -110,7 +178,7 @@ public class BlockInfoPanel extends JPanel {
         mSyncingMode = false;
     }
 
-    /** Rebuilds the table from the current selection, view and detail settings. */
+    /** Rebuilds the table from the current selection, group and detail settings. */
     private void rebuild() {
         SelectionModel sel = StarMadeLogic.getInstance().getSelection();
         syncModeBox(sel.getMode());
@@ -144,12 +212,32 @@ public class BlockInfoPanel extends JPanel {
         }
         mTable.setModel(dm);
         mTable.setRowSorter(new TableRowSorter<>(dm));
+        installNameDot();
         applyFilter();
         packColumns();
 
         int types = distinctTypeCount(selected, grid);
-        mSummary.setText(selected.size() + " block" + (selected.size() == 1 ? "" : "s")
-                + ", " + types + " type" + (types == 1 ? "" : "s"));
+        long hp = totalHp(selected, grid);
+        mBlocksChip.set(selected.size(), selected.size() == 1 ? "block" : "blocks");
+        mTypesChip.set(types, types == 1 ? "type" : "types");
+        mHpChip.set(hp, "HP");
+    }
+
+    /** Attaches the colour-dot renderer to the Name column (if present). */
+    private void installNameDot() {
+        int nameCol = columnIndex("Name");
+        if (nameCol >= 0) {
+            mTable.getColumnModel().getColumn(nameCol).setCellRenderer(new ColorDotRenderer());
+        }
+    }
+
+    private int columnIndex(String header) {
+        for (int c = 0; c < mTable.getColumnCount(); c++) {
+            if (header.equals(mTable.getColumnName(c))) {
+                return c;
+            }
+        }
+        return -1;
     }
 
     private List<Object[]> perBlockRows(List<Point3i> selected, SparseMatrix<Block> grid, boolean full) {
@@ -224,6 +312,20 @@ public class BlockInfoPanel extends JPanel {
         return ids.size();
     }
 
+    private long totalHp(List<Point3i> selected, SparseMatrix<Block> grid) {
+        if (grid == null) {
+            return 0;
+        }
+        long hp = 0;
+        for (Point3i p : selected) {
+            Block b = grid.get(p);
+            if (b != null) {
+                hp += b.getHitPoints();
+            }
+        }
+        return hp;
+    }
+
     /**
      * Sizes each column to fit its header and cells (up to a cap; overflow scrolls
      * horizontally). Columns stay user-resizable — this just gives a readable
@@ -242,7 +344,7 @@ public class BlockInfoPanel extends JPanel {
                 Component c = mTable.prepareRenderer(mTable.getCellRenderer(row, col), row, col);
                 width = Math.max(width, c.getPreferredSize().width);
             }
-            width += 12; // breathing room
+            width += 14; // breathing room (+ dot for the Name column)
             column.setPreferredWidth(Math.min(width, 600));
         }
     }
@@ -297,6 +399,105 @@ public class BlockInfoPanel extends JPanel {
 
     private static String yesNo(boolean b) {
         return b ? "Yes" : "";
+    }
+
+    private static Color muted() {
+        Color c = UIManager.getColor("Label.disabledForeground");
+        return c != null ? c : new Color(0x88, 0x8D, 0x98);
+    }
+
+    private static Color hairline() {
+        Color c = UIManager.getColor("Component.borderColor");
+        return c != null ? c : new Color(0x3A, 0x3D, 0x41);
+    }
+
+    private static JLabel sectionLabel(String text) {
+        JLabel l = new JLabel(text.toUpperCase());
+        l.setAlignmentX(Component.LEFT_ALIGNMENT);
+        l.setForeground(muted());
+        l.setFont(l.getFont().deriveFont(l.getFont().getSize() - 1f));
+        l.setBorder(BorderFactory.createEmptyBorder(2, 1, 4, 0));
+        l.setHorizontalAlignment(SwingConstants.LEFT);
+        return l;
+    }
+
+    /** A rounded summary pill like the prototype's chips: bold value + muted unit. */
+    private static final class Chip extends JLabel {
+        Chip() {
+            setBorder(BorderFactory.createEmptyBorder(3, 10, 3, 10));
+            setForeground(muted());
+        }
+
+        void set(long value, String unit) {
+            setText("<html><b>" + String.format("%,d", value) + "</b> " + unit + "</html>");
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(hairline());
+            g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, getHeight(), getHeight());
+            g2.dispose();
+            super.paintComponent(g);
+        }
+
+        @Override
+        public Dimension getMaximumSize() {
+            return getPreferredSize();
+        }
+    }
+
+    /** Small rounded colour square drawn before the block name. */
+    private static final class SquareIcon implements Icon {
+        private final Color color;
+
+        SquareIcon(Color color) {
+            this.color = color;
+        }
+
+        @Override
+        public void paintIcon(Component c, Graphics g, int x, int y) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(color);
+            g2.fillRoundRect(x, y, 10, 10, 3, 3);
+            g2.setColor(hairline());
+            g2.drawRoundRect(x, y, 10, 10, 3, 3);
+            g2.dispose();
+        }
+
+        @Override
+        public int getIconWidth() {
+            return 12;
+        }
+
+        @Override
+        public int getIconHeight() {
+            return 10;
+        }
+    }
+
+    /** Name-column renderer that prefixes each row with the block type's colour. */
+    private static final class ColorDotRenderer extends DefaultTableCellRenderer {
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean sel,
+                boolean focus, int row, int col) {
+            super.getTableCellRendererComponent(table, value, sel, focus, row, col);
+            Object idVal = null;
+            for (int c = 0; c < table.getColumnCount(); c++) {
+                if ("ID".equals(table.getColumnName(c))) {
+                    idVal = table.getValueAt(row, c);
+                    break;
+                }
+            }
+            if (idVal instanceof Number) {
+                setIcon(new SquareIcon(BlockTypeColors.getFillColor(((Number) idVal).shortValue())));
+            } else {
+                setIcon(null);
+            }
+            return this;
+        }
     }
 
     /** DocumentListener that runs one action on any text change. */

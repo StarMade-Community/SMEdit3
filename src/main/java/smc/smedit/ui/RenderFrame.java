@@ -262,6 +262,7 @@ public class RenderFrame extends JFrame {
     private DockPanel mBrushDock;
     private DockPanel mConsoleDock;
     private DockPanel mBlockInfoDock;
+    private DockPanel mLayersDock;
     private DockPanel mShelfDock;
     private ToolShelf mShelf;
     private JMenu mWindowMenu;
@@ -403,7 +404,8 @@ public class RenderFrame extends JFrame {
         mViewportDock = new DockPanel("viewport", "Viewport", getClient(), false, false, false);
         mBrushDock = new DockPanel("brush", "Brush", brushPanel, true, true, true);
         mConsoleDock = new DockPanel("console", "Console", textScroll, true, true, true);
-        mBlockInfoDock = new DockPanel("blockinfo", "Selection", new BlockInfoPanel(), true, true, true);
+        mBlockInfoDock = new DockPanel("blockinfo", "Inspector", new BlockInfoPanel(), true, true, true);
+        mLayersDock = new DockPanel("layers", "Layers", new LayersPanel(getClient()), true, true, true);
         // Maya-style shelf: every block plugin ("function") as an icon button,
         // grouped into horizontally-scrollable tabs. Movable/floatable like the rest.
         mShelf = new ToolShelf(getClient());
@@ -421,6 +423,9 @@ public class RenderFrame extends JFrame {
         Docking.dock(mConsoleDock, this, DockingRegion.SOUTH, 0.22);
         Docking.dock(mBrushDock, mViewportDock, DockingRegion.WEST, 0.20);
         Docking.dock(mBlockInfoDock, mViewportDock, DockingRegion.EAST, 0.22);
+        // Tab the Layers panel onto the Inspector (same right flank, like the
+        // prototype's Inspector/Layers tabs).
+        Docking.dock(mLayersDock, mBlockInfoDock, DockingRegion.CENTER);
 
         // Remember this arrangement as the default, restore a saved layout if one
         // exists, then keep the layout persisted across runs (workspace memory).
@@ -446,6 +451,19 @@ public class RenderFrame extends JFrame {
                     Docking.dock(mShelfDock, this, DockingRegion.NORTH, SHELF_SPLIT);
                 }
                 StarMadeLogic.setProperty("shelf.introduced", true);
+            }
+            // Same one-time migration for the Layers panel: users with a saved
+            // layout from before it existed won't have it, so restore() leaves it
+            // hidden. Tab it onto the Inspector once, then respect the saved state.
+            if (!StarMadeLogic.isProperty("layers.introduced")) {
+                if (!Docking.isDocked(mLayersDock)) {
+                    if (Docking.isDocked(mBlockInfoDock)) {
+                        Docking.dock(mLayersDock, mBlockInfoDock, DockingRegion.CENTER);
+                    } else {
+                        Docking.dock(mLayersDock, mViewportDock, DockingRegion.EAST, 0.22);
+                    }
+                }
+                StarMadeLogic.setProperty("layers.introduced", true);
             }
         } catch (Exception e) {
             log.log(Level.WARNING, "Could not restore docking layout; using default.", e);
@@ -489,10 +507,12 @@ public class RenderFrame extends JFrame {
         JCheckBoxMenuItem brushToggle = panelToggle(mBrushDock, DockingRegion.WEST, 0.20);
         JCheckBoxMenuItem consoleToggle = panelToggle(mConsoleDock, DockingRegion.SOUTH, 0.25);
         JCheckBoxMenuItem blockInfoToggle = panelToggle(mBlockInfoDock, DockingRegion.EAST, 0.2);
+        JCheckBoxMenuItem layersToggle = panelToggle(mLayersDock, DockingRegion.EAST, 0.2);
         mWindowMenu.add(shelfToggle);
         mWindowMenu.add(brushToggle);
         mWindowMenu.add(consoleToggle);
         mWindowMenu.add(blockInfoToggle);
+        mWindowMenu.add(layersToggle);
         mWindowMenu.addSeparator();
         JMenuItem reset = new JMenuItem("Reset Layout");
         reset.addActionListener(e -> resetLayout());
@@ -508,6 +528,7 @@ public class RenderFrame extends JFrame {
                 brushToggle.setSelected(Docking.isDocked(mBrushDock));
                 consoleToggle.setSelected(Docking.isDocked(mConsoleDock));
                 blockInfoToggle.setSelected(Docking.isDocked(mBlockInfoDock));
+                layersToggle.setSelected(Docking.isDocked(mLayersDock));
             }
             @Override public void menuDeselected(javax.swing.event.MenuEvent e) { }
             @Override public void menuCanceled(javax.swing.event.MenuEvent e) { }

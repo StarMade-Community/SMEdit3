@@ -1,13 +1,13 @@
 /**
  * Copyright 2014 SMEdit https://github.com/StarMade/SMEdit SMTools
  * https://github.com/StarMade/SMTools
- *
+ * <p>
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -16,37 +16,18 @@
  */
 package smc.smedit.ui.shelf;
 
-import java.awt.BorderLayout;
-import java.awt.Font;
-import java.awt.Insets;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
-import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JScrollBar;
-import javax.swing.JScrollPane;
-import javax.swing.JTabbedPane;
-import javax.swing.JToolBar;
-import javax.swing.SwingConstants;
-import javax.swing.SwingUtilities;
-
 import smc.smedit.logic.StarMadeLogic;
 import smc.smedit.mods.IBlocksPlugin;
 import smc.smedit.ui.RenderPanel;
 import smc.smedit.ui.act.plugin.BlocksPluginAction;
 import smc.smedit.ui.logic.ShipSpec;
+
+import javax.swing.*;
+import java.awt.*;
+import java.util.*;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * A Maya-shelf-style tool palette: the editor's block plugins ("functions") are
@@ -73,44 +54,20 @@ public class ToolShelf extends JPanel {
 
     private static final Logger log = Logger.getLogger(ToolShelf.class.getName());
 
-    /** Glyph size (px) for the shelf buttons. */
+    /**
+     * Glyph size (px) for the shelf buttons.
+     */
     private static final int ICON_SIZE = 22;
 
-    /** Preferred left-to-right tab order; unlisted categories are appended, sorted. */
-    private static final List<String> CATEGORY_ORDER = Arrays.asList(
-            "Select", "Clipboard", "Transform", "Build", "Surface", "Paint",
-            "Shape", "Generate", "Import", "Export", "Macro", "Info",
-            "Edit", "Modify", "View", "File", "General");
+    /**
+     * Preferred left-to-right tab order; unlisted categories are appended, sorted.
+     */
+    private static final List<String> CATEGORY_ORDER = Arrays.asList("Select", "Clipboard", "Transform", "Build", "Surface", "Paint", "Shape", "Generate", "Import", "Export", "Macro", "Info", "Edit", "Modify", "View", "File", "General");
 
-    /** Keyword (lower-case, substring) → category, tested in order. */
-    private static final String[][] KEYWORD_CATEGORIES = {
-        {"select", "Select"},
-        {"copy", "Clipboard"},
-        {"cut", "Clipboard"},
-        {"paste", "Clipboard"},
-        {"delete", "Clipboard"},
-        {"move", "Transform"},
-        {"rotate", "Transform"},
-        {"scale", "Transform"},
-        {"reflect", "Transform"},
-        {"symmetr", "Transform"},
-        {"duplicate", "Transform"},
-        {"mirror", "Transform"},
-        {"fill", "Build"},
-        {"deck", "Build"},
-        {"hollow", "Build"},
-        {"hull", "Build"},
-        {"smooth", "Surface"},
-        {"soften", "Surface"},
-        {"harden", "Surface"},
-        {"replace", "Paint"},
-        {"stripe", "Paint"},
-        {"ombre", "Paint"},
-        {"text", "Paint"},
-        {"image", "Paint"},
-        {"report", "Info"},
-        {"propert", "Info"},
-    };
+    /**
+     * Keyword (lower-case, substring) → category, tested in order.
+     */
+    private static final String[][] KEYWORD_CATEGORIES = {{"select", "Select"}, {"copy", "Clipboard"}, {"cut", "Clipboard"}, {"paste", "Clipboard"}, {"delete", "Clipboard"}, {"move", "Transform"}, {"rotate", "Transform"}, {"scale", "Transform"}, {"reflect", "Transform"}, {"symmetr", "Transform"}, {"duplicate", "Transform"}, {"mirror", "Transform"}, {"fill", "Build"}, {"deck", "Build"}, {"hollow", "Build"}, {"hull", "Build"}, {"smooth", "Surface"}, {"soften", "Surface"}, {"harden", "Surface"}, {"replace", "Paint"}, {"stripe", "Paint"}, {"ombre", "Paint"}, {"text", "Paint"}, {"image", "Paint"}, {"report", "Info"}, {"propert", "Info"},};
 
     private final transient RenderPanel client;
     private final JTabbedPane tabs;
@@ -118,14 +75,147 @@ public class ToolShelf extends JPanel {
     public ToolShelf(RenderPanel client) {
         super(new BorderLayout());
         this.client = client;
-        tabs = new JTabbedPane(JTabbedPane.TOP, JTabbedPane.SCROLL_TAB_LAYOUT);
+        tabs = new JTabbedPane(SwingConstants.TOP, JTabbedPane.SCROLL_TAB_LAYOUT);
         tabs.setFocusable(false);
         add(tabs, BorderLayout.CENTER);
         rebuild();
 
         // A different model may expose a different tool set; rebuild when it changes.
-        StarMadeLogic.getInstance().addPropertyChangeListener("currentModel",
-                e -> SwingUtilities.invokeLater(this::rebuild));
+        StarMadeLogic.getInstance().addPropertyChangeListener("currentModel", e -> SwingUtilities.invokeLater(this::rebuild));
+    }
+
+    /**
+     * Classification of the current model, or {@code TYPE_ALL} if none is loaded.
+     */
+    private static int currentType() {
+        ShipSpec spec = StarMadeLogic.getInstance().getCurrentModel();
+        return spec != null ? spec.getClassification() : IBlocksPlugin.TYPE_ALL;
+    }
+
+    /**
+     * The shelf tab a tool belongs in. Precedence: a {@code Group/Name} prefix,
+     * then view-only tools, then a keyword match, then the plugin subtype.
+     */
+    static String categoryOf(IBlocksPlugin plugin) {
+        String name = plugin.getName();
+        if (name == null) {
+            name = "";
+        }
+        int slash = name.indexOf('/');
+        if (slash > 0) {
+            return name.substring(0, slash).trim();
+        }
+        Set<Integer> subtypes = subtypesOf(plugin);
+        if (subtypes.size() == 1 && subtypes.contains(IBlocksPlugin.SUBTYPE_VIEW)) {
+            return "View";
+        }
+        String lower = name.toLowerCase();
+        for (String[] entry : KEYWORD_CATEGORIES) {
+            if (lower.contains(entry[0])) {
+                return entry[1];
+            }
+        }
+        return subtypeCategory(subtypes);
+    }
+
+    /**
+     * Distinct subtype ids declared by the plugin, resilient to bad plugins.
+     */
+    private static Set<Integer> subtypesOf(IBlocksPlugin plugin) {
+        Set<Integer> subtypes = new LinkedHashSet<>();
+        try {
+            int[][] classifications = plugin.getClassifications();
+            if (classifications != null) {
+                for (int[] classification : classifications) {
+                    if (classification != null && classification.length > 1) {
+                        subtypes.add(classification[1]);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.log(Level.FINE, "plugin getClassifications() failed", e);
+        }
+        return subtypes;
+    }
+
+    // ------------------------------------------------------------------
+    // Categorisation
+    // ------------------------------------------------------------------
+
+    /**
+     * Fallback category from a tool's subtype(s); universal tools go to General.
+     */
+    private static String subtypeCategory(Set<Integer> subtypes) {
+        if (subtypes.size() >= 4) {
+            return "General";
+        }
+        if (subtypes.contains(IBlocksPlugin.SUBTYPE_MODIFY)) {
+            return "Modify";
+        }
+        if (subtypes.contains(IBlocksPlugin.SUBTYPE_PAINT)) {
+            return "Paint";
+        }
+        if (subtypes.contains(IBlocksPlugin.SUBTYPE_GENERATE)) {
+            return "Generate";
+        }
+        if (subtypes.contains(IBlocksPlugin.SUBTYPE_EDIT)) {
+            return "Edit";
+        }
+        if (subtypes.contains(IBlocksPlugin.SUBTYPE_FILE)) {
+            return "File";
+        }
+        if (subtypes.contains(IBlocksPlugin.SUBTYPE_VIEW)) {
+            return "View";
+        }
+        return "General";
+    }
+
+    /**
+     * Orders the present categories by {@link #CATEGORY_ORDER}, extras appended sorted.
+     */
+    private static List<String> orderCategories(Set<String> present) {
+        List<String> ordered = new ArrayList<>();
+        for (String category : CATEGORY_ORDER) {
+            if (present.contains(category)) {
+                ordered.add(category);
+            }
+        }
+        List<String> extras = new ArrayList<>();
+        for (String category : present) {
+            if (!CATEGORY_ORDER.contains(category)) {
+                extras.add(category);
+            }
+        }
+        Collections.sort(extras);
+        ordered.addAll(extras);
+        return ordered;
+    }
+
+    /**
+     * Button label: the part after any {@code Group/} prefix, minus a trailing ellipsis.
+     */
+    private static String shortLabel(String name) {
+        if (name == null) {
+            return "";
+        }
+        int slash = name.lastIndexOf('/');
+        String label = (slash >= 0 ? name.substring(slash + 1) : name).trim();
+        label = label.replace("…", "");
+        while (label.endsWith(".")) {
+            label = label.substring(0, label.length() - 1);
+        }
+        return label.trim();
+    }
+
+    /**
+     * Tooltip: the tool's description, falling back to its full name.
+     */
+    private static String tooltip(IBlocksPlugin plugin) {
+        String description = plugin.getDescription();
+        if (description != null && !description.trim().isEmpty()) {
+            return description;
+        }
+        return plugin.getName();
     }
 
     /**
@@ -134,8 +224,7 @@ public class ToolShelf extends JPanel {
      * from the EDT at any time.
      */
     public final void rebuild() {
-        String selected = tabs.getSelectedIndex() >= 0
-                ? tabs.getTitleAt(tabs.getSelectedIndex()) : null;
+        String selected = tabs.getSelectedIndex() >= 0 ? tabs.getTitleAt(tabs.getSelectedIndex()) : null;
         tabs.removeAll();
 
         List<IBlocksPlugin> plugins;
@@ -175,7 +264,9 @@ public class ToolShelf extends JPanel {
         repaint();
     }
 
-    /** A single tab: one horizontally-scrolling row of tool buttons. */
+    /**
+     * A single tab: one horizontally-scrolling row of tool buttons.
+     */
     private JComponent buildStrip(String category, List<IBlocksPlugin> tools) {
         JToolBar strip = new JToolBar();
         strip.setFloatable(false);
@@ -185,9 +276,7 @@ public class ToolShelf extends JPanel {
             strip.add(makeButton(category, plugin));
         }
 
-        JScrollPane scroll = new JScrollPane(strip,
-                JScrollPane.VERTICAL_SCROLLBAR_NEVER,
-                JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        JScrollPane scroll = new JScrollPane(strip, ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         scroll.setBorder(null);
         scroll.getHorizontalScrollBar().setUnitIncrement(24);
         // Let the mouse wheel scroll the row sideways (there is no vertical axis).
@@ -198,7 +287,9 @@ public class ToolShelf extends JPanel {
         return scroll;
     }
 
-    /** An icon-over-label button that runs the plugin via {@link BlocksPluginAction}. */
+    /**
+     * An icon-over-label button that runs the plugin via {@link BlocksPluginAction}.
+     */
     private JButton makeButton(String category, IBlocksPlugin plugin) {
         JButton button = new JButton(new BlocksPluginAction(client, plugin));
         button.setText(shortLabel(plugin.getName()));
@@ -208,130 +299,8 @@ public class ToolShelf extends JPanel {
         button.setHorizontalTextPosition(SwingConstants.CENTER);
         button.setIconTextGap(2);
         button.setFocusable(false);
-        button.setFont(button.getFont().deriveFont(Font.PLAIN, 10f));
+        button.setFont(button.getFont().deriveFont(Font.PLAIN, 10.0f));
         button.setMargin(new Insets(4, 6, 4, 6));
         return button;
-    }
-
-    // ------------------------------------------------------------------
-    // Categorisation
-    // ------------------------------------------------------------------
-
-    /** Classification of the current model, or {@code TYPE_ALL} if none is loaded. */
-    private static int currentType() {
-        ShipSpec spec = StarMadeLogic.getInstance().getCurrentModel();
-        return spec != null ? spec.getClassification() : IBlocksPlugin.TYPE_ALL;
-    }
-
-    /**
-     * The shelf tab a tool belongs in. Precedence: a {@code Group/Name} prefix,
-     * then view-only tools, then a keyword match, then the plugin subtype.
-     */
-    static String categoryOf(IBlocksPlugin plugin) {
-        String name = plugin.getName();
-        if (name == null) {
-            name = "";
-        }
-        int slash = name.indexOf('/');
-        if (slash > 0) {
-            return name.substring(0, slash).trim();
-        }
-        Set<Integer> subtypes = subtypesOf(plugin);
-        if (subtypes.size() == 1 && subtypes.contains(IBlocksPlugin.SUBTYPE_VIEW)) {
-            return "View";
-        }
-        String lower = name.toLowerCase();
-        for (String[] entry : KEYWORD_CATEGORIES) {
-            if (lower.contains(entry[0])) {
-                return entry[1];
-            }
-        }
-        return subtypeCategory(subtypes);
-    }
-
-    /** Distinct subtype ids declared by the plugin, resilient to bad plugins. */
-    private static Set<Integer> subtypesOf(IBlocksPlugin plugin) {
-        Set<Integer> subtypes = new LinkedHashSet<>();
-        try {
-            int[][] classifications = plugin.getClassifications();
-            if (classifications != null) {
-                for (int[] classification : classifications) {
-                    if (classification != null && classification.length > 1) {
-                        subtypes.add(classification[1]);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.log(Level.FINE, "plugin getClassifications() failed", e);
-        }
-        return subtypes;
-    }
-
-    /** Fallback category from a tool's subtype(s); universal tools go to General. */
-    private static String subtypeCategory(Set<Integer> subtypes) {
-        if (subtypes.size() >= 4) {
-            return "General";
-        }
-        if (subtypes.contains(IBlocksPlugin.SUBTYPE_MODIFY)) {
-            return "Modify";
-        }
-        if (subtypes.contains(IBlocksPlugin.SUBTYPE_PAINT)) {
-            return "Paint";
-        }
-        if (subtypes.contains(IBlocksPlugin.SUBTYPE_GENERATE)) {
-            return "Generate";
-        }
-        if (subtypes.contains(IBlocksPlugin.SUBTYPE_EDIT)) {
-            return "Edit";
-        }
-        if (subtypes.contains(IBlocksPlugin.SUBTYPE_FILE)) {
-            return "File";
-        }
-        if (subtypes.contains(IBlocksPlugin.SUBTYPE_VIEW)) {
-            return "View";
-        }
-        return "General";
-    }
-
-    /** Orders the present categories by {@link #CATEGORY_ORDER}, extras appended sorted. */
-    private static List<String> orderCategories(Set<String> present) {
-        List<String> ordered = new ArrayList<>();
-        for (String category : CATEGORY_ORDER) {
-            if (present.contains(category)) {
-                ordered.add(category);
-            }
-        }
-        List<String> extras = new ArrayList<>();
-        for (String category : present) {
-            if (!CATEGORY_ORDER.contains(category)) {
-                extras.add(category);
-            }
-        }
-        Collections.sort(extras);
-        ordered.addAll(extras);
-        return ordered;
-    }
-
-    /** Button label: the part after any {@code Group/} prefix, minus a trailing ellipsis. */
-    private static String shortLabel(String name) {
-        if (name == null) {
-            return "";
-        }
-        int slash = name.lastIndexOf('/');
-        String label = (slash >= 0 ? name.substring(slash + 1) : name).trim();
-        label = label.replace("…", "");
-        while (label.endsWith(".")) {
-            label = label.substring(0, label.length() - 1);
-        }
-        return label.trim();
-    }
-
-    /** Tooltip: the tool's description, falling back to its full name. */
-    private static String tooltip(IBlocksPlugin plugin) {
-        String description = plugin.getDescription();
-        if (description != null && !description.trim().isEmpty()) {
-            return description;
-        }
-        return plugin.getName();
     }
 }

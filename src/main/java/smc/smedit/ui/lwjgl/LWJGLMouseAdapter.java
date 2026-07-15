@@ -74,6 +74,18 @@ public class LWJGLMouseAdapter extends MouseAdapter {
     }
 
     @Override
+    public void mouseMoved(MouseEvent ev) {
+        // Live status-bar readout: report the grid cell under the cursor (same pick
+        // the tools use). Only fires with no button down, so it never fights a stroke.
+        smc.smedit.ui.CursorStatus.get().report(mPanel.getPointAt(ev.getX(), ev.getY()));
+    }
+
+    @Override
+    public void mouseExited(MouseEvent ev) {
+        smc.smedit.ui.CursorStatus.get().report(null);
+    }
+
+    @Override
     public void mouseWheelMoved(MouseWheelEvent e) {
         doMouseWheel(e.getWheelRotation());
     }

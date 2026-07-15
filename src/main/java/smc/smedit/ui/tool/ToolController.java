@@ -102,6 +102,14 @@ public final class ToolController {
 
         default void activeBlockChanged(short blockId) {
         }
+
+        /**
+         * The grid was changed by an edit stroke (build / erase / paint / fill), so
+         * aggregate readouts (block count, type count, dimensions) may be stale.
+         * Fired once per completed edit, not per touched cell.
+         */
+        default void modelEdited() {
+        }
     }
 
     private static final ToolController INSTANCE = new ToolController();
@@ -122,7 +130,7 @@ public final class ToolController {
     private boolean symX;
     private boolean symY;
     private boolean symZ;
-    private boolean floodDiagonals;         // double-click flood spreads through edge/corner touches too
+    private boolean floodDiagonals = true;         // double-click flood spreads through edge/corner touches too
     private boolean stroking;               // between press and release of an edit stroke
 
     private final List<Listener> listeners = new ArrayList<>();
@@ -354,6 +362,7 @@ public final class ToolController {
                 break;
             case FILL:
                 fillAt(hit, renderer);
+                fireEdited();
                 break;
             case PICKER:
                 pick(hit);
@@ -399,7 +408,18 @@ public final class ToolController {
 
     /** Left-button release: ends any in-progress stroke. */
     public void onRelease() {
+        boolean wasStroke = stroking;
         stroking = false;
+        if (wasStroke) {
+            fireEdited();
+        }
+    }
+
+    /** Notifies listeners that the grid changed, so status readouts can refresh. */
+    private void fireEdited() {
+        for (Listener l : new ArrayList<>(listeners)) {
+            l.modelEdited();
+        }
     }
 
     // ------------------------------------------------------------------

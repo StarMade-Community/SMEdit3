@@ -268,6 +268,8 @@ public class LWJGLRenderPanel extends RenderPanel {
         } else {
             mFilteredGrid = StarMadeLogic.getInstance().getViewFilter().modify(StarMadeLogic.getModel(), null, StarMadeLogic.getInstance(), null);
         }
+        // Drop blocks in hidden layers so face-culling exposes the revealed interior.
+        mFilteredGrid = StarMadeLogic.getInstance().getLayers().applyVisibility(mFilteredGrid);
         updateAxis();
         updateGrid();
         mBlocks.getChildren().clear();
