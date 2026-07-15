@@ -986,10 +986,17 @@ public class BlockTypeColors {
     public static final java.util.Set<Short> BLOCK_TRANSPARENT = new java.util.HashSet<>();
     /** Blocks flagged {@code <Deprecated>true} in BlockConfig.xml (removed from the game). */
     public static final java.util.Set<Short> BLOCK_DEPRECATED = new java.util.HashSet<>();
+    /** Blocks that are neither buyable ({@code <InShop>}) nor craftable ({@code <ProducedInFactory>}). */
+    public static final java.util.Set<Short> BLOCK_UNOBTAINABLE = new java.util.HashSet<>();
 
     /** @return whether a block is deprecated (no longer obtainable in-game). */
     public static boolean isDeprecated(short blockID) {
         return BLOCK_DEPRECATED.contains(blockID);
+    }
+
+    /** @return whether a block can be bought in a shop or crafted in a factory. */
+    public static boolean isObtainable(short blockID) {
+        return !BLOCK_UNOBTAINABLE.contains(blockID);
     }
 
     /** @return whether a block is transparent (renders in the blended, non-occluding pass). */
@@ -1190,6 +1197,12 @@ public class BlockTypeColors {
                 // pickers can hide them.
                 String deprecatedTag = XMLUtils.getTextTag(n, "Deprecated");
                 boolean deprecated = deprecatedTag != null && "true".equalsIgnoreCase(deprecatedTag.trim());
+                // Obtainable = buyable in a shop OR craftable in a factory
+                // (<ProducedInFactory> is a factory-type id; 0 = not produced).
+                String inShopTag = XMLUtils.getTextTag(n, "InShop");
+                boolean inShop = inShopTag != null && "true".equalsIgnoreCase(inShopTag.trim());
+                int producedInFactory = IntegerUtils.parseInt(XMLUtils.getTextTag(n, "ProducedInFactory"));
+                boolean obtainable = inShop || producedInFactory != 0;
 
                 BlockTypes.BLOCK_NAMES.put(id, name);
                 BLOCK_HITPOINTS.put(id, hitPoints);
@@ -1213,6 +1226,9 @@ public class BlockTypeColors {
                 }
                 if (deprecated) {
                     BLOCK_DEPRECATED.add(id);
+                }
+                if (!obtainable) {
+                    BLOCK_UNOBTAINABLE.add(id);
                 }
                 try {
                     Field f = BlockTypes.class.getField(type);

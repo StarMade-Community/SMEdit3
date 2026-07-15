@@ -108,8 +108,8 @@ public final class HullCatalog {
                 continue;
             }
             short id = ShortUtils.parseShort(BlockTypeColors.mBlockTypes.getProperty(type));
-            if (id <= 0 || BlockTypeColors.isDeprecated(id)) {
-                return; // skip unknown or deprecated (no-longer-obtainable) blocks
+            if (id <= 0 || BlockTypeColors.isDeprecated(id) || !BlockTypeColors.isObtainable(id)) {
+                return; // skip unknown, deprecated, or non-craftable/non-purchasable blocks
             }
             allByTier.get(tier).add(id);
             if (tail.isEmpty()) {

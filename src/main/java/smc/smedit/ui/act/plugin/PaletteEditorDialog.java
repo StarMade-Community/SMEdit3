@@ -113,13 +113,17 @@ public class PaletteEditorDialog extends JDialog {
     }
 
     private void buildSources() {
-        // Every non-deprecated block the install knows about. (Already-chosen ids
-        // still render in the Chosen list even if excluded here.)
+        // Every obtainable, non-deprecated block the install knows about.
+        // (Already-chosen ids still render in the Chosen list even if excluded here.)
         java.util.Set<Short> seen = new java.util.HashSet<>();
         for (Short id : BlockTypes.BLOCK_NAMES.keySet()) {
-            if (id != null && id > 0 && !BlockTypeColors.isDeprecated(id) && seen.add(id)) {
-                allAvailable.add(id);
+            if (id == null || id <= 0 || !seen.add(id)) {
+                continue;
             }
+            if (BlockTypeColors.isDeprecated(id) || !BlockTypeColors.isObtainable(id)) {
+                continue;
+            }
+            allAvailable.add(id);
         }
         allAvailable.sort(Comparator.comparing(PaletteBlocks::name, String.CASE_INSENSITIVE_ORDER));
         for (HullCatalog.Tier tier : HullCatalog.Tier.values()) {
