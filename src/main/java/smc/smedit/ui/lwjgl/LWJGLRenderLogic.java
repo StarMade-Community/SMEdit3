@@ -617,6 +617,44 @@ public class LWJGLRenderLogic {
     }
 
     /**
+     * Outlines a set of selected cells by their exact shape: emits, for every cell,
+     * only the faces whose orthogonal neighbour is <em>not</em> selected. Rendered
+     * as wireframe this traces the true silhouette of an irregular selection (a
+     * flood-fill, a scattered multi-pick) instead of a single min/max bounding box.
+     * Each cell's cube is inflated by {@code e} so the edges don't z-fight the blocks.
+     */
+    public static void addSelectionCells(MeshInfo group, java.util.Collection<Point3i> cells,
+            short[] colors, float e) {
+        if (cells == null || cells.isEmpty()) {
+            return;
+        }
+        java.util.Set<Point3i> set = (cells instanceof java.util.Set)
+                ? (java.util.Set<Point3i>) cells : new java.util.HashSet<>(cells);
+        for (Point3i p : set) {
+            float lox = p.x - .5f - e, loy = p.y - .5f - e, loz = p.z - .5f - e;
+            float hix = p.x + .5f + e, hiy = p.y + .5f + e, hiz = p.z + .5f + e;
+            if (!set.contains(new Point3i(p.x + 1, p.y, p.z))) {
+                addSelectFace(group, hix, loy, loz, hix, hiy, hiz, RenderPoly.XP, colors[0 % colors.length]);
+            }
+            if (!set.contains(new Point3i(p.x - 1, p.y, p.z))) {
+                addSelectFace(group, lox, loy, loz, lox, hiy, hiz, RenderPoly.XM, colors[1 % colors.length]);
+            }
+            if (!set.contains(new Point3i(p.x, p.y + 1, p.z))) {
+                addSelectFace(group, lox, hiy, loz, hix, hiy, hiz, RenderPoly.YP, colors[2 % colors.length]);
+            }
+            if (!set.contains(new Point3i(p.x, p.y - 1, p.z))) {
+                addSelectFace(group, lox, loy, loz, hix, loy, hiz, RenderPoly.YM, colors[3 % colors.length]);
+            }
+            if (!set.contains(new Point3i(p.x, p.y, p.z + 1))) {
+                addSelectFace(group, lox, loy, hiz, hix, hiy, hiz, RenderPoly.ZP, colors[4 % colors.length]);
+            }
+            if (!set.contains(new Point3i(p.x, p.y, p.z - 1))) {
+                addSelectFace(group, lox, loy, loz, hix, hiy, loz, RenderPoly.ZM, colors[5 % colors.length]);
+            }
+        }
+    }
+
+    /**
      *
      * @param group
      * @param x1

@@ -250,7 +250,7 @@ public class LWJGLRenderPanel extends RenderPanel {
         BlockTypes.SPECIAL_SELECT_ZP, BlockTypes.SPECIAL_SELECT_ZM,
     };
 
-    /** Rebuilds the empty box frame around the current selection's extent. */
+    /** Rebuilds the wireframe outline tracing the exact selected cells. */
     public void updateSelectionHighlight() {
         java.util.List<Point3i> selected = StarMadeLogic.getInstance().getSelection().getSelected();
         MeshInfo info = new MeshInfo();
@@ -258,19 +258,11 @@ public class LWJGLRenderPanel extends RenderPanel {
         info.indexes = new ArrayList<>();
         info.colors = new ArrayList<>(); // plain-coloured, not textured
         if (!selected.isEmpty()) {
-            // One frame around the whole selection's bounding extent, inflated a
-            // touch so its edges don't z-fight the enclosed blocks.
-            int minx = Integer.MAX_VALUE, miny = Integer.MAX_VALUE, minz = Integer.MAX_VALUE;
-            int maxx = Integer.MIN_VALUE, maxy = Integer.MIN_VALUE, maxz = Integer.MIN_VALUE;
-            for (Point3i p : selected) {
-                minx = Math.min(minx, p.x); miny = Math.min(miny, p.y); minz = Math.min(minz, p.z);
-                maxx = Math.max(maxx, p.x); maxy = Math.max(maxy, p.y); maxz = Math.max(maxz, p.z);
-            }
-            final float e = 0.03f;
-            LWJGLRenderLogic.addBox(info,
-                    new Point3f(minx - e, miny - e, minz - e),
-                    new Point3f(maxx + e, maxy + e, maxz + e),
-                    SELECT_FACE_COLORS);
+            // Outline the true shape of the selection: every cell's outward-facing
+            // faces (culling shared interior faces), inflated a touch so the edges
+            // don't z-fight the enclosed blocks. Irregular selections (flood-fill,
+            // scattered multi-pick) now trace exactly, not a min/max bounding box.
+            LWJGLRenderLogic.addSelectionCells(info, selected, SELECT_FACE_COLORS, 0.03f);
         }
         JGLObj obj = null;
         if (!info.verts.isEmpty()) {

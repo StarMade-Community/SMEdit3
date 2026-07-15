@@ -173,4 +173,30 @@ public final class SelectionModel {
         }
         fireChanged();
     }
+
+    /** Adds the given cells to the selection (Shift double-click flood). */
+    public void addAll(java.util.Collection<Point3i> cells) {
+        boolean changed = false;
+        for (Point3i p : cells) {
+            if (p != null && mSelected.add(new Point3i(p))) {
+                changed = true;
+            }
+        }
+        if (changed) {
+            fireChanged();
+        }
+    }
+
+    /** Removes the given cells from the selection (Ctrl double-click flood). */
+    public void removeAll(java.util.Collection<Point3i> cells) {
+        boolean changed = false;
+        for (Point3i p : cells) {
+            if (p != null && mSelected.remove(p)) {
+                changed = true;
+            }
+        }
+        if (changed) {
+            fireChanged();
+        }
+    }
 }

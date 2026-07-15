@@ -90,8 +90,9 @@ public class LWJGLMouseAdapter extends MouseAdapter {
             mMouseMode = MOUSE_MODE_TOOL;
             Point3i hit = mPanel.getPointAt(p.x, p.y);
             if (clickCount >= 2) {
-                // Double-click = flood-select the contiguous same-type region (Select tool).
-                ToolController.get().onDoubleClick(hit);
+                // Double-click = flood-select the contiguous same-type region (Select
+                // tool). Shift adds the region to the selection, Ctrl removes it.
+                ToolController.get().onDoubleClick(hit, modifiers);
             } else {
                 Point3i place = mPanel.getPlacementAt(p.x, p.y);
                 ToolController.get().onPress(hit, place, mPanel, modifiers);

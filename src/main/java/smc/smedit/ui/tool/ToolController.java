@@ -122,6 +122,7 @@ public final class ToolController {
     private boolean symX;
     private boolean symY;
     private boolean symZ;
+    private boolean floodDiagonals;         // double-click flood spreads through edge/corner touches too
     private boolean stroking;               // between press and release of an edit stroke
 
     private final List<Listener> listeners = new ArrayList<>();
@@ -293,6 +294,15 @@ public final class ToolController {
         symZ = on;
     }
 
+    /** Whether the double-click flood spreads through diagonal (edge/corner) touches, not just faces. */
+    public boolean isFloodDiagonals() {
+        return floodDiagonals;
+    }
+
+    public void setFloodDiagonals(boolean on) {
+        floodDiagonals = on;
+    }
+
     public void addListener(Listener l) {
         if (l != null && !listeners.contains(l)) {
             listeners.add(l);
@@ -358,11 +368,20 @@ public final class ToolController {
     /**
      * A double-click. For the Select tool it flood-selects every contiguous block of
      * the same type (any shape / slab of the same family) — the basis for a bucket fill.
+     * Plain replaces the selection; Shift adds the region, Ctrl removes it.
      */
-    public void onDoubleClick(Point3i hit) {
-        if (hit != null && active == EditorTool.SELECT) {
-            StarMadeLogic.getInstance().getSelection()
-                    .select(contiguousByType(hit, StarMadeLogic.getModel()));
+    public void onDoubleClick(Point3i hit, int modifiers) {
+        if (hit == null || active != EditorTool.SELECT) {
+            return;
+        }
+        Set<Point3i> region = contiguousByType(hit, StarMadeLogic.getModel(), floodDiagonals);
+        SelectionModel sel = StarMadeLogic.getInstance().getSelection();
+        if ((modifiers & InputEvent.CTRL_MASK) != 0) {
+            sel.removeAll(region);
+        } else if ((modifiers & InputEvent.SHIFT_MASK) != 0) {
+            sel.addAll(region);
+        } else {
+            sel.select(region);
         }
     }
 
@@ -517,7 +536,7 @@ public final class ToolController {
             return;
         }
         List<Point3i> selected = StarMadeLogic.getInstance().getSelection().getSelected();
-        Collection<Point3i> target = selected.isEmpty() ? contiguousByType(hit, grid) : selected;
+        Collection<Point3i> target = selected.isEmpty() ? contiguousByType(hit, grid, floodDiagonals) : selected;
         if (target.isEmpty() || getActiveBlockType() < 0) {
             return;
         }
@@ -551,7 +570,7 @@ public final class ToolController {
      * block of the <em>same type</em> — any shape or slab of the same family (so a
      * grey-armor cube, wedge and ½-slab all count as one type).
      */
-    private static Set<Point3i> contiguousByType(Point3i start, SparseMatrix<Block> grid) {
+    private static Set<Point3i> contiguousByType(Point3i start, SparseMatrix<Block> grid, boolean diagonals) {
         Set<Point3i> found = new LinkedHashSet<>();
         if (start == null || grid == null) {
             return found;
@@ -566,7 +585,7 @@ public final class ToolController {
         found.add(new Point3i(start));
         while (!queue.isEmpty() && found.size() < FLOOD_CAP) {
             Point3i p = queue.poll();
-            for (Point3i n : neighbours(p)) {
+            for (Point3i n : (diagonals ? neighbours26(p) : neighbours(p))) {
                 if (found.contains(n)) {
                     continue;
                 }
@@ -683,6 +702,22 @@ public final class ToolController {
             new Point3i(p.x, p.y - 1, p.z), new Point3i(p.x, p.y + 1, p.z),
             new Point3i(p.x, p.y, p.z - 1), new Point3i(p.x, p.y, p.z + 1),
         };
+    }
+
+    /** All 26 face/edge/corner neighbours — the diagonal flood's connectivity. */
+    private static Point3i[] neighbours26(Point3i p) {
+        Point3i[] out = new Point3i[26];
+        int i = 0;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx != 0 || dy != 0 || dz != 0) {
+                        out[i++] = new Point3i(p.x + dx, p.y + dy, p.z + dz);
+                    }
+                }
+            }
+        }
+        return out;
     }
 
     /** Adds the mirror image of every cell across each enabled symmetry plane. */

@@ -408,6 +408,15 @@ public class BrushPanel extends JPanel implements ToolController.Listener {
         sym.add(symToggle("Z", "fore / aft", tc.isSymZ(), tc::setSymZ));
         controls.add(fullWidth(sym));
 
+        controls.add(sectionLabel("Flood Select"));
+        JPanel flood = new JPanel(new GridLayout(1, 1, 4, 0));
+        JToggleButton diag = new JToggleButton("Diagonals", tc.isFloodDiagonals());
+        diag.setToolTipText("Double-click flood spreads through edge/corner touches, not just shared faces");
+        diag.setFocusable(false);
+        diag.addActionListener(e -> tc.setFloodDiagonals(diag.isSelected()));
+        flood.add(diag);
+        controls.add(fullWidth(flood));
+
         return controls;
     }
 

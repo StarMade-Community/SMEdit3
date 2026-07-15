@@ -54,6 +54,18 @@ public class JGLCanvas extends Canvas {
     private AtomicReference<Dimension> mNewCanvasSize;
 
     private boolean[] mMouseState;
+    // Click-count tracking for synthesized presses: LWJGL only reports raw
+    // button up/down, so we derive AWT-style multi-click counts ourselves
+    // (else double-click features like flood-select never fire on non-Mac).
+    private int mLastClickButton = -1;
+    private long mLastClickNanos;
+    private int mLastClickX;
+    private int mLastClickY;
+    private int mClickCount;
+    /** How close together (ns) two presses must be to count as a multi-click. */
+    private static final long MULTI_CLICK_INTERVAL_NANOS = multiClickIntervalNanos();
+    /** How near (pixels) two presses must be to count as a multi-click. */
+    private static final int MULTI_CLICK_SLOP = 4;
     private final List<MouseListener> mMouseListeners;
     private final List<MouseMotionListener> mMouseMotionListeners;
     private final List<MouseWheelListener> mMouseWheelListeners;
@@ -470,12 +482,13 @@ public class JGLCanvas extends Canvas {
                             if (!isFocusOwner()) {
                                 java.awt.EventQueue.invokeLater(this::requestFocusInWindow);
                             }
-                            MouseEvent event = new MouseEvent(this, MouseEvent.MOUSE_PRESSED, nanoseconds, modifiers, x, y, 1, false, jButton);
+                            int clickCount = nextClickCount(button, nanoseconds, x, y);
+                            MouseEvent event = new MouseEvent(this, MouseEvent.MOUSE_PRESSED, nanoseconds, modifiers, x, y, clickCount, false, jButton);
                             fireMouseEvent(event);
                             mMouseState[button] = true;
                         }
                     } else {
-                        MouseEvent event = new MouseEvent(this, MouseEvent.MOUSE_RELEASED, nanoseconds, modifiers, x, y, 1, false, jButton);
+                        MouseEvent event = new MouseEvent(this, MouseEvent.MOUSE_RELEASED, nanoseconds, modifiers, x, y, mClickCount, false, jButton);
                         fireMouseEvent(event);
                         mMouseState[button] = false;
                     }
@@ -588,6 +601,34 @@ public class JGLCanvas extends Canvas {
     @Override
     public synchronized void removeKeyListener(KeyListener l) {
         mKeyListeners.remove(l);
+    }
+
+    /** The platform double-click speed (ms → ns), defaulting to 500ms if unavailable. */
+    private static long multiClickIntervalNanos() {
+        Object prop = java.awt.Toolkit.getDefaultToolkit()
+                .getDesktopProperty("awt.multiClickInterval");
+        long ms = (prop instanceof Integer) ? (Integer) prop : 500;
+        return ms * 1_000_000L;
+    }
+
+    /**
+     * Derives the AWT click count for a fresh press: increments while presses of the
+     * same button land close together in time and space, otherwise restarts at 1.
+     */
+    private int nextClickCount(int button, long nanos, int x, int y) {
+        boolean sameSpot = Math.abs(x - mLastClickX) <= MULTI_CLICK_SLOP
+                && Math.abs(y - mLastClickY) <= MULTI_CLICK_SLOP;
+        if (button == mLastClickButton && sameSpot
+                && (nanos - mLastClickNanos) <= MULTI_CLICK_INTERVAL_NANOS) {
+            mClickCount++;
+        } else {
+            mClickCount = 1;
+        }
+        mLastClickButton = button;
+        mLastClickNanos = nanos;
+        mLastClickX = x;
+        mLastClickY = y;
+        return mClickCount;
     }
 
     private void fireMouseEvent(MouseEvent e) {
