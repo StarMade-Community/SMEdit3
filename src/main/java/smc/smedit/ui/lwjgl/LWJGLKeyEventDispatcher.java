@@ -76,12 +76,29 @@ public class LWJGLKeyEventDispatcher implements KeyListener, FocusListener {
 
     @Override
     public void keyPressed(KeyEvent e) {
-        // Don't drive the camera while typing in a text field (search / console).
+        // Don't drive the camera or steal undo/redo while typing in a text field.
         if (isTypingInTextField()) {
             return;
         }
         mShiftDown = e.isShiftDown();
         int code = e.getKeyCode();
+        // Undo/redo: Ctrl+Z undoes, Ctrl+Shift+Z or Ctrl+Y redoes. The GL Display
+        // captures keyboard input while the viewport is focused, so AWT menu
+        // accelerators never fire here — handle them on the viewport key path.
+        if (e.isControlDown()) {
+            if (code == KeyEvent.VK_Z) {
+                if (e.isShiftDown()) {
+                    mPanel.redo();
+                } else {
+                    mPanel.undo();
+                }
+                return;
+            }
+            if (code == KeyEvent.VK_Y) {
+                mPanel.redo();
+                return;
+            }
+        }
         if (MOVE_KEYS.contains(code)) {
             mPressed.add(code);
             if (!mMoveTimer.isRunning()) {

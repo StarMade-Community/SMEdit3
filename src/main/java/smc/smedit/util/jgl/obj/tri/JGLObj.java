@@ -29,6 +29,7 @@ public class JGLObj extends JGLNode {
 
     public static final int TRIANGLES = 0;
     public static final int QUADS = 1;
+    public static final int LINES = 2;
 
     protected FloatBuffer mVertexBuffer;
     protected FloatBuffer mNormalBuffer;
@@ -248,11 +249,7 @@ public class JGLObj extends JGLNode {
                 mIndexShortBuffer.put(indices[i]);
             }
             mIndexShortBuffer.position(0);
-            if (mMode == TRIANGLES) {
-                mIndices = indices.length / 3;
-            } else {
-                mIndices = indices.length / 4;
-            }
+            mIndices = indices.length / indicesPerPrimitive();
         }
     }
 
@@ -265,11 +262,7 @@ public class JGLObj extends JGLNode {
                 mIndexIntBuffer.put(indices[i]);
             }
             mIndexIntBuffer.position(0);
-            if (mMode == TRIANGLES) {
-                mIndices = indices.length / 3;
-            } else {
-                mIndices = indices.length / 4;
-            }
+            mIndices = indices.length / indicesPerPrimitive();
         }
     }
 
@@ -385,11 +378,7 @@ public class JGLObj extends JGLNode {
 
     public void setIndexShortBuffer(ShortBuffer indexBuffer) {
         mIndexShortBuffer = indexBuffer;
-        if (mMode == TRIANGLES) {
-            mIndices = mIndexShortBuffer.limit() / 3;
-        } else {
-            mIndices = mIndexShortBuffer.limit() / 4;
-        }
+        mIndices = mIndexShortBuffer.limit() / indicesPerPrimitive();
     }
 
     public IntBuffer getIndexIntBuffer() {
@@ -398,11 +387,7 @@ public class JGLObj extends JGLNode {
 
     public void setIndexIntBuffer(IntBuffer indexBuffer) {
         mIndexIntBuffer = indexBuffer;
-        if (mMode == TRIANGLES) {
-            mIndices = mIndexIntBuffer.limit() / 3;
-        } else {
-            mIndices = mIndexIntBuffer.limit() / 4;
-        }
+        mIndices = mIndexIntBuffer.limit() / indicesPerPrimitive();
     }
 
     public int getIndices() {
@@ -468,6 +453,18 @@ public class JGLObj extends JGLNode {
 
     public void setTransparent(boolean transparent) {
         mTransparent = transparent;
+    }
+
+    /** Indices per primitive for the current mode: 3 (triangles), 2 (lines), else 4 (quads). */
+    private int indicesPerPrimitive() {
+        switch (mMode) {
+            case TRIANGLES:
+                return 3;
+            case LINES:
+                return 2;
+            default:
+                return 4;
+        }
     }
 
     public int getMode() {

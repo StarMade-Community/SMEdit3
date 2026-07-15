@@ -616,6 +616,36 @@ public class LWJGLRenderLogic {
                 RenderPoly.ZM, colors[5 % colors.length]);
     }
 
+    /** Appends one coloured line segment (two endpoints, two matching colours). */
+    public static void addLine(java.util.List<Point3f> verts, java.util.List<Color3f> colors,
+            Point3f a, Point3f b, Color3f color) {
+        verts.add(a);
+        verts.add(b);
+        colors.add(color);
+        colors.add(color);
+    }
+
+    /**
+     * Builds a {@link JGLObj#LINES} object from a flat list of endpoint pairs and
+     * per-vertex colours — the cheap 2D-line primitive used for the axis guide and
+     * grid (no faces, no textures). Returns {@code null} if there's nothing to draw.
+     */
+    public static JGLObj linesToObj(java.util.List<Point3f> verts, java.util.List<Color3f> colors) {
+        if (verts == null || verts.isEmpty()) {
+            return null;
+        }
+        JGLObj obj = new JGLObj();
+        obj.setMode(JGLObj.LINES);
+        obj.setVertices(verts);
+        int[] idx = new int[verts.size()];
+        for (int i = 0; i < idx.length; i++) {
+            idx[i] = i;
+        }
+        obj.setIndices(idx);
+        obj.setColors(colors);
+        return obj;
+    }
+
     /**
      * Outlines a set of selected cells by their exact shape: emits, for every cell,
      * only the faces whose orthogonal neighbour is <em>not</em> selected. Rendered

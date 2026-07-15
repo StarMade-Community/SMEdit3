@@ -1,5 +1,5 @@
 /**
- * Copyright 2014 
+ * Copyright 2014
  * SMEdit https://github.com/StarMade/SMEdit
  * SMTools https://github.com/StarMade/SMTools
  *
@@ -15,35 +15,32 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  **/
-package smc.smedit.ui.act.edit;
+package smc.smedit.ui.act.view;
 
-import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
-import java.awt.event.KeyEvent;
-
-import javax.swing.KeyStroke;
 
 import smc.smedit.ui.RenderFrame;
 import smc.smedit.ui.act.GenericAction;
 
 /**
- * @Auther Jo Jaquinta for SMEdit Classic - version 1.0
+ * Toggles the ground grid guide in the viewport.
  **/
 @SuppressWarnings("serial")
-public class RedoAction extends GenericAction {
+public class GridAction extends GenericAction {
 
     private final RenderFrame mFrame;
 
-    public RedoAction(RenderFrame frame) {
+    public GridAction(RenderFrame frame) {
         mFrame = frame;
-        setName("Redo");
-        setToolTipText("Redo last undo");
-        putValue(ACCELERATOR_KEY, KeyStroke.getKeyStroke(KeyEvent.VK_Y,
-                Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()));
+        setName("Grid");
+        setToolTipText("Display Grid");
+        setChecked(mFrame.getClient().isGrid());
     }
 
     @Override
     public void actionPerformed(ActionEvent ev) {
-        mFrame.getClient().redo();
+        mFrame.getClient().setGrid(!mFrame.getClient().isGrid());
+        setChecked(mFrame.getClient().isGrid());
     }
+
 }

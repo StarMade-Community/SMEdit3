@@ -39,7 +39,9 @@ import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.ButtonGroup;
 import javax.swing.JMenu;
+import javax.swing.JRadioButtonMenuItem;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
@@ -71,6 +73,7 @@ import smc.smedit.ui.act.file.SaveAsBlueprintAction1;
 import smc.smedit.ui.act.file.SaveAsFileAction;
 import smc.smedit.ui.act.file.SaveAsFileAction1;
 import smc.smedit.ui.act.view.AxisAction;
+import smc.smedit.ui.act.view.GridAction;
 import smc.smedit.ui.logic.ShipSpec;
 import smc.smedit.ui.logic.ShipTreeLogic;
 import smc.smedit.ui.lwjgl.LWJGLRenderPanel;
@@ -836,6 +839,21 @@ public class RenderFrame extends JFrame {
         menuEdit.add(new JSeparator());
         menuBar.add(menuView);
         menuView.add(new JCheckBoxMenuItem(new AxisAction(this)));
+        menuView.add(new JCheckBoxMenuItem(new GridAction(this)));
+        // Where the axis/grid guide is centred.
+        JMenu axisOrigin = new JMenu("Axis Origin");
+        ButtonGroup anchorGroup = new ButtonGroup();
+        JRadioButtonMenuItem sceneCenter = new JRadioButtonMenuItem("Scene Center",
+                getClient().getAxisAnchor() == RenderPanel.AxisAnchor.SCENE);
+        sceneCenter.addActionListener(e -> getClient().setAxisAnchor(RenderPanel.AxisAnchor.SCENE));
+        JRadioButtonMenuItem selectionCenter = new JRadioButtonMenuItem("Selection Center",
+                getClient().getAxisAnchor() == RenderPanel.AxisAnchor.SELECTION);
+        selectionCenter.addActionListener(e -> getClient().setAxisAnchor(RenderPanel.AxisAnchor.SELECTION));
+        anchorGroup.add(sceneCenter);
+        anchorGroup.add(selectionCenter);
+        axisOrigin.add(sceneCenter);
+        axisOrigin.add(selectionCenter);
+        menuView.add(axisOrigin);
         JMenuItem resetCamItem = new JMenuItem("Reset Camera");
         resetCamItem.addActionListener(e -> getClient().resetCamera());
         menuView.add(resetCamItem);

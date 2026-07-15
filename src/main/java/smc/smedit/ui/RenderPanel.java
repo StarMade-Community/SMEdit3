@@ -59,6 +59,29 @@ public abstract class RenderPanel extends JPanel {
 
     public abstract void setAxis(boolean axis);
 
+    /** Where the axis/grid guide is centred. */
+    public enum AxisAnchor {
+        /** The centre of the whole model's bounding box (the build's middle). */
+        SCENE,
+        /** The centre of the current selection (falls back to the scene centre if empty). */
+        SELECTION
+    }
+
+    public AxisAnchor getAxisAnchor() {
+        return AxisAnchor.SCENE;
+    }
+
+    public void setAxisAnchor(AxisAnchor anchor) {
+    }
+
+    /** Whether the ground grid guide is shown. */
+    public boolean isGrid() {
+        return false;
+    }
+
+    public void setGrid(boolean grid) {
+    }
+
     public abstract boolean isDontDraw();
 
     public abstract void setDontDraw(boolean dontDraw);

@@ -450,16 +450,29 @@ public class AWTRenderPanel extends RenderPanel {
 
     @Override
     public void undo() {
-        SparseMatrix<Block> grid = mUndoer.undo();
-        if (grid != null) {
-            StarMadeLogic.setModel(grid);
-        }
+        restore(mUndoer.undo(StarMadeLogic.getModel()));
     }
 
     @Override
     public void redo() {
-        SparseMatrix<Block> grid = mUndoer.redo();
-        if (grid != null) {
+        restore(mUndoer.redo(StarMadeLogic.getModel()));
+    }
+
+    /**
+     * Installs a grid restored by undo/redo, replacing the live grid's contents in
+     * place and repainting — without the {@link StarMadeLogic#setModel} "model"
+     * change that re-frames the camera (wrong for an undo, which must leave the view
+     * put).
+     */
+    private void restore(SparseMatrix<Block> grid) {
+        if (grid == null) {
+            return;
+        }
+        SparseMatrix<Block> current = StarMadeLogic.getModel();
+        if (current != null) {
+            current.set(grid);
+            updateTiles();
+        } else {
             StarMadeLogic.setModel(grid);
         }
     }

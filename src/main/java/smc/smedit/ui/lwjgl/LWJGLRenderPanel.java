@@ -24,6 +24,7 @@ import java.awt.event.FocusListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseListener;
 import java.util.ArrayList;
+import java.util.List;
 
 import smc.smedit.data.BlockTypes;
 import smc.smedit.data.RenderPoly;
@@ -38,6 +39,7 @@ import smc.smedit.util.jgl.obj.JGLNode;
 import smc.smedit.util.jgl.obj.JGLScene;
 import smc.smedit.util.jgl.obj.tri.JGLObj;
 import smc.smedit.util.lwjgl.win.JGLCanvas;
+import smc.smedit.vecmath.Color3f;
 import smc.smedit.vecmath.Color4f;
 import smc.smedit.vecmath.Point3f;
 import smc.smedit.vecmath.Point3i;
@@ -52,6 +54,16 @@ public class LWJGLRenderPanel extends RenderPanel {
     private final JGLGroup mBlocks;
     private final JGLGroup mSelection;
     private final JGLGroup mAxis;
+    private final JGLGroup mGrid;
+
+    /** Where the axis/grid guide is centred. */
+    private AxisAnchor mAxisAnchor = AxisAnchor.SCENE;
+    private boolean mShowGrid;
+
+    private static final Color3f AXIS_X = new Color3f(0.90f, 0.25f, 0.25f);
+    private static final Color3f AXIS_Y = new Color3f(0.30f, 0.85f, 0.30f);
+    private static final Color3f AXIS_Z = new Color3f(0.35f, 0.45f, 1.00f);
+    private static final Color3f GRID_COLOR = new Color3f(0.32f, 0.32f, 0.35f);
 
     private SparseMatrix<Block> mFilteredGrid;
     private boolean mPlainGraphics;
@@ -85,6 +97,8 @@ public class LWJGLRenderPanel extends RenderPanel {
         mUniverse.getChildren().add(mSelection);
         mAxis = new JGLGroup();
         mUniverse.getChildren().add(mAxis);
+        mGrid = new JGLGroup();
+        mUniverse.getChildren().add(mGrid);
         mCanvas = new JGLCanvas();
         mCanvas.setScene(mScene);
         setLayout(new BorderLayout());
@@ -112,8 +126,9 @@ public class LWJGLRenderPanel extends RenderPanel {
         // Single-key tool shortcuts (V/B/P/…) via the same canvas key path.
         mCanvas.addKeyListener(new smc.smedit.ui.tool.ToolKeyListener());
         StarMadeLogic.getInstance().addPropertyChangeListener("model", ev -> setLookAt(new Point3f(0, 0, -1)));
-        // Refresh the viewport highlight whenever the selection changes.
-        StarMadeLogic.getInstance().getSelection().addListener(this::updateSelectionHighlight);
+        // Refresh the viewport highlight whenever the selection changes (and the
+        // axis/grid too, when they're anchored to the selection).
+        StarMadeLogic.getInstance().getSelection().addListener(this::onSelectionChanged);
     }
 
     @Override
@@ -232,6 +247,7 @@ public class LWJGLRenderPanel extends RenderPanel {
             mFilteredGrid = StarMadeLogic.getInstance().getViewFilter().modify(StarMadeLogic.getModel(), null, StarMadeLogic.getInstance(), null);
         }
         updateAxis();
+        updateGrid();
         mBlocks.getChildren().clear();
         LWJGLRenderLogic.addBlocks(mBlocks, mFilteredGrid, mPlainGraphics);
         System.out.println("Quads:" + mBlocks.getChildren().size());
@@ -279,31 +295,112 @@ public class LWJGLRenderPanel extends RenderPanel {
         }
     }
 
+    /**
+     * Rebuilds the axis guide as three thin coloured lines (X red, Y green, Z blue)
+     * crossing the current anchor point. Cheap 2D-line geometry, not boxes.
+     */
     public void updateAxis() {
-        mAxis.getChildren().clear();
-        MeshInfo info = new MeshInfo();
-        info.verts = new ArrayList<>();
-        info.indexes = new ArrayList<>();
-        //info.colors = new ArrayList<Color3f>();
-        info.uv = new ArrayList<>();
-        System.out.println("Adding axis");
-//        LWJGLRenderLogic.addBox(info, new Point3f(9,8,8), new Point3f(256+8,8,8), new short[] { BlockTypes.SPECIAL_SELECT_XP });
-//        LWJGLRenderLogic.addBox(info, new Point3f(8-256,8,8), new Point3f(7,8,8), new short[] { BlockTypes.SPECIAL_SELECT_XM });
-//        LWJGLRenderLogic.addBox(info, new Point3f(8,9,8), new Point3f(8,256+8,8), new short[] { BlockTypes.SPECIAL_SELECT_YP });
-//        LWJGLRenderLogic.addBox(info, new Point3f(8,8-256,8), new Point3f(8,7,8), new short[] { BlockTypes.SPECIAL_SELECT_YM });
-//        LWJGLRenderLogic.addBox(info, new Point3f(8,8,9), new Point3f(8,8,256+8), new short[] { BlockTypes.SPECIAL_SELECT_ZP });
-//        LWJGLRenderLogic.addBox(info, new Point3f(8,8,8-256), new Point3f(8,8,7), new short[] { BlockTypes.SPECIAL_SELECT_ZM });
-        LWJGLRenderLogic.addBox(info, new Point3f(9, 8, 8), new Point3f(256 + 8, 8, 8), new short[]{BlockTypes.LIGHT_RED});
-        LWJGLRenderLogic.addBox(info, new Point3f(8 - 256, 8, 8), new Point3f(7, 8, 8), new short[]{BlockTypes.LIGHT_RED});
-        LWJGLRenderLogic.addBox(info, new Point3f(8, 9, 8), new Point3f(8, 256 + 8, 8), new short[]{BlockTypes.LIGHT_GREEN});
-        LWJGLRenderLogic.addBox(info, new Point3f(8, 8 - 256, 8), new Point3f(8, 7, 8), new short[]{BlockTypes.LIGHT_GREEN});
-        LWJGLRenderLogic.addBox(info, new Point3f(8, 8, 9), new Point3f(8, 8, 256 + 8), new short[]{BlockTypes.LIGHT_BLUE});
-        LWJGLRenderLogic.addBox(info, new Point3f(8, 8, 8 - 256), new Point3f(8, 8, 7), new short[]{BlockTypes.LIGHT_BLUE});
-        JGLObj obj = LWJGLRenderLogic.infoToObj(info);
-//        for (int i = 0; i < obj.getColorBuffer().limit(); i++)
-//            System.out.print(" "+obj.getColorBuffer().get(i));
-//        System.out.println();
-        mAxis.add(obj);
+        Point3f o = guideOrigin();
+        float r = guideReach();
+        List<Point3f> verts = new ArrayList<>();
+        List<Color3f> cols = new ArrayList<>();
+        LWJGLRenderLogic.addLine(verts, cols,
+                new Point3f(o.x - r, o.y, o.z), new Point3f(o.x + r, o.y, o.z), AXIS_X);
+        LWJGLRenderLogic.addLine(verts, cols,
+                new Point3f(o.x, o.y - r, o.z), new Point3f(o.x, o.y + r, o.z), AXIS_Y);
+        LWJGLRenderLogic.addLine(verts, cols,
+                new Point3f(o.x, o.y, o.z - r), new Point3f(o.x, o.y, o.z + r), AXIS_Z);
+        JGLObj obj = LWJGLRenderLogic.linesToObj(verts, cols);
+        synchronized (mAxis) {
+            mAxis.getChildren().clear();
+            if (obj != null) {
+                mAxis.add(obj);
+            }
+        }
+    }
+
+    /**
+     * Rebuilds the ground grid as 2D lines on the horizontal (Y) plane through the
+     * anchor point, spanning the model extent. Empty (nothing drawn) when the grid
+     * is toggled off. Spacing coarsens for very large models to cap the line count.
+     */
+    public void updateGrid() {
+        List<Point3f> verts = new ArrayList<>();
+        List<Color3f> cols = new ArrayList<>();
+        if (mShowGrid) {
+            Point3f o = guideOrigin();
+            float r = guideReach();
+            int minX = (int) Math.floor(o.x - r), maxX = (int) Math.ceil(o.x + r);
+            int minZ = (int) Math.floor(o.z - r), maxZ = (int) Math.ceil(o.z + r);
+            int span = Math.max(maxX - minX, maxZ - minZ);
+            int step = Math.max(1, (int) Math.ceil(span / 100.0)); // ≤ ~100 lines per direction
+            float y = o.y;
+            for (int x = minX; x <= maxX; x += step) {
+                LWJGLRenderLogic.addLine(verts, cols,
+                        new Point3f(x, y, minZ), new Point3f(x, y, maxZ), GRID_COLOR);
+            }
+            for (int z = minZ; z <= maxZ; z += step) {
+                LWJGLRenderLogic.addLine(verts, cols,
+                        new Point3f(minX, y, z), new Point3f(maxX, y, z), GRID_COLOR);
+            }
+        }
+        JGLObj obj = LWJGLRenderLogic.linesToObj(verts, cols);
+        synchronized (mGrid) {
+            mGrid.getChildren().clear();
+            if (obj != null) {
+                mGrid.add(obj);
+            }
+        }
+    }
+
+    /** The point the axis/grid guide is centred on, per the current anchor. */
+    private Point3f guideOrigin() {
+        if (mAxisAnchor == AxisAnchor.SELECTION) {
+            List<Point3i> sel = StarMadeLogic.getInstance().getSelection().getSelected();
+            if (!sel.isEmpty()) {
+                return centerOf(sel);
+            }
+        }
+        SparseMatrix<Block> grid = StarMadeLogic.getModel();
+        if (grid != null && grid.size() > 0) {
+            Point3i lo = new Point3i();
+            Point3i hi = new Point3i();
+            grid.getBounds(lo, hi);
+            return new Point3f((lo.x + hi.x) / 2f, (lo.y + hi.y) / 2f, (lo.z + hi.z) / 2f);
+        }
+        return new Point3f(0, 0, 0);
+    }
+
+    /** Half-length of the axis lines / grid, scaled to the model with sane clamps. */
+    private float guideReach() {
+        SparseMatrix<Block> grid = StarMadeLogic.getModel();
+        if (grid != null && grid.size() > 0) {
+            Point3i lo = new Point3i();
+            Point3i hi = new Point3i();
+            grid.getBounds(lo, hi);
+            int extent = Math.max(hi.x - lo.x, Math.max(hi.y - lo.y, hi.z - lo.z));
+            return Math.min(512f, Math.max(16f, extent / 2f + 8f));
+        }
+        return 16f;
+    }
+
+    private static Point3f centerOf(List<Point3i> cells) {
+        int minx = Integer.MAX_VALUE, miny = Integer.MAX_VALUE, minz = Integer.MAX_VALUE;
+        int maxx = Integer.MIN_VALUE, maxy = Integer.MIN_VALUE, maxz = Integer.MIN_VALUE;
+        for (Point3i p : cells) {
+            minx = Math.min(minx, p.x); miny = Math.min(miny, p.y); minz = Math.min(minz, p.z);
+            maxx = Math.max(maxx, p.x); maxy = Math.max(maxy, p.y); maxz = Math.max(maxz, p.z);
+        }
+        return new Point3f((minx + maxx) / 2f, (miny + maxy) / 2f, (minz + maxz) / 2f);
+    }
+
+    /** Selection change: refresh the highlight, and the guide too if it follows the selection. */
+    private void onSelectionChanged() {
+        updateSelectionHighlight();
+        if (mAxisAnchor == AxisAnchor.SELECTION) {
+            updateAxis();
+            updateGrid();
+        }
     }
 
     @Override
@@ -375,6 +472,31 @@ public class LWJGLRenderPanel extends RenderPanel {
     }
 
     @Override
+    public AxisAnchor getAxisAnchor() {
+        return mAxisAnchor;
+    }
+
+    @Override
+    public void setAxisAnchor(AxisAnchor anchor) {
+        if (anchor != null && anchor != mAxisAnchor) {
+            mAxisAnchor = anchor;
+            updateAxis();
+            updateGrid();
+        }
+    }
+
+    @Override
+    public boolean isGrid() {
+        return mShowGrid;
+    }
+
+    @Override
+    public void setGrid(boolean grid) {
+        mShowGrid = grid;
+        updateGrid();
+    }
+
+    @Override
     public UndoBuffer getUndoer() {
         return mUndoer;
     }
@@ -386,16 +508,30 @@ public class LWJGLRenderPanel extends RenderPanel {
 
     @Override
     public void undo() {
-        SparseMatrix<Block> grid = mUndoer.undo();
-        if (grid != null) {
-            StarMadeLogic.setModel(grid);
-        }
+        restore(mUndoer.undo(StarMadeLogic.getModel()));
     }
 
     @Override
     public void redo() {
-        SparseMatrix<Block> grid = mUndoer.redo();
-        if (grid != null) {
+        restore(mUndoer.redo(StarMadeLogic.getModel()));
+    }
+
+    /**
+     * Installs a grid restored by undo/redo. Replaces the live grid's contents
+     * <em>in place</em> and rebuilds the mesh directly, rather than going through
+     * {@link StarMadeLogic#setModel} — that fires the "model" change that re-frames
+     * the camera (right for loading a file, wrong for an undo, which must leave the
+     * view exactly where it is).
+     */
+    private void restore(SparseMatrix<Block> grid) {
+        if (grid == null) {
+            return;
+        }
+        SparseMatrix<Block> current = StarMadeLogic.getModel();
+        if (current != null) {
+            current.set(grid);
+            updateTiles();
+        } else {
             StarMadeLogic.setModel(grid);
         }
     }

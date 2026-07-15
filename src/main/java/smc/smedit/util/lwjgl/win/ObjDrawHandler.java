@@ -76,6 +76,12 @@ public class ObjDrawHandler extends NodeDrawHandler {
                 } else if (obj.getIndexIntBuffer() != null) {
                     GL11.glDrawElements(GL11.GL_QUADS, obj.getIndexIntBuffer());
                 }
+            } else if (obj.getMode() == JGLObj.LINES) {
+                if (obj.getIndexShortBuffer() != null) {
+                    GL11.glDrawElements(GL11.GL_LINES, obj.getIndexShortBuffer());
+                } else if (obj.getIndexIntBuffer() != null) {
+                    GL11.glDrawElements(GL11.GL_LINES, obj.getIndexIntBuffer());
+                }
             } else {
                 throw new IllegalArgumentException("Unknown mode: " + obj.getMode());
             }

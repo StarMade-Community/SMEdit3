@@ -17,7 +17,11 @@
  **/
 package smc.smedit.ui.act.edit;
 
+import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
+import java.awt.event.KeyEvent;
+
+import javax.swing.KeyStroke;
 
 import smc.smedit.ui.RenderFrame;
 import smc.smedit.ui.act.GenericAction;
@@ -34,6 +38,8 @@ public class UndoAction extends GenericAction {
         mFrame = frame;
         setName("Undo");
         setToolTipText("Undo last change");
+        putValue(ACCELERATOR_KEY, KeyStroke.getKeyStroke(KeyEvent.VK_Z,
+                Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()));
     }
 
     @Override

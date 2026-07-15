@@ -17,54 +17,85 @@
  **/
 package smc.smedit.data;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.ArrayDeque;
+import java.util.Deque;
 
 import smc.smedit.logic.GridLogic;
 import smc.smedit.ship.data.Block;
 
 /**
- * @Auther Jo Jaquinta for SMEdit Classic - version 1.0
+ * Undo/redo history for the block grid, as two stacks of serialized snapshots.
+ *
+ * <p>{@link #checkpoint} is called with the <em>pre-edit</em> grid right before a
+ * change is applied; it pushes that snapshot onto the undo stack and discards any
+ * redo history (a fresh edit forks the timeline). {@link #undo}/{@link #redo} take
+ * the current (live) grid so the state being left can be banked onto the opposite
+ * stack — that's what makes redo able to return to the most recent edit, which the
+ * old single-pointer buffer could never do.
  **/
 public class UndoBuffer {
 
-    private final List<byte[]> mBuffer;
-    private int mPointer;
+    /** Grids this big aren't snapshotted (serializing them each edit is too costly). */
+    private static final int MAX_SNAPSHOT_BLOCKS = 10000;
+    /** Cap on retained history, so a long session doesn't grow memory without bound. */
+    private static final int MAX_DEPTH = 64;
+
+    private final Deque<byte[]> mUndo = new ArrayDeque<>();
+    private final Deque<byte[]> mRedo = new ArrayDeque<>();
 
     public UndoBuffer() {
-        mBuffer = new ArrayList<>();
-        mPointer = 0;
     }
 
-    public SparseMatrix<Block> undo() {
-        if (mPointer > 0) {
-            mPointer--;
-            return GridLogic.fromBytes(mBuffer.get(mPointer));
-        } else {
-            return null;
-        }
-    }
-
-    public SparseMatrix<Block> redo() {
-        if (mPointer < mBuffer.size()) {
-            return GridLogic.fromBytes(mBuffer.get(mPointer++));
-        } else {
-            return null;
-        }
-    }
-
+    /** Records the pre-edit grid; call right before mutating the model. */
     public void checkpoint(SparseMatrix<Block> grid) {
-        if (grid.size() > 10000) {
+        if (grid == null || grid.size() > MAX_SNAPSHOT_BLOCKS) {
             return;
         }
-        while (mBuffer.size() > mPointer) {
-            mBuffer.remove(mPointer);
+        mUndo.push(GridLogic.toBytes(grid));
+        while (mUndo.size() > MAX_DEPTH) {
+            mUndo.removeLast();
         }
-        mBuffer.add(GridLogic.toBytes(grid));
-        mPointer++;
+        mRedo.clear();
+    }
+
+    /**
+     * Restores the previous state, banking {@code current} (the live grid) for redo.
+     * Returns the grid to install, or {@code null} if there's nothing to undo.
+     */
+    public SparseMatrix<Block> undo(SparseMatrix<Block> current) {
+        if (mUndo.isEmpty()) {
+            return null;
+        }
+        if (current != null) {
+            mRedo.push(GridLogic.toBytes(current));
+        }
+        return GridLogic.fromBytes(mUndo.pop());
+    }
+
+    /**
+     * Re-applies the next state, banking {@code current} (the live grid) for undo.
+     * Returns the grid to install, or {@code null} if there's nothing to redo.
+     */
+    public SparseMatrix<Block> redo(SparseMatrix<Block> current) {
+        if (mRedo.isEmpty()) {
+            return null;
+        }
+        if (current != null) {
+            mUndo.push(GridLogic.toBytes(current));
+        }
+        return GridLogic.fromBytes(mRedo.pop());
+    }
+
+    public boolean canUndo() {
+        return !mUndo.isEmpty();
+    }
+
+    public boolean canRedo() {
+        return !mRedo.isEmpty();
     }
 
     public void clear() {
-        mBuffer.clear();
+        mUndo.clear();
+        mRedo.clear();
     }
 }
