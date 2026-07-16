@@ -71,12 +71,13 @@ import smc.smedit.ui.act.file.OpenExistingAction;
 import smc.smedit.ui.act.file.OpenExistingAction1;
 import smc.smedit.ui.act.file.OpenFileAction;
 import smc.smedit.ui.act.file.OpenFileAction1;
+import smc.smedit.ui.act.file.OpenSceneAction;
 import smc.smedit.ui.act.file.QuitAction;
-import smc.smedit.ui.act.file.SaveAction;
+import smc.smedit.ui.act.file.SaveSceneAction;
+import smc.smedit.ui.act.file.SaveAsSceneAction;
 import smc.smedit.ui.act.file.SaveAsBlueprintAction;
 import smc.smedit.ui.act.file.SaveAsBlueprintAction1;
 import smc.smedit.ui.act.file.SaveAsFileAction;
-import smc.smedit.ui.act.file.SaveAsFileAction1;
 import smc.smedit.ui.act.view.AxisAction;
 import smc.smedit.ui.act.view.CameraModeAction;
 import smc.smedit.ui.act.view.GridAction;
@@ -269,6 +270,7 @@ public class RenderFrame extends JFrame {
     private DockPanel mConsoleDock;
     private DockPanel mBlockInfoDock;
     private DockPanel mLayersDock;
+    private DockPanel mSceneDock;
     private JMenu mWindowMenu;
     /** Menu bar home for one-shot operations (plugins) with no left-rail tool. */
     private JMenu mOperationsMenu;
@@ -416,22 +418,23 @@ public class RenderFrame extends JFrame {
         mConsoleDock = new DockPanel("console", "Console", textScroll, true, true, true);
         mBlockInfoDock = new DockPanel("blockinfo", "Inspector", new BlockInfoPanel(), true, true, true);
         mLayersDock = new DockPanel("layers", "Layers", new LayersPanel(getClient()), true, true, true);
+        mSceneDock = new DockPanel("scene", "Scene", new ScenePanel(this), true, true, true);
 
-        // Clean "cross" default layout: a full-width console on the bottom (docked to
-        // the window root), with the Brush and Selection panels flanking the viewport
-        // in the middle band. The side panels are docked RELATIVE TO THE VIEWPORT, not
-        // the window, so they only split the middle band and leave the console spanning
-        // full width (docking them to the window root instead nests the console under
-        // the brush, squashing the palette — the old, awful default). One-shot
-        // operations no longer live in a dockable shelf — they surface in the active
-        // tool's context bar and the Operations menu.
+        // Default layout: the viewport owns the whole middle band, a full-width
+        // console spans the bottom (docked to the window root), the Brush, Inspector
+        // and Layers panels share one tabbed group on the left, and the Scene
+        // outliner sits alone on the right. The Brush group and the Scene panel are
+        // docked RELATIVE TO THE VIEWPORT, not the window, so they only split the
+        // middle band and leave the console spanning full width. Inspector and Layers
+        // are docked CENTER onto the Brush so the three merge into one tab strip
+        // rather than eating three separate slivers of screen. One-shot operations
+        // live in the active tool's context bar and the Operations menu, not a shelf.
         Docking.dock(mViewportDock, this);
         Docking.dock(mConsoleDock, this, DockingRegion.SOUTH, 0.22);
         Docking.dock(mBrushDock, mViewportDock, DockingRegion.WEST, 0.20);
-        Docking.dock(mBlockInfoDock, mViewportDock, DockingRegion.EAST, 0.22);
-        // Tab the Layers panel onto the Inspector (same right flank, like the
-        // prototype's Inspector/Layers tabs).
-        Docking.dock(mLayersDock, mBlockInfoDock, DockingRegion.CENTER);
+        Docking.dock(mBlockInfoDock, mBrushDock, DockingRegion.CENTER);
+        Docking.dock(mLayersDock, mBrushDock, DockingRegion.CENTER);
+        Docking.dock(mSceneDock, mViewportDock, DockingRegion.EAST, 0.20);
 
         // Remember this arrangement as the default, restore a saved layout if one
         // exists, then keep the layout persisted across runs (workspace memory).
@@ -440,27 +443,58 @@ public class RenderFrame extends JFrame {
             File layoutFile = new File(Paths.getSettingsDirectory(), "layout.xml");
             AppState.setPersistFile(layoutFile);
             AppState.setDefaultApplicationLayout(mDefaultLayout);
-            if (layoutFile.isFile()) {
-                AppState.restore();
+            // Reopen the last workspace layout the user left. Auto-persist keeps
+            // layout.xml in step with every rearrangement, so restoring it here is
+            // what makes the panels come back exactly as they were last time.
+            boolean firstRun = !layoutFile.isFile();
+            if (!firstRun) {
+                try {
+                    AppState.restore();
+                } catch (Exception restoreEx) {
+                    // A layout saved by an older build can name dockables that no
+                    // longer exist (e.g. the removed 'shelf'); restore then throws
+                    // part-way through and leaves the window half-built. Discard the
+                    // stale file and fall back to the freshly-built default so the app
+                    // opens usable instead of broken. Auto-persist rewrites a clean
+                    // layout.xml on the next change.
+                    log.log(Level.WARNING, "Saved layout is incompatible with this build; "
+                            + "resetting to the default layout.", restoreEx);
+                    DockingState.restoreApplicationLayout(mDefaultLayout);
+                    layoutFile.delete();
+                }
             }
             AppState.setAutoPersist(true);
-            // If the user picked a default layout preset in Settings, load it.
-            String defaultLayout = StarMadeLogic.getProps().getProperty("layout.default", "");
-            if (!defaultLayout.isEmpty() && LayoutPresets.names().contains(defaultLayout)) {
-                LayoutPresets.load(defaultLayout);
+            // First run only (no saved layout yet): seed the workspace from the
+            // default layout preset picked in Settings. On later starts the restored
+            // last-used layout wins — otherwise a configured default would clobber the
+            // arrangement the user left every time they reopened the app.
+            if (firstRun) {
+                String defaultLayout = StarMadeLogic.getProps().getProperty("layout.default", "");
+                if (!defaultLayout.isEmpty() && LayoutPresets.names().contains(defaultLayout)) {
+                    LayoutPresets.load(defaultLayout);
+                }
             }
-            // Same one-time migration for the Layers panel: users with a saved
-            // layout from before it existed won't have it, so restore() leaves it
-            // hidden. Tab it onto the Inspector once, then respect the saved state.
+            // One-time migration for the Layers panel: users with a saved layout from
+            // before it existed won't have it, so restore() leaves it hidden. Tab it
+            // into the Brush group once, then respect the saved state.
             if (!StarMadeLogic.isProperty("layers.introduced")) {
                 if (!Docking.isDocked(mLayersDock)) {
-                    if (Docking.isDocked(mBlockInfoDock)) {
+                    if (Docking.isDocked(mBrushDock)) {
+                        Docking.dock(mLayersDock, mBrushDock, DockingRegion.CENTER);
+                    } else if (Docking.isDocked(mBlockInfoDock)) {
                         Docking.dock(mLayersDock, mBlockInfoDock, DockingRegion.CENTER);
                     } else {
-                        Docking.dock(mLayersDock, mViewportDock, DockingRegion.EAST, 0.22);
+                        Docking.dock(mLayersDock, mViewportDock, DockingRegion.WEST, 0.20);
                     }
                 }
                 StarMadeLogic.setProperty("layers.introduced", true);
+            }
+            // Same one-time migration for the Scene outliner — it lives on the right.
+            if (!StarMadeLogic.isProperty("scene.introduced")) {
+                if (!Docking.isDocked(mSceneDock)) {
+                    Docking.dock(mSceneDock, mViewportDock, DockingRegion.EAST, 0.20);
+                }
+                StarMadeLogic.setProperty("scene.introduced", true);
             }
         } catch (Exception e) {
             log.log(Level.WARNING, "Could not restore docking layout; using default.", e);
@@ -502,12 +536,14 @@ public class RenderFrame extends JFrame {
         mWindowMenu.removeAll();
         JCheckBoxMenuItem brushToggle = panelToggle(mBrushDock, DockingRegion.WEST, 0.20);
         JCheckBoxMenuItem consoleToggle = panelToggle(mConsoleDock, DockingRegion.SOUTH, 0.25);
-        JCheckBoxMenuItem blockInfoToggle = panelToggle(mBlockInfoDock, DockingRegion.EAST, 0.2);
-        JCheckBoxMenuItem layersToggle = panelToggle(mLayersDock, DockingRegion.EAST, 0.2);
+        JCheckBoxMenuItem blockInfoToggle = panelToggle(mBlockInfoDock, DockingRegion.WEST, 0.20);
+        JCheckBoxMenuItem layersToggle = panelToggle(mLayersDock, DockingRegion.WEST, 0.20);
+        JCheckBoxMenuItem sceneToggle = panelToggle(mSceneDock, DockingRegion.EAST, 0.20);
         mWindowMenu.add(brushToggle);
         mWindowMenu.add(consoleToggle);
         mWindowMenu.add(blockInfoToggle);
         mWindowMenu.add(layersToggle);
+        mWindowMenu.add(sceneToggle);
         mWindowMenu.addSeparator();
         JMenuItem reset = new JMenuItem("Reset Layout");
         reset.addActionListener(e -> resetLayout());
@@ -523,6 +559,7 @@ public class RenderFrame extends JFrame {
                 consoleToggle.setSelected(Docking.isDocked(mConsoleDock));
                 blockInfoToggle.setSelected(Docking.isDocked(mBlockInfoDock));
                 layersToggle.setSelected(Docking.isDocked(mLayersDock));
+                sceneToggle.setSelected(Docking.isDocked(mSceneDock));
             }
             @Override public void menuDeselected(javax.swing.event.MenuEvent e) { }
             @Override public void menuCanceled(javax.swing.event.MenuEvent e) { }
@@ -615,7 +652,7 @@ public class RenderFrame extends JFrame {
         outerToolBar.add(getDefaultButton(new OpenExistingAction1(this), "Open BP", "open a blueprint", icon(Feather.FOLDER)));
         outerToolBar.add(getDefaultButton(new OpenFileAction1(this), "Open", "open a file", icon(Feather.FILE)));
         outerToolBar.add(getDefaultButton(new SaveAsBlueprintAction1(this, false), "Save BP", "Save blueprint", icon(Feather.SAVE)));
-        outerToolBar.add(getDefaultButton(new SaveAsFileAction1(this), "Save", "Save file", icon(Feather.DOWNLOAD)));
+        outerToolBar.add(getDefaultButton(new SaveSceneAction(this), "Save", "Save the scene", icon(Feather.DOWNLOAD)));
         outerToolBar.add(getDefaultButton(new Shot(this), "Screenshot", "Screenshots of work", icon(Feather.CAMERA)));
 
         outerToolBar.addSeparator();
@@ -904,10 +941,14 @@ public class RenderFrame extends JFrame {
         menuBar.add(menuFile);
         menuFile.add(new OpenExistingAction(this));
         menuFile.add(new OpenFileAction(this));
+        menuFile.add(new OpenSceneAction(this));
         menuFile.add(new JSeparator());
-        menuFile.add(new SaveAction(this));
+        // Save writes the whole scene (SMEdit's native document) as a .smedit file.
+        menuFile.add(new SaveSceneAction(this));
         JMenu saveAs = new JMenu("Save As");
         menuFile.add(saveAs);
+        saveAs.add(new SaveAsSceneAction(this));
+        saveAs.addSeparator();
         saveAs.add(new SaveAsBlueprintAction(this, false));
         saveAs.add(new SaveAsBlueprintAction(this, true));
         saveAs.add(new SaveAsFileAction(this));

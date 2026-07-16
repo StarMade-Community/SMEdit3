@@ -17,11 +17,13 @@ import smc.smedit.vecmath.Point3i;
  */
 public final class SelectionModel {
 
-    /** How a left-click pick affects the selection. */
+    /**
+     * What a viewport pick selects. In {@link #BLOCKS} mode a click selects the
+     * block under the cursor (Shift/Ctrl-click toggles, and a left-drag box-selects
+     * a region); {@link #ENTITY} mode always selects the whole entity.
+     */
     public enum Mode {
-        SINGLE("Single Block"),
-        MULTI("Multi Block"),
-        BLOCK_TYPE("Block Type"),
+        BLOCKS("Blocks"),
         ENTITY("Whole Entity");
 
         private final String label;
@@ -42,7 +44,7 @@ public final class SelectionModel {
     }
 
     private final LinkedHashSet<Point3i> mSelected = new LinkedHashSet<>();
-    private Mode mMode = Mode.SINGLE;
+    private Mode mMode = Mode.BLOCKS;
     private final List<Listener> mListeners = new ArrayList<>();
 
     public Mode getMode() {
@@ -92,59 +94,35 @@ public final class SelectionModel {
     }
 
     /**
-     * Applies a pick at grid position {@code p} using the current mode.
-     * {@code additive} (Shift/Ctrl-click) forces MULTI toggle regardless of mode.
+     * Applies a pick at grid position {@code p} using the current mode. In ENTITY
+     * mode any click selects the whole entity. In BLOCKS mode a plain click replaces
+     * the selection with the single block; {@code additive} (Shift/Ctrl-click)
+     * toggles that block in/out of the running selection instead.
      */
     public void applyPick(Point3i p, SparseMatrix<Block> grid, boolean additive) {
-        Mode effective = additive ? Mode.MULTI : mMode;
+        if (mMode == Mode.ENTITY) {
+            selectAll(grid);
+            fireChanged();
+            return;
+        }
         if (p == null) {
             // Clicked empty space: deselect everything — but keep an accumulating
-            // multi-selection (a stray shift-click on air shouldn't wipe it).
-            if (effective != Mode.MULTI && !mSelected.isEmpty()) {
+            // additive selection (a stray shift-click on air shouldn't wipe it).
+            if (!additive && !mSelected.isEmpty()) {
                 mSelected.clear();
                 fireChanged();
             }
             return;
         }
-        switch (effective) {
-            case SINGLE:
-                mSelected.clear();
+        if (additive) {
+            if (!mSelected.remove(p)) {
                 mSelected.add(new Point3i(p));
-                break;
-            case MULTI:
-                if (!mSelected.remove(p)) {
-                    mSelected.add(new Point3i(p));
-                }
-                break;
-            case BLOCK_TYPE:
-                selectByType(p, grid);
-                break;
-            case ENTITY:
-                selectAll(grid);
-                break;
-            default:
-                break;
+            }
+        } else {
+            mSelected.clear();
+            mSelected.add(new Point3i(p));
         }
         fireChanged();
-    }
-
-    private void selectByType(Point3i p, SparseMatrix<Block> grid) {
-        mSelected.clear();
-        if (grid == null) {
-            return;
-        }
-        Block picked = grid.get(p);
-        if (picked == null) {
-            return;
-        }
-        short id = picked.getBlockID();
-        for (Iterator<Point3i> it = grid.iteratorNonNull(); it.hasNext();) {
-            Point3i q = it.next();
-            Block b = grid.get(q);
-            if (b != null && b.getBlockID() == id) {
-                mSelected.add(q);
-            }
-        }
     }
 
     private void selectAll(SparseMatrix<Block> grid) {

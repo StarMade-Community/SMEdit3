@@ -23,8 +23,16 @@ import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseListener;
+import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
+
+import org.lwjgl.BufferUtils;
+import org.lwjgl.util.glu.GLU;
 
 import smc.smedit.data.BlockTypes;
 import smc.smedit.data.RenderPoly;
@@ -34,7 +42,11 @@ import smc.smedit.logic.StarMadeLogic;
 import smc.smedit.ship.data.Block;
 import smc.smedit.ui.RenderPanel;
 import smc.smedit.util.jgl.obj.JGLCamera;
+import smc.smedit.scene.Scene;
+import smc.smedit.scene.SceneModel;
+import smc.smedit.scene.SceneObject;
 import smc.smedit.util.jgl.obj.JGLGroup;
+import smc.smedit.vecmath.Matrix4f;
 import smc.smedit.util.jgl.obj.JGLNode;
 import smc.smedit.util.jgl.obj.JGLScene;
 import smc.smedit.util.jgl.obj.tri.JGLObj;
@@ -52,6 +64,8 @@ public class LWJGLRenderPanel extends RenderPanel {
     private final JGLScene mScene;
     public JGLCamera mUniverse;
     private final JGLGroup mBlocks;
+    /** Read-only geometry for the scene's other (non-active) visible objects, each at its transform. */
+    private final JGLGroup mContext;
     private final JGLGroup mSelection;
     private final JGLGroup mAxis;
     private final JGLGroup mGrid;
@@ -95,6 +109,9 @@ public class LWJGLRenderPanel extends RenderPanel {
         // Render thread stashes the block group's GL matrices here for picking.
         mBlocks.setData("pickCapture", mPickMatrices);
         mUniverse.getChildren().add(mBlocks);
+        // Non-active scene objects render here as read-only context (no picking).
+        mContext = new JGLGroup();
+        mUniverse.getChildren().add(mContext);
         mSelection = new JGLGroup();
         mUniverse.getChildren().add(mSelection);
         mAxis = new JGLGroup();
@@ -275,9 +292,48 @@ public class LWJGLRenderPanel extends RenderPanel {
         mBlocks.getChildren().clear();
         LWJGLRenderLogic.addBlocks(mBlocks, mFilteredGrid, mPlainGraphics);
         System.out.println("Quads:" + mBlocks.getChildren().size());
+        updateContext();
         updateSelectionBox();
         // Depth-sort the freshly built glass mesh for the current camera.
         updateTransform();
+    }
+
+    /**
+     * Rebuilds the read-only geometry for every visible scene object other than the
+     * active one, each positioned in the active object's frame (active⁻¹ · world) so
+     * the whole scene is shown around the object being edited. The active object
+     * itself is drawn by {@link #mBlocks} at the origin (fully editable/pickable).
+     */
+    private void updateContext() {
+        mContext.getChildren().clear();
+        SceneModel sm = StarMadeLogic.getInstance().getSceneModel();
+        Scene scene = sm != null ? sm.getScene() : null;
+        if (scene == null || scene.getObjects().size() < 2) {
+            return; // nothing but the active object to draw
+        }
+        SceneObject active = sm.getActiveObject();
+        Matrix4f invActive = new Matrix4f();
+        invActive.setIdentity();
+        if (active != null) {
+            invActive.set(active.getTransform());
+            try {
+                invActive.invert();
+            } catch (RuntimeException e) {
+                invActive.setIdentity(); // singular transform: fall back to the world frame
+            }
+        }
+        for (SceneObject o : new java.util.ArrayList<>(scene.getObjects())) {
+            if (o == active || !o.isVisible() || o.getGrid() == null) {
+                continue;
+            }
+            Matrix4f m = new Matrix4f();
+            m.set(invActive);
+            m.mul(o.getTransform()); // active⁻¹ · worldₒ
+            JGLGroup g = new JGLGroup();
+            g.setTransform(m);
+            LWJGLRenderLogic.addBlocks(g, o.getGrid(), mPlainGraphics);
+            mContext.getChildren().add(g);
+        }
     }
 
     public void updateSelectionBox() {
@@ -456,6 +512,72 @@ public class LWJGLRenderPanel extends RenderPanel {
         // (x, y) are LWJGL window coords (origin bottom-left), matching what the
         // GL viewport/gluUnProject expect. Ray-cast into the voxel grid.
         return RaycastPicker.pick((float) x, (float) y, mPickMatrices.snapshot(), StarMadeLogic.getModel());
+    }
+
+    // ------------------------------------------------------------------
+    // Marquee (drag-box) selection
+    // ------------------------------------------------------------------
+
+    /** The selection captured when an additive drag-box began; empty otherwise. */
+    private List<Point3i> mMarqueeBase = Collections.emptyList();
+
+    /**
+     * Begins a drag-box selection. An additive drag (Shift/Ctrl) unions with the
+     * selection that existed when the drag started; a plain drag replaces it.
+     */
+    public void beginMarquee(boolean additive) {
+        mMarqueeBase = additive
+                ? StarMadeLogic.getInstance().getSelection().getSelected()
+                : Collections.emptyList();
+    }
+
+    /**
+     * Selects every block whose centre projects inside the screen rectangle spanned
+     * by (x0,y0)-(x1,y1) — LWJGL window coords (origin bottom-left, matching the
+     * synthesized mouse events). Selects through occluders, so the marquee grabs the
+     * whole framed region, not just the visible skin.
+     */
+    public void updateMarquee(int x0, int y0, int x1, int y1) {
+        PickMatrices.Snapshot snap = mPickMatrices.snapshot();
+        SparseMatrix<Block> grid = StarMadeLogic.getModel();
+        if (snap == null || grid == null) {
+            return;
+        }
+        int minX = Math.min(x0, x1), maxX = Math.max(x0, x1);
+        int minY = Math.min(y0, y1), maxY = Math.max(y0, y1);
+        FloatBuffer mv = wrap16(snap.modelview);
+        FloatBuffer proj = wrap16(snap.projection);
+        IntBuffer vp = BufferUtils.createIntBuffer(16);
+        vp.put(snap.viewport).flip();
+        FloatBuffer win = BufferUtils.createFloatBuffer(3);
+        LinkedHashSet<Point3i> inside = new LinkedHashSet<>(mMarqueeBase);
+        for (Iterator<Point3i> it = grid.iteratorNonNull(); it.hasNext();) {
+            Point3i p = it.next();
+            win.clear();
+            if (!GLU.gluProject(p.x, p.y, p.z, mv, proj, vp, win)) {
+                continue;
+            }
+            float wz = win.get(2);
+            if (wz < 0f || wz > 1f) {
+                continue; // behind the eye or past the far plane
+            }
+            float wx = win.get(0), wy = win.get(1);
+            if (wx >= minX && wx <= maxX && wy >= minY && wy <= maxY) {
+                inside.add(new Point3i(p));
+            }
+        }
+        StarMadeLogic.getInstance().getSelection().select(inside);
+    }
+
+    /** Ends a drag-box selection, releasing the captured base selection. */
+    public void endMarquee() {
+        mMarqueeBase = Collections.emptyList();
+    }
+
+    private static FloatBuffer wrap16(float[] a) {
+        FloatBuffer b = BufferUtils.createFloatBuffer(16);
+        b.put(a).flip();
+        return b;
     }
 
     /**

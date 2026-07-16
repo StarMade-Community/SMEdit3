@@ -11,9 +11,7 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.RenderingHints;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Pattern;
 
 import javax.swing.BorderFactory;
@@ -49,16 +47,15 @@ import smc.smedit.vecmath.Point3i;
 
 /**
  * Dockable panel that lists data for the current block selection. The selection
- * mode drives what a viewport click selects; the group toggle switches between a
- * per-block table and a by-type summary; the detail control widens the columns;
- * the filter narrows visible rows. Summary chips give the running block / type /
- * HP totals, and the Name column carries a colour dot for the block type.
+ * mode drives what a viewport click selects (blocks vs. the whole entity); the
+ * detail control widens the columns; the filter narrows visible rows. Summary
+ * chips give the running block / type / HP totals, and the Name column carries a
+ * colour dot for the block type.
  */
 @SuppressWarnings("serial")
 public class BlockInfoPanel extends JPanel {
 
     private final JComboBox<SelectionModel.Mode> mModeBox = new JComboBox<>(SelectionModel.Mode.values());
-    private final JComboBox<String> mViewBox = new JComboBox<>(new String[]{"Per-block", "By type"});
     private final JComboBox<String> mDetailBox = new JComboBox<>(new String[]{"Basic", "Full"});
     private final JTextField mFilter = new JTextField(12);
     private final JTable mTable = new JTable();
@@ -96,16 +93,15 @@ public class BlockInfoPanel extends JPanel {
 
         header.add(sectionLabel("Selection"));
 
-        // Mode / Group / Detail in a compact two-column grid so the controls stack
-        // and stay full-width when the dock is narrow.
+        // Mode / Detail in a compact two-column grid so the controls stack and stay
+        // full-width when the dock is narrow.
         JPanel controls = new JPanel(new GridBagLayout());
         controls.setAlignmentX(Component.LEFT_ALIGNMENT);
         GridBagConstraints gc = new GridBagConstraints();
         gc.insets = new Insets(2, 0, 2, 6);
         gc.anchor = GridBagConstraints.WEST;
         addControlRow(controls, gc, 0, "Mode", mModeBox);
-        addControlRow(controls, gc, 1, "Group", mViewBox);
-        addControlRow(controls, gc, 2, "Detail", mDetailBox);
+        addControlRow(controls, gc, 1, "Detail", mDetailBox);
         controls.setMaximumSize(new Dimension(Integer.MAX_VALUE, controls.getPreferredSize().height));
         header.add(controls);
 
@@ -120,6 +116,12 @@ public class BlockInfoPanel extends JPanel {
         chips.add(Box.createHorizontalStrut(6));
         chips.add(mHpChip);
         chips.add(Box.createHorizontalGlue());
+        // Seed the pills with representative HTML content before measuring: an empty
+        // chip is much shorter than a filled one, and clamping the row's max height to
+        // the empty measurement clips the pills once rebuild() fills them in.
+        mBlocksChip.set(0, "blocks");
+        mTypesChip.set(0, "types");
+        mHpChip.set(0, "HP");
         chips.setMaximumSize(new Dimension(Integer.MAX_VALUE, chips.getPreferredSize().height));
         header.add(chips);
 
@@ -149,7 +151,6 @@ public class BlockInfoPanel extends JPanel {
                 sel.selectEntity(StarMadeLogic.getModel());
             }
         });
-        mViewBox.addActionListener(e -> rebuild());
         mDetailBox.addActionListener(e -> rebuild());
         mFilter.getDocument().addDocumentListener(new SimpleDoc(this::applyFilter));
         clear.addActionListener(e -> StarMadeLogic.getInstance().getSelection().clear());
@@ -184,22 +185,12 @@ public class BlockInfoPanel extends JPanel {
         syncModeBox(sel.getMode());
         SparseMatrix<Block> grid = StarMadeLogic.getModel();
         List<Point3i> selected = sel.getSelected();
-        boolean byType = mViewBox.getSelectedIndex() == 1;
         boolean full = mDetailBox.getSelectedIndex() == 1;
 
-        String[] cols;
-        List<Object[]> rows;
-        if (byType) {
-            cols = full
-                    ? new String[]{"ID", "Name", "Count", "Style", "Transp", "Sides", "Total HP"}
-                    : new String[]{"ID", "Name", "Count"};
-            rows = byTypeRows(selected, grid, full);
-        } else {
-            cols = full
-                    ? new String[]{"Pos", "ID", "Name", "Orient", "Style", "Slab", "Transp", "Sides", "HP", "Active", "Face Tex"}
-                    : new String[]{"Pos", "ID", "Name", "Orient", "Active"};
-            rows = perBlockRows(selected, grid, full);
-        }
+        String[] cols = full
+                ? new String[]{"Pos", "ID", "Name", "Orient", "Style", "Slab", "Transp", "Sides", "HP", "Active", "Face Tex"}
+                : new String[]{"Pos", "ID", "Name", "Orient", "Active"};
+        List<Object[]> rows = perBlockRows(selected, grid, full);
 
         DefaultTableModel dm = new DefaultTableModel(cols, 0) {
             @Override
@@ -261,38 +252,6 @@ public class BlockInfoPanel extends JPanel {
                     (int) b.getHitPoints(), yesNo(b.isActive()), faceTex(id)});
             } else {
                 rows.add(new Object[]{pos, id, name, (int) b.getOrientation(), yesNo(b.isActive())});
-            }
-        }
-        return rows;
-    }
-
-    private List<Object[]> byTypeRows(List<Point3i> selected, SparseMatrix<Block> grid, boolean full) {
-        List<Object[]> rows = new ArrayList<>();
-        if (grid == null) {
-            return rows;
-        }
-        // id -> [count, total HP], preserving first-seen order.
-        Map<Short, int[]> agg = new LinkedHashMap<>();
-        for (Point3i p : selected) {
-            Block b = grid.get(p);
-            if (b == null) {
-                continue;
-            }
-            int[] v = agg.computeIfAbsent(b.getBlockID(), k -> new int[2]);
-            v[0]++;
-            v[1] += b.getHitPoints();
-        }
-        for (Map.Entry<Short, int[]> e : agg.entrySet()) {
-            short id = e.getKey();
-            String name = BlockTypes.BLOCK_NAMES.getOrDefault(id, "?");
-            if (full) {
-                rows.add(new Object[]{id, name, e.getValue()[0],
-                    styleName(BlockTypeColors.getBlockStyle(id)),
-                    yesNo(BlockTypeColors.isTransparent(id)),
-                    BlockTypeColors.BLOCK_INDIVIDUAL_SIDES.getOrDefault(id, 1),
-                    e.getValue()[1]});
-            } else {
-                rows.add(new Object[]{id, name, e.getValue()[0]});
             }
         }
         return rows;

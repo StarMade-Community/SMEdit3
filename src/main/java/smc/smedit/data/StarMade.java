@@ -24,6 +24,7 @@ import java.util.Properties;
 
 import smc.smedit.logic.LayerModel;
 import smc.smedit.logic.SelectionModel;
+import smc.smedit.scene.SceneModel;
 import smc.smedit.mods.IBlocksPlugin;
 import smc.smedit.mods.IStarMadePluginFactory;
 import smc.smedit.ship.data.Block;
@@ -49,6 +50,7 @@ public class StarMade extends PCSBean {
     private Point3i mSelectedLower;
     private final SelectionModel mSelection = new SelectionModel();
     private final LayerModel mLayers = new LayerModel();
+    private SceneModel mSceneModel;
     private String mStatusMessage;
     private IBlocksPlugin mViewFilter;
     private ShipSpec mCurrentModel;
@@ -127,6 +129,17 @@ public class StarMade extends PCSBean {
     /** The shared layer/visibility model (block groups that can be hidden in the viewport). */
     public LayerModel getLayers() {
         return mLayers;
+    }
+
+    /**
+     * The live multi-entity scene document (lazily created). Its active object's
+     * grid is, by reference, the editor's single working grid ({@link #getModel()}).
+     */
+    public SceneModel getSceneModel() {
+        if (mSceneModel == null) {
+            mSceneModel = new SceneModel(this);
+        }
+        return mSceneModel;
     }
 
     public short getSelectedBlockType() {

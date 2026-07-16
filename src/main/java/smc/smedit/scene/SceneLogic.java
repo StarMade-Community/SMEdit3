@@ -95,6 +95,15 @@ public final class SceneLogic {
     }
 
     /**
+     * Exports a single scene object as a standalone StarMade blueprint folder
+     * (header/logic/meta + DATA), loadable by the game. Used by the outliner's
+     * per-object "Export…" action.
+     */
+    public static void writeObjectAsBlueprint(SceneObject obj, File blueprintDir) throws IOException {
+        writeObjectFolder(obj, blueprintDir);
+    }
+
+    /**
      * Writes one object's blocks as a StarMade blueprint folder. This is a
      * de-singletoned copy of {@link BlueprintLogic#saveBlueprint} that takes the
      * object's own grid/logic instead of reaching into {@code StarMadeLogic}.

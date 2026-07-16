@@ -105,7 +105,7 @@ public class SettingsDialog extends JDialog {
         JButton reset = new JButton("Reset to Default Layout");
         reset.addActionListener(e -> owner.resetLayout());
         addRow(p, 1, "", reset);
-        addNote(p, 2, "The chosen preset is restored on the next start.");
+        addNote(p, 2, "Seeds the workspace on first start; afterwards your last-used layout reopens.");
         return p;
     }
 

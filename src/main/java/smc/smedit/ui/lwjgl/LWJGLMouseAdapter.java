@@ -18,10 +18,14 @@
 package smc.smedit.ui.lwjgl;
 
 import java.awt.Point;
+import java.awt.event.InputEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
 
+import smc.smedit.logic.SelectionModel;
+import smc.smedit.logic.StarMadeLogic;
+import smc.smedit.ui.tool.EditorTool;
 import smc.smedit.ui.tool.ToolController;
 import smc.smedit.vecmath.Point3f;
 import smc.smedit.vecmath.Point3i;
@@ -45,12 +49,17 @@ public class LWJGLMouseAdapter extends MouseAdapter {
     private static final int MOUSE_MODE_PIVOT = 1; // orbit around the ship centre
     private static final int MOUSE_MODE_PAN = 3;
     private static final int MOUSE_MODE_TOOL = 4;  // left-drag drives the active tool
+    private static final int MOUSE_MODE_MARQUEE = 5; // left-drag box-selects blocks
+
+    /** Pixels the cursor must travel before a Select left-drag becomes a marquee. */
+    private static final int MARQUEE_THRESHOLD = 3;
 
     private final LWJGLRenderPanel mPanel;
 
     private Point mMouseDownAt;
     private Point3f mMousePivotAround;
     private int mMouseMode;
+    private boolean mMarqueeMoved;
 
     public LWJGLMouseAdapter(LWJGLRenderPanel panel) {
         mPanel = panel;
@@ -100,6 +109,14 @@ public class LWJGLMouseAdapter extends MouseAdapter {
         } else if (button == MouseEvent.BUTTON2) {
             // Middle-drag pans the view.
             mMouseMode = MOUSE_MODE_PAN;
+        } else if (isMarqueeStart(modifiers, clickCount)) {
+            // Select tool, Blocks mode, single left-press with no Alt: arm a drag-box
+            // selection. It doesn't commit until the cursor moves past the threshold,
+            // so a plain click still selects the single block under the cursor (on
+            // release). Shift/Ctrl unions with the existing selection.
+            mMouseMode = MOUSE_MODE_MARQUEE;
+            mMarqueeMoved = false;
+            mPanel.beginMarquee((modifiers & (InputEvent.SHIFT_MASK | InputEvent.CTRL_MASK)) != 0);
         } else {
             // Left-click is the ACTIVE TOOL's action (paint / erase / select / …),
             // routed through the ToolController — no longer an implicit select.
@@ -116,6 +133,14 @@ public class LWJGLMouseAdapter extends MouseAdapter {
                 ToolController.get().onPress(hit, place, mPanel, modifiers);
             }
         }
+    }
+
+    /** Whether a left-press should arm a drag-box selection rather than the tool action. */
+    private static boolean isMarqueeStart(int modifiers, int clickCount) {
+        return clickCount < 2
+                && (modifiers & InputEvent.ALT_MASK) == 0
+                && ToolController.get().getActive() == EditorTool.SELECT
+                && StarMadeLogic.getInstance().getSelection().getMode() == SelectionModel.Mode.BLOCKS;
     }
 
     private void doMouseMove(Point p, int modifiers) {
@@ -157,6 +182,15 @@ public class LWJGLMouseAdapter extends MouseAdapter {
             Point3i hit = mPanel.getPointAt(p.x, p.y);
             Point3i place = mPanel.getPlacementAt(p.x, p.y);
             ToolController.get().onDrag(hit, place, mPanel);
+        } else if (mMouseMode == MOUSE_MODE_MARQUEE) {
+            // Anchor stays put (mMouseDownAt); grow the box to the cursor once it's
+            // travelled far enough to be a drag rather than a click.
+            if (Math.abs(dx) > MARQUEE_THRESHOLD || Math.abs(dy) > MARQUEE_THRESHOLD) {
+                mMarqueeMoved = true;
+            }
+            if (mMarqueeMoved) {
+                mPanel.updateMarquee(mMouseDownAt.x, mMouseDownAt.y, p.x, p.y);
+            }
         }
     }
 
@@ -165,6 +199,16 @@ public class LWJGLMouseAdapter extends MouseAdapter {
             doMouseMove(p, modifiers);
         } else if (mMouseMode == MOUSE_MODE_TOOL) {
             ToolController.get().onRelease();
+        } else if (mMouseMode == MOUSE_MODE_MARQUEE) {
+            if (mMarqueeMoved) {
+                mPanel.updateMarquee(mMouseDownAt.x, mMouseDownAt.y, p.x, p.y);
+            } else {
+                // A plain click, not a drag: select the single block under the cursor.
+                boolean additive = (modifiers & (InputEvent.SHIFT_MASK | InputEvent.CTRL_MASK)) != 0;
+                StarMadeLogic.getInstance().getSelection()
+                        .applyPick(mPanel.getPointAt(p.x, p.y), StarMadeLogic.getModel(), additive);
+            }
+            mPanel.endMarquee();
         }
         mMouseDownAt = null;
         mMouseMode = MOUSE_MODE_NULL;

@@ -52,8 +52,8 @@ public class SaveAsFileAction extends GenericAction {
 
     public SaveAsFileAction(RenderFrame frame) {
         mFrame = frame;
-        setName("File...");
-        setToolTipText("Save as smb2 file");
+        setName("Ship File…");
+        setToolTipText("Save the active object as an .smd2 ship file");
     }
     
     
