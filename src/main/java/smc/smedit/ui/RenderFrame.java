@@ -730,6 +730,8 @@ public class RenderFrame extends JFrame {
         switch (tool) {
             case SELECT:
                 SelectionModel sel = StarMadeLogic.getInstance().getSelection();
+                innerToolBar.add(hint("Double-click a block to select its whole connected type."));
+                innerToolBar.addSeparator();
                 innerToolBar.add(new JLabel("Mode: "));
                 JComboBox<SelectionModel.Mode> modeBox = new JComboBox<>(SelectionModel.Mode.values());
                 modeBox.setSelectedItem(sel.getMode());
@@ -742,8 +744,6 @@ public class RenderFrame extends JFrame {
                     }
                 });
                 innerToolBar.add(modeBox);
-                innerToolBar.addSeparator();
-                innerToolBar.add(hint("Double-click a block to select its whole connected type."));
                 break;
             case FILL:
                 innerToolBar.add(hint("Click to repaint the selection — or the connected same-type region — with the brush material."));
