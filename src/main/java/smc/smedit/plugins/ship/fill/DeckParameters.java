@@ -17,7 +17,8 @@
  **/
 package smc.smedit.plugins.ship.fill;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.ui.act.plugin.Description;
 
 /**
@@ -42,7 +43,7 @@ public class DeckParameters {
     public DeckParameters() {
         mThickness = 1;
         mSpace = 3;
-        mMaterial = BlockTypes.HULL_COLOR_GREY_ID;
+        mMaterial = Blocks.GREY_STANDARD_ARMOR.getId();
         mStairwellWidth = 3;
         mStairwellXGap = 12;
         mStairwellZGap = 27;

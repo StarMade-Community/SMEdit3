@@ -29,7 +29,8 @@ import java.util.logging.Logger;
 
 import javax.swing.ImageIcon;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.RenderPoly;
 import smc.smedit.data.RenderSet;
 import smc.smedit.data.SparseMatrix;
@@ -85,13 +86,13 @@ public class RenderPolyLogic {
             Point3i p = i.next();
             Block b = blocks.get(p);
             short blockID = b.getBlockID();
-            if (BlockTypes.isCorner(blockID) || BlockTypes.isPowerCorner(blockID)) {
+            if (BlockGroups.isCorner(blockID) || BlockGroups.isPowerCorner(blockID)) {
                 doCorner(blocks, p, polys);
-            } else if (BlockTypes.isWedge(blockID) || BlockTypes.isPowerWedge(blockID)) {
+            } else if (BlockGroups.isWedge(blockID) || BlockGroups.isPowerWedge(blockID)) {
                 doWedge(blocks, p, polys);
-            } else if (BlockTypes.isPenta(blockID) || BlockTypes.isPowerPenta(blockID)) {
+            } else if (BlockGroups.isPenta(blockID) || BlockGroups.isPowerPenta(blockID)) {
                 doPenta(blocks, p, polys);
-            } else if (BlockTypes.isTetra(blockID) || BlockTypes.isPowerTetra(blockID)) {
+            } else if (BlockGroups.isTetra(blockID) || BlockGroups.isPowerTetra(blockID)) {
                 doTetra(blocks, p, polys);
             } else {
                 doCube(blocks, p, polys);
@@ -477,7 +478,7 @@ public class RenderPolyLogic {
 
     private static boolean opaque(SparseMatrix<Block> grid, int x, int y, int z) {
         Block b = grid.get(x, y, z);
-        return (b != null) && !BlockTypes.isAnyCorner(b.getBlockID()) && !BlockTypes.isAnyWedge(b.getBlockID());
+        return (b != null) && !BlockGroups.isAnyCorner(b.getBlockID()) && !BlockGroups.isAnyWedge(b.getBlockID());
     }
 
     public static void transformAndSort(final RenderSet set, Matrix4f transform) {

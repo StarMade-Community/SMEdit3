@@ -28,7 +28,8 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.ship.data.Block;
 import smc.smedit.ship.data.BlockEntry;
@@ -99,8 +100,8 @@ public class HeaderLogic {
         log.log(Level.INFO, "Header " + header.getLowerBound() + " -- " + header.getUpperBound() + " (u1=" + header.getUnknown1() + ", u2=" + header.getUnknown2() + ")");
         //System.out.println("Header " + header.getLowerBound() + " -- " + header.getUpperBound() + " (u1=" + header.getUnknown1() + ", u2=" + header.getUnknown2() + ")");
         for (BlockEntry entry : header.getManifest()) {
-            log.log(Level.INFO, "  " + entry.getBlockQuantity() + "x " + BlockTypes.BLOCK_NAMES.get(entry.getBlockID()));
-            //System.out.println("  " + entry.getBlockQuantity() + "x " + BlockTypes.BLOCK_NAMES.get(entry.getBlockID()));
+            log.log(Level.INFO, "  " + entry.getBlockQuantity() + "x " + BlockGroups.BLOCK_NAMES.get(entry.getBlockID()));
+            //System.out.println("  " + entry.getBlockQuantity() + "x " + BlockGroups.BLOCK_NAMES.get(entry.getBlockID()));
         }
     }
 

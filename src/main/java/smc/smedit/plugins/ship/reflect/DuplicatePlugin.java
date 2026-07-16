@@ -21,7 +21,8 @@ import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.CubeIterator;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.data.StarMade;
@@ -115,7 +116,7 @@ public class DuplicatePlugin implements IBlocksPlugin {
             if (b == null) {
                 continue;
             }
-            if (b.getBlockID() == BlockTypes.CORE_ID) {
+            if (b.getBlockID() == Blocks.SHIP_CORE.getId()) {
                 continue;
             }
             if (params.getXReflect() > 0) {
@@ -128,7 +129,7 @@ public class DuplicatePlugin implements IBlocksPlugin {
             short ori;
             ori = b.getOrientation();
             b = new Block(b.getBlockID());
-            if (BlockTypes.isWedge(b.getBlockID()) || BlockTypes.isPowerWedge(b.getBlockID()) || (b.getBlockID() == BlockTypes.GLASS_WEDGE_ID)) {
+            if (BlockGroups.isWedge(b.getBlockID()) || BlockGroups.isPowerWedge(b.getBlockID()) || (b.getBlockID() == Blocks.GLASS_WEDGE.getId())) {
                 ori = WedgeLogic.reflect(ori, true, false, false);
                 if (ori >= 0) {
                     b.setOrientation(ori);
@@ -136,7 +137,7 @@ public class DuplicatePlugin implements IBlocksPlugin {
                     log.log(Level.WARNING, "Could not rotate wedge ori=" + b.getOrientation());
                 }
             }
-            if (BlockTypes.isCorner(b.getBlockID()) || BlockTypes.isPowerCorner(b.getBlockID()) || (b.getBlockID() == BlockTypes.GLASS_CORNER_ID)) {
+            if (BlockGroups.isCorner(b.getBlockID()) || BlockGroups.isPowerCorner(b.getBlockID()) || (b.getBlockID() == Blocks.GLASS_CORNER.getId())) {
                 ori = CornerLogic.reflect(ori, true, false, false);
                 if (ori >= 0) {
                     b.setOrientation(ori);
@@ -187,7 +188,7 @@ public class DuplicatePlugin implements IBlocksPlugin {
             if (b == null) {
                 continue;
             }
-            if (b.getBlockID() == BlockTypes.CORE_ID) {
+            if (b.getBlockID() == Blocks.SHIP_CORE.getId()) {
                 continue;
             }
             if (params.getYReflect() > 0) {
@@ -202,7 +203,7 @@ public class DuplicatePlugin implements IBlocksPlugin {
             short ori;
             ori = b.getOrientation();
             b = new Block(b.getBlockID());
-            if (BlockTypes.isWedge(b.getBlockID()) || BlockTypes.isPowerWedge(b.getBlockID()) || (b.getBlockID() == BlockTypes.GLASS_WEDGE_ID)) {
+            if (BlockGroups.isWedge(b.getBlockID()) || BlockGroups.isPowerWedge(b.getBlockID()) || (b.getBlockID() == Blocks.GLASS_WEDGE.getId())) {
                 ori = WedgeLogic.reflect(ori, false, true, false);
                 if (ori >= 0) {
                     b.setOrientation(ori);
@@ -210,7 +211,7 @@ public class DuplicatePlugin implements IBlocksPlugin {
                     log.log(Level.WARNING, "Could not rotate wedge ori=" + b.getOrientation());
                 }
             }
-            if (BlockTypes.isCorner(b.getBlockID()) || BlockTypes.isPowerCorner(b.getBlockID()) || (b.getBlockID() == BlockTypes.GLASS_CORNER_ID)) {
+            if (BlockGroups.isCorner(b.getBlockID()) || BlockGroups.isPowerCorner(b.getBlockID()) || (b.getBlockID() == Blocks.GLASS_CORNER.getId())) {
                 ori = CornerLogic.reflect(ori, false, true, false);
                 if (ori >= 0) {
                     b.setOrientation(ori);
@@ -259,7 +260,7 @@ public class DuplicatePlugin implements IBlocksPlugin {
             if (b == null) {
                 continue;
             }
-            if (b.getBlockID() == BlockTypes.CORE_ID) {
+            if (b.getBlockID() == Blocks.SHIP_CORE.getId()) {
                 continue;
             }
             if (params.getXReflect() > 0) {
@@ -274,7 +275,7 @@ public class DuplicatePlugin implements IBlocksPlugin {
             b = new Block(b.getBlockID());
             short ori;
             ori = b.getOrientation();
-            if (BlockTypes.isWedge(b.getBlockID()) || BlockTypes.isPowerWedge(b.getBlockID()) || (b.getBlockID() == BlockTypes.GLASS_WEDGE_ID)) {
+            if (BlockGroups.isWedge(b.getBlockID()) || BlockGroups.isPowerWedge(b.getBlockID()) || (b.getBlockID() == Blocks.GLASS_WEDGE.getId())) {
                 ori = WedgeLogic.reflect(ori, false, false, true);
                 if (ori >= 0) {
                     b.setOrientation(ori);
@@ -282,7 +283,7 @@ public class DuplicatePlugin implements IBlocksPlugin {
                     log.log(Level.WARNING, "Could not rotate wedge ori=" + b.getOrientation());
                 }
             }
-            if (BlockTypes.isCorner(b.getBlockID()) || BlockTypes.isPowerCorner(b.getBlockID()) || (b.getBlockID() == BlockTypes.GLASS_CORNER_ID)) {
+            if (BlockGroups.isCorner(b.getBlockID()) || BlockGroups.isPowerCorner(b.getBlockID()) || (b.getBlockID() == Blocks.GLASS_CORNER.getId())) {
                 ori = CornerLogic.reflect(ori, false, false, true);
                 if (ori >= 0) {
                     b.setOrientation(ori);

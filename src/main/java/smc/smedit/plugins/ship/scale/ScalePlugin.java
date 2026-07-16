@@ -21,7 +21,8 @@ import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.data.StarMade;
 import smc.smedit.mods.IBlocksPlugin;
@@ -104,14 +105,14 @@ public class ScalePlugin implements IBlocksPlugin {
             Point3f fPoint;
             fPoint = transform(xyz, core, params);
             log.log(Level.INFO, "  \"+xyz+\" -> ", fPoint);
-            if (b.getBlockID() != BlockTypes.CORE_ID) {
+            if (b.getBlockID() != Blocks.SHIP_CORE.getId()) {
                 for (int x = 0; x < size.x; x++) {
                     for (int y = 0; y < size.y; y++) {
                         for (int z = 0; z < size.z; z++) {
                             Block newB;
                             newB = new Block(b);
-                            if (BlockTypes.isController(newB.getBlockID())) {
-                                newB.setBlockID(BlockTypes.CONTROLLER_IDS.get(newB.getBlockID()));
+                            if (BlockGroups.isController(newB.getBlockID())) {
+                                newB.setBlockID(BlockGroups.controlledBlock(newB.getBlockID()));
                             }
                             set(fPoint, x, y, z, modified, newB);
                         }
@@ -151,7 +152,7 @@ public class ScalePlugin implements IBlocksPlugin {
         for (Iterator<Point3i> i = grid.iteratorNonNull(); i.hasNext();) {
             Point3i xyz;
             xyz = i.next();
-            if (grid.get(xyz).getBlockID() == BlockTypes.CORE_ID) {
+            if (grid.get(xyz).getBlockID() == Blocks.SHIP_CORE.getId()) {
                 return xyz;
             }
         }

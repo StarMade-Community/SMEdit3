@@ -28,7 +28,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.data.StarMade;
 import smc.smedit.logic.utils.StringUtils;
@@ -127,7 +128,7 @@ public class ObjectReportPlugin implements IBlocksPlugin {
             } else {
                 quantities.put(b.getBlockID(), count + 1);
             }
-            if (b.getBlockID() == BlockTypes.CORE_ID) {
+            if (b.getBlockID() == Blocks.SHIP_CORE.getId()) {
                 core.add(p);
             }
         }
@@ -153,7 +154,7 @@ public class ObjectReportPlugin implements IBlocksPlugin {
             } else {
                 wtr.print("     ");
             }
-            wtr.print(" " + BlockTypes.BLOCK_NAMES.get(id));
+            wtr.print(" " + BlockGroups.BLOCK_NAMES.get(id));
             wtr.println();
         }
     }

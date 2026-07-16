@@ -25,7 +25,8 @@ import java.io.OutputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.ent.data.Tag;
 import smc.smedit.ent.logic.TagLogic;
@@ -112,9 +113,9 @@ public class MetaLogic {
         //System.out.println("Meta (u1=" + meta.getUnknown1() + ", u2=" + meta.getUnknown2() + ", u3=" + meta.getUnknown3() + ")");
         for (DockEntry entry : meta.getDocks()) {
             log.log(Level.INFO, "    " + entry.getSubFolder() + " @" + entry.getPosition() + "/" + entry.getA()
-                    + " " + BlockTypes.BLOCK_NAMES.get(entry.getBlockID()) + " (" + entry.getUnknown1() + ")");
+                    + " " + BlockGroups.BLOCK_NAMES.get(entry.getBlockID()) + " (" + entry.getUnknown1() + ")");
             //System.out.println("    " + entry.getSubFolder() + " @" + entry.getPosition() + "/" + entry.getA()
-                    //+ " " + BlockTypes.BLOCK_NAMES.get(entry.getBlockID()) + " (" + entry.getUnknown1() + ")");
+                    //+ " " + BlockGroups.BLOCK_NAMES.get(entry.getBlockID()) + " (" + entry.getUnknown1() + ")");
         }
         TagUtils.dump(meta.getData(), "  ");
     }

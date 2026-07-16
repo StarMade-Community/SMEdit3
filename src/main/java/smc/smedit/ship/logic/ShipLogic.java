@@ -23,7 +23,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.CubeIterator;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.ship.data.Block;
@@ -220,10 +221,10 @@ public class ShipLogic {
     public static Point3i findCore(SparseMatrix<Block> grid) {
         Point3i p = new Point3i(8, 8, 8);
         Block b = grid.get(p);
-        if ((b != null) && (b.getBlockID() == BlockTypes.CORE_ID)) {
+        if ((b != null) && (b.getBlockID() == Blocks.SHIP_CORE.getId())) {
             return p;
         }
-        return findFirstBlock(grid, BlockTypes.CORE_ID);
+        return findFirstBlock(grid, Blocks.SHIP_CORE.getId());
     }
 
     public static Point3i findFirstBlock(SparseMatrix<Block> grid, short id) {
@@ -370,10 +371,10 @@ public class ShipLogic {
         if (core != null) {
             grid.set(core, null);
         }
-        List<Point3i> cores = findBlocks(grid, BlockTypes.CORE_ID);
+        List<Point3i> cores = findBlocks(grid, Blocks.SHIP_CORE.getId());
         for (Point3i p : cores) {
             grid.set(p, null);
         }
-        grid.set(8, 8, 8, new Block(BlockTypes.CORE_ID));
+        grid.set(8, 8, 8, new Block(Blocks.SHIP_CORE.getId()));
     }
 }

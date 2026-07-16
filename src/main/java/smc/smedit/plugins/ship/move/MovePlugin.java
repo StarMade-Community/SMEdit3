@@ -23,7 +23,8 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.data.StarMade;
 import smc.smedit.mods.IBlocksPlugin;
@@ -54,7 +55,7 @@ public class MovePlugin implements IBlocksPlugin {
             to = new Point3i(from.x - dx, from.y - dy, from.z - dz);
             Block b;
             b = original.get(from);
-            if (b.getBlockID() == BlockTypes.CORE_ID) {
+            if (b.getBlockID() == Blocks.SHIP_CORE.getId()) {
                 short newID = getFiller(original, from);
                 if (newID == -1) {
                     continue;
@@ -101,7 +102,7 @@ public class MovePlugin implements IBlocksPlugin {
     public static Point3i findCore(SparseMatrix<Block> grid) {
         for (Iterator<Point3i> i = grid.iteratorNonNull(); i.hasNext();) {
             Point3i xyz = i.next();
-            if (grid.get(xyz).getBlockID() == BlockTypes.CORE_ID) {
+            if (grid.get(xyz).getBlockID() == Blocks.SHIP_CORE.getId()) {
                 return xyz;
             }
         }

@@ -28,7 +28,8 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.logic.IOLogic;
 import smc.smedit.ship.data.Block;
@@ -140,7 +141,7 @@ public class LogicLogic {
             controlledEntry.setPosition(new Point3s(controllerBlockPosition));
             GroupEntry controlledGroup = new GroupEntry();
             controlledEntry.getGroups().add(controlledGroup);
-            short controlledBlockID = BlockTypes.CONTROLLER_IDS.get(controllerBlock.getBlockID());
+            short controlledBlockID = BlockGroups.controlledBlock(controllerBlock.getBlockID());
             controlledGroup.setBlockID(controlledBlockID);
             List<Point3i> controlledBlocks = ShipLogic.findBlocks(grid, controlledBlockID);
             for (Point3i block : controlledBlocks) {
@@ -148,7 +149,7 @@ public class LogicLogic {
             }
         }
         // uncontrolled blocks
-        for (short controlledBlockID : new short[]{BlockTypes.THRUSTER_ID}) {
+        for (short controlledBlockID : new short[]{Blocks.THRUSTER_MODULE.getId()}) {
             List<Point3i> controlledBlocks = ShipLogic.findBlocks(grid, controlledBlockID);
             if (controlledBlocks.isEmpty()) {
                 continue;
@@ -168,7 +169,7 @@ public class LogicLogic {
         for (Iterator<Point3i> i = grid.iteratorNonNull(); i.hasNext();) {
             Point3i pp = i.next();
             Block b = grid.get(pp);
-            if (BlockTypes.isController(b.getBlockID())) {
+            if (BlockGroups.isController(b.getBlockID())) {
                 blocks.add(pp);
             }
         }
@@ -180,15 +181,15 @@ public class LogicLogic {
         //System.out.println("Logic, unknown=" + logic.getUnknown1() + ", #controllers=" + logic.getControllers().size());
         for (ControllerEntry controller : logic.getControllers()) {
             Block controllerBlock = grid.get(controller.getPosition());
-            log.log(Level.INFO, "  Controller at " + controller.getPosition() + " (" + BlockTypes.BLOCK_NAMES.get(controllerBlock.getBlockID()) + "), #groups=" + controller.getGroups().size());
-            //System.out.println("  Controller at " + controller.getPosition() + " (" + BlockTypes.BLOCK_NAMES.get(controllerBlock.getBlockID()) + "), #groups=" + controller.getGroups().size());
+            log.log(Level.INFO, "  Controller at " + controller.getPosition() + " (" + BlockGroups.BLOCK_NAMES.get(controllerBlock.getBlockID()) + "), #groups=" + controller.getGroups().size());
+            //System.out.println("  Controller at " + controller.getPosition() + " (" + BlockGroups.BLOCK_NAMES.get(controllerBlock.getBlockID()) + "), #groups=" + controller.getGroups().size());
             for (GroupEntry group : controller.getGroups()) {
-                log.log(Level.INFO, "    Group of " + group.getBlocks().size() + " " + BlockTypes.BLOCK_NAMES.get(group.getBlockID()));
-                //System.out.println("    Group of " + group.getBlocks().size() + " " + BlockTypes.BLOCK_NAMES.get(group.getBlockID()));
+                log.log(Level.INFO, "    Group of " + group.getBlocks().size() + " " + BlockGroups.BLOCK_NAMES.get(group.getBlockID()));
+                //System.out.println("    Group of " + group.getBlocks().size() + " " + BlockGroups.BLOCK_NAMES.get(group.getBlockID()));
 //                for (Point3s block : group.getBlocks())
 //                {
 //                    Block groupBlock = grid.get(block);
-//                    System.out.println("      "+block+" ("+BlockTypes.BLOCK_NAMES.get(groupBlock.getBlockID())+")");
+//                    System.out.println("      "+block+" ("+BlockGroups.BLOCK_NAMES.get(groupBlock.getBlockID())+")");
 //                }
             }
         }

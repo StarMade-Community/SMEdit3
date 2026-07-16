@@ -24,7 +24,8 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.CubeIterator;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.data.StarMade;
@@ -142,7 +143,7 @@ public class HullPlugin implements IBlocksPlugin {
         }
         HollowPlugin.doHollow(modified, cb);
         if (ShipLogic.findCore(modified) == null) {
-            modified.set(params.getCenterX(), params.getCenterY(), params.getCenterZ(), new Block(BlockTypes.CORE_ID));
+            modified.set(params.getCenterX(), params.getCenterY(), params.getCenterZ(), new Block(Blocks.SHIP_CORE.getId()));
         }
         return modified;
     }
@@ -343,7 +344,7 @@ public class HullPlugin implements IBlocksPlugin {
         for (int z = 0; z <= 5; z++) {
             int skip = ((z == 0) || (z == 5)) ? 1 : 3;
             int rad = ((z == 0) || (z == 5)) ? 6 : 2;
-            short type = ((z == 0) || (z == 5)) ? BlockTypes.HULL_COLOR_BLUE_ID : BlockTypes.HULL_COLOR_WHITE_ID;
+            short type = ((z == 0) || (z == 5)) ? Blocks.BLUE_STANDARD_ARMOR.getId() : Blocks.WHITE_STANDARD_ARMOR.getId();
             Point3i squareO = new Point3i(o);
             for (int s = 0; s < skip; s++) {
                 squareO.add(planeX);
@@ -447,7 +448,7 @@ public class HullPlugin implements IBlocksPlugin {
     }
 
     private void addHull(SparseMatrix<Block> grid, int x, int y, int z) {
-        addHull(grid, x, y, z, BlockTypes.HULL_COLOR_GREY_ID);
+        addHull(grid, x, y, z, Blocks.GREY_STANDARD_ARMOR.getId());
     }
 
     private void addHull(SparseMatrix<Block> grid, int x, int y, int z, short type) {

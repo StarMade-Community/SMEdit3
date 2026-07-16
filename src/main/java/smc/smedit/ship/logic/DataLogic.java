@@ -38,7 +38,8 @@ import java.util.logging.Logger;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.InflaterInputStream;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.CubeIterator;
 import smc.smedit.logic.IOLogic;
 import smc.smedit.logic.utils.DebugLogic;
@@ -207,7 +208,7 @@ public class DataLogic {
                         blocks[x][y][z].setActive(((bitfield >> 20) & 0x1) == 1);
                         blocks[x][y][z].setOrientation((short) (((bitfield >> 21) & 0x7)
                                 | ((bitfield >> (20 - 3)) & 0x8)));
-                        //if (BlockTypes.isHull(blocks[x][y][z].getBlockID()))
+                        //if (BlockGroups.isHull(blocks[x][y][z].getBlockID()))
                         //    System.out.println("  Block "+Integer.toHexString(bitfield)
                         //            +" (id="+ blocks[x][y][z].getBlockID()+", hp="+ blocks[x][y][z].getHitPoints()+")"
                         //            +" "+ByteUtils.toString(inbuf));
@@ -216,7 +217,7 @@ public class DataLogic {
                         if (blocks[x][y][z].getBlockID() <= 0) {
                             blocks[x][y][z] = null; // clear out unneeded blocks
                         } else if (DebugLogic.HULL_ONLY) {
-                            if (!BlockTypes.isAnyHull(blocks[x][y][z].getBlockID())) {
+                            if (!BlockGroups.isAnyHull(blocks[x][y][z].getBlockID())) {
                                 blocks[x][y][z] = null; // clear out unneeded blocks
                             }
                         }
@@ -256,11 +257,11 @@ public class DataLogic {
              for (int y = 0; y < 16; y++)
              if (blocks[x][y][z] != null)
              {
-             if (blocks[x][y][z].getBlockID() == BlockTypes.HULL_COLOR_BLACK_ID)
+             if (blocks[x][y][z].getBlockID() == Blocks.BLACK_STANDARD_ARMOR.getId())
              System.out.print("#");
-             else if (blocks[x][y][z].getBlockID() == BlockTypes.HULL_COLOR_WHITE_ID)
+             else if (blocks[x][y][z].getBlockID() == Blocks.WHITE_STANDARD_ARMOR.getId())
              System.out.print(".");
-             else if (blocks[x][y][z].getBlockID() == BlockTypes.HULL_COLOR_YELLOW_ID)
+             else if (blocks[x][y][z].getBlockID() == Blocks.YELLOW_STANDARD_ARMOR.getId())
              System.out.print(",");
              else
              System.out.print("?");
@@ -333,7 +334,7 @@ public class DataLogic {
                                 bitfield |= ((b.getOrientation() & 0x8) << (20 - 3));
                                 bitfield |= ((b.getOrientation() & 0x7) << 21);
 //                            blockCount++;
-//                            if (BlockTypes.isHull(b.getBlockID()))
+//                            if (BlockGroups.isHull(b.getBlockID()))
 //                                System.out.println("  Block "+Integer.toHexString(bitfield)
 //                                        +" (id="+b.getBlockID()+", hp="+b.getHitPoints()+")"
 //                                        +" "+ByteUtils.toString(fromUnsignedInt(bitfield)));

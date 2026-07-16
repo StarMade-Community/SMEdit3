@@ -29,7 +29,8 @@ import java.util.logging.Logger;
 
 import javax.swing.ImageIcon;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.CubeIterator;
 import smc.smedit.data.RenderTile;
 import smc.smedit.data.SparseMatrix;
@@ -61,13 +62,13 @@ public class RenderLogic {
                 continue;
             }
             Block b = blocks.get(p);
-            if (BlockTypes.isCorner(b.getBlockID()) || BlockTypes.isPowerCorner(b.getBlockID())) {
+            if (BlockGroups.isCorner(b.getBlockID()) || BlockGroups.isPowerCorner(b.getBlockID())) {
                 doCorner(blocks, p, polys);
-            } else if (BlockTypes.isWedge(b.getBlockID()) || BlockTypes.isPowerWedge(b.getBlockID())) {
+            } else if (BlockGroups.isWedge(b.getBlockID()) || BlockGroups.isPowerWedge(b.getBlockID())) {
                 doWedge(blocks, p, polys);
-            } else if (BlockTypes.isPenta(b.getBlockID()) || BlockTypes.isPowerPenta(b.getBlockID())) {
+            } else if (BlockGroups.isPenta(b.getBlockID()) || BlockGroups.isPowerPenta(b.getBlockID())) {
                 doPenta(blocks, p, polys);
-            } else if (BlockTypes.isTetra(b.getBlockID()) || BlockTypes.isPowerTetra(b.getBlockID())) {
+            } else if (BlockGroups.isTetra(b.getBlockID()) || BlockGroups.isPowerTetra(b.getBlockID())) {
                 doTetra(blocks, p, polys);
             } else {
                 doCube(blocks, p, polys);

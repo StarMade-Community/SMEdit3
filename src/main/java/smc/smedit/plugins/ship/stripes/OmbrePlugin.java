@@ -23,7 +23,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.CubeIterator;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.data.StarMade;
@@ -104,7 +105,7 @@ public class OmbrePlugin implements IBlocksPlugin {
             if (b == null) {
                 continue;
             }
-            if (BlockTypes.isAnyHull(b.getBlockID())) {
+            if (BlockGroups.isAnyHull(b.getBlockID())) {
                 b = modify(xyz, b, params, lower, upper);
                 modified.set(xyz, b);
             }
@@ -142,7 +143,7 @@ public class OmbrePlugin implements IBlocksPlugin {
         } else {
             newColor = params.getColor1();
         }
-        newColor = BlockTypes.getColoredBlock(b.getBlockID(), newColor);
+        newColor = BlockGroups.getColoredBlock(b.getBlockID(), newColor);
         b = new Block(b);
         b.setBlockID(newColor);
         return b;

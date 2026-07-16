@@ -17,7 +17,8 @@
  **/
 package smc.smedit.plugins.ship.replace;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.ui.act.plugin.Description;
 
 /**
@@ -32,8 +33,8 @@ public class ReplaceBlocksParameters {
     private short mColor2;
 
     public ReplaceBlocksParameters() {
-        mColor1 = BlockTypes.HULL_COLOR_BLACK_ID;
-        mColor2 = BlockTypes.HULL_COLOR_WHITE_ID;
+        mColor1 = Blocks.BLACK_STANDARD_ARMOR.getId();
+        mColor2 = Blocks.WHITE_STANDARD_ARMOR.getId();
     }
 
     public short getColor1() {

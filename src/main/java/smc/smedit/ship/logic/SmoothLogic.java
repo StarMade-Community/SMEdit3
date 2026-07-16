@@ -19,7 +19,8 @@ package smc.smedit.ship.logic;
 
 import java.util.Iterator;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.BooleanMatrix3D;
 import smc.smedit.data.CubeIterator;
 import smc.smedit.data.RenderTile;
@@ -213,62 +214,62 @@ public class SmoothLogic {
         if (type1 > type2) {
             type1 = type2;
         }
-        if (type1 == BlockTypes.HULL_COLOR_GREY_ID) {
-            return BlockTypes.HULL_COLOR_WEDGE_GREY_ID;
+        if (type1 == Blocks.GREY_STANDARD_ARMOR.getId()) {
+            return Blocks.GREY_STANDARD_ARMOR_WEDGE.getId();
         }
-        if (type1 == BlockTypes.HULL_COLOR_PURPLE_ID) {
-            return BlockTypes.HULL_COLOR_WEDGE_PURPLE_ID;
+        if (type1 == Blocks.PURPLE_STANDARD_ARMOR.getId()) {
+            return Blocks.PURPLE_STANDARD_ARMOR_WEDGE.getId();
         }
-        if (type1 == BlockTypes.HULL_COLOR_BROWN_ID) {
-            return BlockTypes.HULL_COLOR_WEDGE_BROWN_ID;
+        if (type1 == Blocks.BROWN_STANDARD_ARMOR.getId()) {
+            return Blocks.BROWN_STANDARD_ARMOR_WEDGE.getId();
         }
-        if (type1 == BlockTypes.HULL_COLOR_BLACK_ID) {
-            return BlockTypes.HULL_COLOR_WEDGE_BLACK_ID;
+        if (type1 == Blocks.BLACK_STANDARD_ARMOR.getId()) {
+            return Blocks.BLACK_STANDARD_ARMOR_WEDGE.getId();
         }
-        if (type1 == BlockTypes.HULL_COLOR_RED_ID) {
-            return BlockTypes.HULL_COLOR_WEDGE_RED_ID;
+        if (type1 == Blocks.RED_STANDARD_ARMOR.getId()) {
+            return Blocks.RED_STANDARD_ARMOR_WEDGE.getId();
         }
-        if (type1 == BlockTypes.HULL_COLOR_BLUE_ID) {
-            return BlockTypes.HULL_COLOR_WEDGE_BLUE_ID;
+        if (type1 == Blocks.BLUE_STANDARD_ARMOR.getId()) {
+            return Blocks.BLUE_STANDARD_ARMOR_WEDGE.getId();
         }
-        if (type1 == BlockTypes.HULL_COLOR_GREEN_ID) {
-            return BlockTypes.HULL_COLOR_WEDGE_GREEN_ID;
+        if (type1 == Blocks.GREEN_STANDARD_ARMOR.getId()) {
+            return Blocks.GREEN_STANDARD_ARMOR_WEDGE.getId();
         }
-        if (type1 == BlockTypes.HULL_COLOR_YELLOW_ID) {
-            return BlockTypes.HULL_COLOR_WEDGE_YELLOW_ID;
+        if (type1 == Blocks.YELLOW_STANDARD_ARMOR.getId()) {
+            return Blocks.YELLOW_STANDARD_ARMOR_WEDGE.getId();
         }
-        if (type1 == BlockTypes.HULL_COLOR_WHITE_ID) {
-            return BlockTypes.HULL_COLOR_WEDGE_WHITE_ID;
+        if (type1 == Blocks.WHITE_STANDARD_ARMOR.getId()) {
+            return Blocks.WHITE_STANDARD_ARMOR_WEDGE.getId();
         }
-        if (type1 == BlockTypes.GLASS_ID) {
-            return BlockTypes.GLASS_WEDGE_ID;
+        if (type1 == Blocks.GLASS.getId()) {
+            return Blocks.GLASS_WEDGE.getId();
         }
-        if (type1 == BlockTypes.POWERHULL_COLOR_GREY) {
-            return BlockTypes.POWERHULL_COLOR_WEDGE_GREY;
+        if (type1 == Blocks.GREY_ADVANCED_ARMOR.getId()) {
+            return Blocks.GREY_ADVANCED_ARMOR_WEDGE.getId();
         }
-        if (type1 == BlockTypes.POWERHULL_COLOR_PURPLE) {
-            return BlockTypes.POWERHULL_COLOR_WEDGE_PURPLE;
+        if (type1 == Blocks.PURPLE_ADVANCED_ARMOR.getId()) {
+            return Blocks.PURPLE_ADVANCED_ARMOR_WEDGE.getId();
         }
-        if (type1 == BlockTypes.POWERHULL_COLOR_BROWN) {
-            return BlockTypes.POWERHULL_COLOR_WEDGE_BROWN;
+        if (type1 == Blocks.BROWN_ADVANCED_ARMOR.getId()) {
+            return Blocks.BROWN_ADVANCED_ARMOR_WEDGE.getId();
         }
-        if (type1 == BlockTypes.POWERHULL_COLOR_BLACK) {
-            return BlockTypes.POWERHULL_COLOR_WEDGE_BLACK;
+        if (type1 == Blocks.BLACK_ADVANCED_ARMOR.getId()) {
+            return Blocks.BLACK_ADVANCED_ARMOR_WEDGE.getId();
         }
-        if (type1 == BlockTypes.POWERHULL_COLOR_RED) {
-            return BlockTypes.POWERHULL_COLOR_WEDGE_RED;
+        if (type1 == Blocks.RED_ADVANCED_ARMOR.getId()) {
+            return Blocks.RED_ADVANCED_ARMOR_WEDGE.getId();
         }
-        if (type1 == BlockTypes.POWERHULL_COLOR_BLUE) {
-            return BlockTypes.POWERHULL_COLOR_WEDGE_BLUE;
+        if (type1 == Blocks.BLUE_ADVANCED_ARMOR.getId()) {
+            return Blocks.BLUE_ADVANCED_ARMOR_WEDGE.getId();
         }
-        if (type1 == BlockTypes.POWERHULL_COLOR_GREEN) {
-            return BlockTypes.POWERHULL_COLOR_WEDGE_GREEN;
+        if (type1 == Blocks.GREEN_ADVANCED_ARMOR.getId()) {
+            return Blocks.GREEN_ADVANCED_ARMOR_WEDGE.getId();
         }
-        if (type1 == BlockTypes.POWERHULL_COLOR_GOLD) {
-            return BlockTypes.POWERHULL_COLOR_WEDGE_GOLD;
+        if (type1 == Blocks.YELLOW_ADVANCED_ARMOR.getId()) {
+            return Blocks.YELLOW_ADVANCED_ARMOR_WEDGE.getId();
         }
-        if (type1 == BlockTypes.POWERHULL_COLOR_WHITE) {
-            return BlockTypes.POWERHULL_COLOR_WEDGE_WHITE;
+        if (type1 == Blocks.WHITE_ADVANCED_ARMOR.getId()) {
+            return Blocks.WHITE_ADVANCED_ARMOR_WEDGE.getId();
         }
         return type1;
     }
@@ -304,62 +305,62 @@ public class SmoothLogic {
                 type1 = (short) Math.min(type1, Math.min(type2, type3));
             }
         }
-        if (type1 == BlockTypes.HULL_COLOR_GREY_ID) {
-            return BlockTypes.HULL_COLOR_CORNER_GREY_ID;
+        if (type1 == Blocks.GREY_STANDARD_ARMOR.getId()) {
+            return Blocks.GREY_STANDARD_ARMOR_CORNER.getId();
         }
-        if (type1 == BlockTypes.HULL_COLOR_PURPLE_ID) {
-            return BlockTypes.HULL_COLOR_CORNER_PURPLE_ID;
+        if (type1 == Blocks.PURPLE_STANDARD_ARMOR.getId()) {
+            return Blocks.PURPLE_STANDARD_ARMOR_CORNER.getId();
         }
-        if (type1 == BlockTypes.HULL_COLOR_BROWN_ID) {
-            return BlockTypes.HULL_COLOR_CORNER_BROWN_ID;
+        if (type1 == Blocks.BROWN_STANDARD_ARMOR.getId()) {
+            return Blocks.BROWN_STANDARD_ARMOR_CORNER.getId();
         }
-        if (type1 == BlockTypes.HULL_COLOR_BLACK_ID) {
-            return BlockTypes.HULL_COLOR_CORNER_BLACK_ID;
+        if (type1 == Blocks.BLACK_STANDARD_ARMOR.getId()) {
+            return Blocks.BLACK_STANDARD_ARMOR_CORNER.getId();
         }
-        if (type1 == BlockTypes.HULL_COLOR_RED_ID) {
-            return BlockTypes.HULL_COLOR_CORNER_RED_ID;
+        if (type1 == Blocks.RED_STANDARD_ARMOR.getId()) {
+            return Blocks.RED_STANDARD_ARMOR_CORNER.getId();
         }
-        if (type1 == BlockTypes.HULL_COLOR_BLUE_ID) {
-            return BlockTypes.HULL_COLOR_CORNER_BLUE_ID;
+        if (type1 == Blocks.BLUE_STANDARD_ARMOR.getId()) {
+            return Blocks.BLUE_STANDARD_ARMOR_CORNER.getId();
         }
-        if (type1 == BlockTypes.HULL_COLOR_GREEN_ID) {
-            return BlockTypes.HULL_COLOR_CORNER_GREEN_ID;
+        if (type1 == Blocks.GREEN_STANDARD_ARMOR.getId()) {
+            return Blocks.GREEN_STANDARD_ARMOR_CORNER.getId();
         }
-        if (type1 == BlockTypes.HULL_COLOR_YELLOW_ID) {
-            return BlockTypes.HULL_COLOR_CORNER_YELLOW_ID;
+        if (type1 == Blocks.YELLOW_STANDARD_ARMOR.getId()) {
+            return Blocks.YELLOW_STANDARD_ARMOR_CORNER.getId();
         }
-        if (type1 == BlockTypes.HULL_COLOR_WHITE_ID) {
-            return BlockTypes.HULL_COLOR_CORNER_WHITE_ID;
+        if (type1 == Blocks.WHITE_STANDARD_ARMOR.getId()) {
+            return Blocks.WHITE_STANDARD_ARMOR_CORNER.getId();
         }
-        if (type1 == BlockTypes.GLASS_ID) {
-            return BlockTypes.GLASS_CORNER_ID;
+        if (type1 == Blocks.GLASS.getId()) {
+            return Blocks.GLASS_CORNER.getId();
         }
-        if (type1 == BlockTypes.POWERHULL_COLOR_GREY) {
-            return BlockTypes.POWERHULL_COLOR_CORNER_GREY;
+        if (type1 == Blocks.GREY_ADVANCED_ARMOR.getId()) {
+            return Blocks.GREY_ADVANCED_ARMOR_CORNER.getId();
         }
-        if (type1 == BlockTypes.POWERHULL_COLOR_PURPLE) {
-            return BlockTypes.POWERHULL_COLOR_WEDGE_PURPLE;
+        if (type1 == Blocks.PURPLE_ADVANCED_ARMOR.getId()) {
+            return Blocks.PURPLE_ADVANCED_ARMOR_WEDGE.getId();
         }
-        if (type1 == BlockTypes.POWERHULL_COLOR_BROWN) {
-            return BlockTypes.POWERHULL_COLOR_CORNER_BROWN;
+        if (type1 == Blocks.BROWN_ADVANCED_ARMOR.getId()) {
+            return Blocks.BROWN_ADVANCED_ARMOR_CORNER.getId();
         }
-        if (type1 == BlockTypes.POWERHULL_COLOR_BLACK) {
-            return BlockTypes.POWERHULL_COLOR_CORNER_BLACK;
+        if (type1 == Blocks.BLACK_ADVANCED_ARMOR.getId()) {
+            return Blocks.BLACK_ADVANCED_ARMOR_CORNER.getId();
         }
-        if (type1 == BlockTypes.POWERHULL_COLOR_RED) {
-            return BlockTypes.POWERHULL_COLOR_CORNER_RED;
+        if (type1 == Blocks.RED_ADVANCED_ARMOR.getId()) {
+            return Blocks.RED_ADVANCED_ARMOR_CORNER.getId();
         }
-        if (type1 == BlockTypes.POWERHULL_COLOR_BLUE) {
-            return BlockTypes.POWERHULL_COLOR_CORNER_BLUE;
+        if (type1 == Blocks.BLUE_ADVANCED_ARMOR.getId()) {
+            return Blocks.BLUE_ADVANCED_ARMOR_CORNER.getId();
         }
-        if (type1 == BlockTypes.POWERHULL_COLOR_GREEN) {
-            return BlockTypes.POWERHULL_COLOR_CORNER_GREEN;
+        if (type1 == Blocks.GREEN_ADVANCED_ARMOR.getId()) {
+            return Blocks.GREEN_ADVANCED_ARMOR_CORNER.getId();
         }
-        if (type1 == BlockTypes.POWERHULL_COLOR_GOLD) {
-            return BlockTypes.POWERHULL_COLOR_CORNER_GOLD;
+        if (type1 == Blocks.YELLOW_ADVANCED_ARMOR.getId()) {
+            return Blocks.YELLOW_ADVANCED_ARMOR_CORNER.getId();
         }
-        if (type1 == BlockTypes.POWERHULL_COLOR_WHITE) {
-            return BlockTypes.POWERHULL_COLOR_CORNER_WHITE;
+        if (type1 == Blocks.WHITE_ADVANCED_ARMOR.getId()) {
+            return Blocks.WHITE_ADVANCED_ARMOR_CORNER.getId();
         }
         return type1;
     }
@@ -371,10 +372,10 @@ public class SmoothLogic {
             return false;
         }
         short type = grid.get(p2).getBlockID();
-        if (BlockTypes.isWedge(type) || BlockTypes.isPowerWedge(type)) {
+        if (BlockGroups.isWedge(type) || BlockGroups.isPowerWedge(type)) {
             return false;
         }
-        return BlockTypes.isHull(type) || BlockTypes.isPowerHull(type) || (type == BlockTypes.GLASS_ID);
+        return BlockGroups.isHull(type) || BlockGroups.isPowerHull(type) || (type == Blocks.GLASS.getId());
     }
 }
 

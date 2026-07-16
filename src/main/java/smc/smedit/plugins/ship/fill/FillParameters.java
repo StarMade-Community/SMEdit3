@@ -39,10 +39,6 @@ public class FillParameters {
     private int mSalvage;
     @Description(displayName = "% Dumb Missiles")
     private int mMissileDumb;
-    @Description(displayName = "% Heat Seeking Missiles")
-    private int mMissileHeat;
-    @Description(displayName = "% FAFO Missiles")
-    private int mMissileFafo;
 
     public FillParameters() {
         mEmpty = 50;
@@ -52,8 +48,6 @@ public class FillParameters {
         mShield = 5;
         mSalvage = 0;
         mMissileDumb = 0;
-        mMissileHeat = 0;
-        mMissileFafo = 0;
     }
 
     public int getEmpty() {
@@ -112,19 +106,7 @@ public class FillParameters {
         mMissileDumb = missileDumb;
     }
 
-    public int getMissileHeat() {
-        return mMissileHeat;
-    }
 
-    public void setMissileHeat(int missileHeat) {
-        mMissileHeat = missileHeat;
-    }
 
-    public int getMissileFafo() {
-        return mMissileFafo;
-    }
 
-    public void setMissileFafo(int missileFafo) {
-        mMissileFafo = missileFafo;
-    }
 }

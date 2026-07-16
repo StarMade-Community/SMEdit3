@@ -27,11 +27,12 @@ import java.util.Map;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 
 /**
  * Shared block-icon lookups, sourced from the live StarMade install: a block's
- * display name ({@link BlockTypes#BLOCK_NAMES}), its StarMade build icon
+ * display name ({@link BlockGroups#BLOCK_NAMES}), its StarMade build icon
  * ({@link BlockTypeColors#getBuildIconImage}), and — as a fallback when no icon
  * is available — a swatch of its approximated fill colour
  * ({@link BlockTypeColors#getFillColor}).
@@ -58,7 +59,7 @@ public final class BlockIcons {
         if (id == null) {
             return "";
         }
-        String n = BlockTypes.BLOCK_NAMES.get(id);
+        String n = BlockGroups.BLOCK_NAMES.get(id);
         return n != null ? n : ("Block #" + id);
     }
 

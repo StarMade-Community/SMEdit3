@@ -86,7 +86,15 @@ public class BlocksPluginAction extends GenericAction {
                         SparseMatrix<Block> modified = mPlugin.modify(original, params, sm, cb);
                         if (!cb.isPleaseCancel()) {
                             if (modified != null) {
-                                StarMadeLogic.setModel(modified);
+                                if (isFileImport()) {
+                                    // A file-import plugin (e.g. 3D model / schematic) produces
+                                    // a brand-new entity — ADD it to the scene as its own object
+                                    // rather than replacing the current document.
+                                    sm.getSceneModel().openEntity(importName(), modified, null);
+                                    mPanel.getUndoer().clear(); // no cross-object undo yet
+                                } else {
+                                    StarMadeLogic.setModel(modified);
+                                }
                             } else {
                                 mPanel.updateTiles();
                             }
@@ -114,6 +122,27 @@ public class BlocksPluginAction extends GenericAction {
             DlgError.showError(getFrame(), "Error launching plugin",
                     composeDescription(null), t);
         }
+    }
+
+    /** Whether this is a file-import/export plugin — a returned grid is a new entity, not an edit. */
+    private boolean isFileImport() {
+        int[][] cls = mPlugin.getClassifications();
+        if (cls == null) {
+            return false;
+        }
+        for (int[] c : cls) {
+            if (c.length > 1 && c[1] == IBlocksPlugin.SUBTYPE_FILE) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** A display name for an imported entity, derived from the plugin name. */
+    private String importName() {
+        String name = mPlugin.getName();
+        int o = name.indexOf('/');
+        return o >= 0 ? name.substring(o + 1) : name;
     }
 
     private String composeDescription(Object params) {

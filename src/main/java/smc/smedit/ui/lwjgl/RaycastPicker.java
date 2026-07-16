@@ -2,13 +2,17 @@ package smc.smedit.ui.lwjgl;
 
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.util.List;
 
 import org.lwjgl.BufferUtils;
 import org.lwjgl.util.glu.GLU;
 
 import smc.smedit.data.SparseMatrix;
+import smc.smedit.scene.SceneObject;
 import smc.smedit.ship.data.Block;
 import smc.smedit.ui.BlockTypeColors;
+import smc.smedit.vecmath.Matrix4f;
+import smc.smedit.vecmath.Point3f;
 import smc.smedit.vecmath.Point3i;
 
 /**
@@ -49,6 +53,80 @@ public final class RaycastPicker {
             SparseMatrix<Block> grid) {
         Hit h = pickHit(screenX, screenY, snap, grid);
         return h == null ? null : h.cell;
+    }
+
+    /** One pickable scene object: its grid and the world transform it's rendered at. */
+    public static final class Target {
+        public final SceneObject object;
+        public final Matrix4f world;
+        public final SparseMatrix<Block> grid;
+
+        public Target(SceneObject object, Matrix4f world, SparseMatrix<Block> grid) {
+            this.object = object;
+            this.world = world;
+            this.grid = grid;
+        }
+    }
+
+    /**
+     * Picks the nearest block across every {@link Target}. The screen ray is
+     * unprojected to world space (the pick matrices are world→eye), then transformed
+     * into each object's local space by {@code world⁻¹} and walked; the hit closest
+     * to the eye (compared in world space) wins. Returns a {@link PickResult} with
+     * the object and its <em>local</em> cell / placement cell, or {@code null}.
+     */
+    public static PickResult pickScene(float screenX, float screenY, PickMatrices.Snapshot snap,
+            List<Target> targets) {
+        if (snap == null || targets == null || targets.isEmpty()) {
+            return null;
+        }
+        FloatBuffer mv = wrap16(snap.modelview);
+        FloatBuffer proj = wrap16(snap.projection);
+        IntBuffer vp = BufferUtils.createIntBuffer(16);
+        vp.put(snap.viewport).flip();
+        float[] nearW = unproject(screenX, screenY, 0f, mv, proj, vp);
+        float[] farW = unproject(screenX, screenY, 1f, mv, proj, vp);
+        if (nearW == null || farW == null) {
+            return null;
+        }
+        PickResult best = null;
+        double bestDist = Double.POSITIVE_INFINITY;
+        for (Target t : targets) {
+            if (t.grid == null) {
+                continue;
+            }
+            Matrix4f inv = new Matrix4f();
+            inv.set(t.world);
+            try {
+                inv.invert();
+            } catch (RuntimeException e) {
+                continue; // singular transform — not pickable
+            }
+            Hit hit = walk(apply(inv, nearW), apply(inv, farW), t.grid);
+            if (hit == null) {
+                continue;
+            }
+            // Compare hits in a common frame: distance from the eye to the world-space
+            // centre of the hit cell. Nearest wins across objects.
+            Point3f wc = new Point3f(hit.cell.x, hit.cell.y, hit.cell.z);
+            t.world.transform(wc);
+            double d = sq(wc.x - nearW[0]) + sq(wc.y - nearW[1]) + sq(wc.z - nearW[2]);
+            if (d < bestDist) {
+                bestDist = d;
+                best = new PickResult(t.object, hit.cell, hit.place);
+            }
+        }
+        return best;
+    }
+
+    private static float[] apply(Matrix4f m, float[] p) {
+        Point3f pt = new Point3f(p[0], p[1], p[2]);
+        m.transform(pt);
+        return new float[]{pt.x, pt.y, pt.z};
+    }
+
+    private static double sq(double v) {
+        return v * v;
     }
 
     /** As {@link #pick} but also returns the adjacent empty cell for block placement. */

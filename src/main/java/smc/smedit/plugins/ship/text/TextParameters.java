@@ -17,7 +17,8 @@
  */
 package smc.smedit.plugins.ship.text;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.ui.act.plugin.Description;
 
 /**
@@ -40,7 +41,7 @@ public class TextParameters {
     private String mText;
 
     public TextParameters() {
-        mInk = BlockTypes.HULL_COLOR_BLACK_ID;
+        mInk = Blocks.BLACK_STANDARD_ARMOR.getId();
         mFont = "Dialog";
         mText = "Jo is Awesome";
         mBold = false;

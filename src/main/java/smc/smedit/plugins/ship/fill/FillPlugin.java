@@ -25,7 +25,8 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.BooleanMatrix3D;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.data.StarMade;
@@ -56,7 +57,7 @@ public class FillPlugin implements IBlocksPlugin {
             return;
         }
         Collections.sort(interior, fillStrategy);
-        log.log(Level.WARNING, "Sorting for " + BlockTypes.BLOCK_NAMES.get(blockID) + ": " + interior.get(0) + ", " + interior.get(1) + ", " + interior.get(2) + ", ...");
+        log.log(Level.WARNING, "Sorting for " + BlockGroups.BLOCK_NAMES.get(blockID) + ": " + interior.get(0) + ", " + interior.get(1) + ", " + interior.get(2) + ", ...");
         if ((controllerID > 0) && (interior.size() > 0)) {
             place(modified, interior, controllerID);
         }
@@ -96,7 +97,7 @@ public class FillPlugin implements IBlocksPlugin {
         Point3i core = ShipLogic.findCore(modified);
         if (core == null) {
             core = new Point3i(8, 8, 8);
-            modified.set(core, new Block(BlockTypes.CORE_ID));
+            modified.set(core, new Block(Blocks.SHIP_CORE.getId()));
         }
         int accessRadius = (int) (Math.pow(interior.size(), .333) / 200);
         for (Iterator<Point3i> i = interior.iterator(); i.hasNext();) {
@@ -148,33 +149,28 @@ public class FillPlugin implements IBlocksPlugin {
         original.getBounds(lower, upper);
         scopeInterior(original, modified, interior, exterior, lower, upper, cb);
         int interiorSize = interior.size();
-        int oneHundredPercent = params.getEmpty() + params.getMissileDumb() + params.getMissileFafo()
-                + params.getMissileHeat() + params.getPower() + params.getSalvage()
+        int oneHundredPercent = params.getEmpty() + params.getMissileDumb()
+                + params.getPower() + params.getSalvage()
                 + params.getShield() + params.getThrusters() + params.getWeapon();
         cb.setStatus("Filling");
         cb.startTask(oneHundredPercent);
-        fill(modified, interior, params.getThrusters() * interiorSize / oneHundredPercent, (short) -1, BlockTypes.THRUSTER_ID,
+        fill(modified, interior, params.getThrusters() * interiorSize / oneHundredPercent, (short) -1, Blocks.THRUSTER_MODULE.getId(),
                 new FillStrategy(FillStrategy.MINUS, FillStrategy.Z, lower, upper));
         cb.workTask(params.getThrusters());
-        fill(modified, interior, params.getMissileDumb() * interiorSize / oneHundredPercent, BlockTypes.MISSILE_DUMB_CONTROLLER_ID, BlockTypes.MISSILE_DUMB_ID,
+        fill(modified, interior, params.getMissileDumb() * interiorSize / oneHundredPercent, Blocks.MISSILE_COMPUTER.getId(), Blocks.MISSILE_TUBE.getId(),
                 new FillStrategy(FillStrategy.PLUS, FillStrategy.Z, lower, upper));
         cb.workTask(params.getMissileDumb());
-        fill(modified, interior, params.getMissileHeat() * interiorSize / oneHundredPercent, BlockTypes.MISSILE_HEAT_CONTROLLER_ID, BlockTypes.MISSILE_HEAT_ID,
-                new FillStrategy(FillStrategy.PLUS, FillStrategy.Z, lower, upper));
-        cb.workTask(params.getMissileHeat());
-        fill(modified, interior, params.getMissileFafo() * interiorSize / oneHundredPercent, BlockTypes.MISSILE_FAFO_CONTROLLER_ID, BlockTypes.MISSILE_FAFO_ID,
-                new FillStrategy(FillStrategy.PLUS, FillStrategy.Z, lower, upper));
-        cb.workTask(params.getMissileFafo());
-        fill(modified, interior, params.getWeapon() * interiorSize / oneHundredPercent, BlockTypes.WEAPON_CONTROLLER_ID, BlockTypes.WEAPON_ID,
+        fill(modified, interior, params.getWeapon() * interiorSize / oneHundredPercent, Blocks.CANNON_COMPUTER.getId(), Blocks.CANNON_BARREL.getId(),
                 new FillStrategy(FillStrategy.OUTSIDE, FillStrategy.X, lower, upper));
         cb.workTask(params.getWeapon());
-        fill(modified, interior, params.getSalvage() * interiorSize / oneHundredPercent, BlockTypes.SALVAGE_CONTROLLER_ID, BlockTypes.SALVAGE_ID,
+        fill(modified, interior, params.getSalvage() * interiorSize / oneHundredPercent, Blocks.SALVAGE_COMPUTER.getId(), Blocks.SALVAGE_MODULE.getId(),
                 new FillStrategy(FillStrategy.OUTSIDE, FillStrategy.Y, lower, upper));
         cb.workTask(params.getSalvage());
-        fill(modified, interior, params.getPower() * interiorSize / oneHundredPercent, BlockTypes.POWER_COIL_ID, BlockTypes.POWER_ID,
+        // Power reactors are standalone modules (no controller block).
+        fill(modified, interior, params.getPower() * interiorSize / oneHundredPercent, (short) -1, Blocks.POWER_REACTOR.getId(),
                 new FillStrategy(FillStrategy.CENTER, FillStrategy.X | FillStrategy.Y | FillStrategy.Z, lower, upper));
         cb.workTask(params.getPower());
-        fill(modified, interior, params.getShield() * interiorSize / oneHundredPercent, (short) -1, BlockTypes.SHIELD_ID,
+        fill(modified, interior, params.getShield() * interiorSize / oneHundredPercent, (short) -1, Blocks.SHIELD_CAPACITOR.getId(),
                 new FillStrategy(FillStrategy.OUTSIDE, FillStrategy.X | FillStrategy.Y | FillStrategy.Z, lower, upper));
         cb.workTask(params.getShield());
         cb.endTask();

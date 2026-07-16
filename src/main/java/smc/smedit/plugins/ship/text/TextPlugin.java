@@ -26,7 +26,8 @@ import java.awt.image.BufferedImage;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.data.StarMade;
 import smc.smedit.logic.PluginUtils;
@@ -127,7 +128,7 @@ public class TextPlugin implements IBlocksPlugin {
                         oldBlock = modified.get(depth);
                         if (oldBlock != null) {
                             Block newBlock;
-                            newBlock = BlockTypes.colorize(oldBlock, params.getInk());
+                            newBlock = BlockGroups.colorize(oldBlock, params.getInk());
                             modified.set(depth, newBlock);
                         }
                         depth.add(mDepthVector);

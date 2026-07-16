@@ -17,13 +17,11 @@
  **/
 package smc.smedit.ship.logic;
 
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Set;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.BooleanMatrix3D;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.mods.IPluginCallback;
@@ -35,31 +33,17 @@ import smc.smedit.vecmath.Point3i;
  **/
 public class HullLogic {
 
+    /** Upgrades every standard-armour block in the grid to its advanced-armour equivalent. */
     public static void power(SparseMatrix<Block> grid) {
-        Map<Short, Short> filter = new HashMap<>();
-        for (int color = 0; color < BlockTypes.HULL_COLOR_MAP[0].length; color++) {
-            filter.put(BlockTypes.HULL_COLOR_MAP[BlockTypes.HULL_COLORS][color], BlockTypes.HULL_COLOR_MAP[BlockTypes.POWERHULL_COLORS][color]);
-            filter.put(BlockTypes.HULL_COLOR_MAP[BlockTypes.WEDGE_COLORS][color], BlockTypes.HULL_COLOR_MAP[BlockTypes.POWERWEDGE_COLORS][color]);
-            filter.put(BlockTypes.HULL_COLOR_MAP[BlockTypes.CORNER_COLORS][color], BlockTypes.HULL_COLOR_MAP[BlockTypes.POWERCORNER_COLORS][color]);
-            filter.put(BlockTypes.HULL_COLOR_MAP[BlockTypes.PENTA_COLORS][color], BlockTypes.HULL_COLOR_MAP[BlockTypes.POWERPENTA_COLORS][color]);
-            filter.put(BlockTypes.HULL_COLOR_MAP[BlockTypes.TETRA_COLORS][color], BlockTypes.HULL_COLOR_MAP[BlockTypes.POWERTETRA_COLORS][color]);
-        }
-        doFilter(grid, filter);
+        retier(grid, true);
     }
 
+    /** Downgrades every advanced-armour block in the grid to its standard-armour equivalent. */
     public static void unpower(SparseMatrix<Block> grid) {
-        Map<Short, Short> filter = new HashMap<>();
-        for (int color = 0; color < BlockTypes.HULL_COLOR_MAP[0].length; color++) {
-            filter.put(BlockTypes.HULL_COLOR_MAP[BlockTypes.POWERHULL_COLORS][color], BlockTypes.HULL_COLOR_MAP[BlockTypes.HULL_COLORS][color]);
-            filter.put(BlockTypes.HULL_COLOR_MAP[BlockTypes.POWERWEDGE_COLORS][color], BlockTypes.HULL_COLOR_MAP[BlockTypes.WEDGE_COLORS][color]);
-            filter.put(BlockTypes.HULL_COLOR_MAP[BlockTypes.POWERCORNER_COLORS][color], BlockTypes.HULL_COLOR_MAP[BlockTypes.CORNER_COLORS][color]);
-            filter.put(BlockTypes.HULL_COLOR_MAP[BlockTypes.POWERPENTA_COLORS][color], BlockTypes.HULL_COLOR_MAP[BlockTypes.PENTA_COLORS][color]);
-            filter.put(BlockTypes.HULL_COLOR_MAP[BlockTypes.POWERTETRA_COLORS][color], BlockTypes.HULL_COLOR_MAP[BlockTypes.TETRA_COLORS][color]);
-        }
-        doFilter(grid, filter);
+        retier(grid, false);
     }
 
-    private static void doFilter(SparseMatrix<Block> grid, Map<Short, Short> filter) {
+    private static void retier(SparseMatrix<Block> grid, boolean toAdvanced) {
         for (Iterator<Point3i> i = grid.iterator(); i.hasNext();) {
             Point3i coords = i.next();
             Block block = grid.get(coords);
@@ -67,11 +51,10 @@ public class HullLogic {
                 continue;
             }
             short oldID = block.getBlockID();
-            if (!filter.containsKey(oldID)) {
-                continue;
-            }
-            short newID = filter.get(oldID);
-            if (newID != -1) {
+            short newID = toAdvanced
+                    ? BlockGroups.getPoweredBlock(oldID)
+                    : BlockGroups.getUnPoweredBlock(oldID);
+            if (newID > 0) {
                 block.setBlockID(newID);
             }
         }

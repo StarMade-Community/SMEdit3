@@ -109,28 +109,36 @@ public class LWJGLMouseAdapter extends MouseAdapter {
         } else if (button == MouseEvent.BUTTON2) {
             // Middle-drag pans the view.
             mMouseMode = MOUSE_MODE_PAN;
-        } else if (isMarqueeStart(modifiers, clickCount)) {
-            // Select tool, Blocks mode, single left-press with no Alt: arm a drag-box
-            // selection. It doesn't commit until the cursor moves past the threshold,
-            // so a plain click still selects the single block under the cursor (on
-            // release). Shift/Ctrl unions with the existing selection.
-            mMouseMode = MOUSE_MODE_MARQUEE;
-            mMarqueeMoved = false;
-            mPanel.beginMarquee((modifiers & (InputEvent.SHIFT_MASK | InputEvent.CTRL_MASK)) != 0);
         } else {
-            // Left-click is the ACTIVE TOOL's action (paint / erase / select / …),
-            // routed through the ToolController — no longer an implicit select.
-            // The controller reads the modifiers itself (Alt = pick, Shift/Ctrl =
-            // additive select). Left-drag then continues the tool (e.g. painting).
-            mMouseMode = MOUSE_MODE_TOOL;
-            Point3i hit = mPanel.getPointAt(p.x, p.y);
-            if (clickCount >= 2) {
-                // Double-click = flood-select the contiguous same-type region (Select
-                // tool). Shift adds the region to the selection, Ctrl removes it.
-                ToolController.get().onDoubleClick(hit, modifiers);
+            // Left button. Resolve which ENTITY is under the cursor across the whole
+            // scene and make it the edit target, so tools act on whatever you click —
+            // not just one privileged entity. The pick's cell/place are already local
+            // to that object (now the active grid).
+            PickResult pr = mPanel.pickScene(p.x, p.y);
+            mPanel.focusPickedObject(pr);
+            Point3i hit = pr == null ? null : pr.cell;
+            if (isMarqueeStart(modifiers, clickCount)) {
+                // Select tool, Blocks mode, single left-press with no Alt: arm a drag-box
+                // selection. It doesn't commit until the cursor moves past the threshold,
+                // so a plain click still selects the single block under the cursor (on
+                // release). Shift/Ctrl unions with the existing selection.
+                mMouseMode = MOUSE_MODE_MARQUEE;
+                mMarqueeMoved = false;
+                mPanel.beginMarquee((modifiers & (InputEvent.SHIFT_MASK | InputEvent.CTRL_MASK)) != 0);
             } else {
-                Point3i place = mPanel.getPlacementAt(p.x, p.y);
-                ToolController.get().onPress(hit, place, mPanel, modifiers);
+                // Left-click is the ACTIVE TOOL's action (paint / erase / select / …),
+                // routed through the ToolController. The controller reads the modifiers
+                // itself (Alt = pick, Shift/Ctrl = additive select). Left-drag then
+                // continues the tool (e.g. painting).
+                mMouseMode = MOUSE_MODE_TOOL;
+                if (clickCount >= 2) {
+                    // Double-click = flood-select the contiguous same-type region (Select
+                    // tool). Shift adds the region to the selection, Ctrl removes it.
+                    ToolController.get().onDoubleClick(hit, modifiers);
+                } else {
+                    Point3i place = pr == null ? null : pr.place;
+                    ToolController.get().onPress(hit, place, mPanel, modifiers);
+                }
             }
         }
     }

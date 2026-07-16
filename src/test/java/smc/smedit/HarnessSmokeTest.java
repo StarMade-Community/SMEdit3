@@ -4,7 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 
 /**
  * Sanity check that the JUnit harness is wired up and can see the main classes.
@@ -15,6 +16,6 @@ class HarnessSmokeTest {
 
     @Test
     void junitRunsAgainstMainClasses() {
-        assertEquals((short) 1, BlockTypes.CORE_ID, "ship core block id");
+        assertEquals((short) 1, Blocks.SHIP_CORE.getId(), "ship core block id");
     }
 }

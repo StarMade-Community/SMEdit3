@@ -20,7 +20,8 @@ package smc.smedit.plugins.planet.hollow;
 import java.util.Iterator;
 import java.util.Set;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.BooleanMatrix3D;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.data.StarMade;
@@ -96,7 +97,7 @@ public class HollowPlugin implements IBlocksPlugin {
             b = grid.get(xyz);
             if (isEdge(exterior, xyz)) {
             } else {
-                if (b.getBlockID() == BlockTypes.CORE_ID) {
+                if (b.getBlockID() == Blocks.SHIP_CORE.getId()) {
                 } else {
                     grid.set(xyz, null);
                 }

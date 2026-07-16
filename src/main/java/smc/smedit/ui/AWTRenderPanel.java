@@ -30,7 +30,8 @@ import java.awt.geom.Path2D;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.RenderPoly;
 import smc.smedit.data.RenderSet;
 import smc.smedit.data.SparseMatrix;
@@ -313,9 +314,9 @@ public class AWTRenderPanel extends RenderPanel {
         Point3i lower = StarMadeLogic.getInstance().getSelectedLower();
         Point3i upper = StarMadeLogic.getInstance().getSelectedUpper();
         if ((lower != null) && (upper != null)) {
-            addBox(lower, upper, new short[]{BlockTypes.SPECIAL_SELECT_XP, BlockTypes.SPECIAL_SELECT_XM,
-                BlockTypes.SPECIAL_SELECT_YP, BlockTypes.SPECIAL_SELECT_YM,
-                BlockTypes.SPECIAL_SELECT_ZP, BlockTypes.SPECIAL_SELECT_ZM,});
+            addBox(lower, upper, new short[]{BlockGroups.SPECIAL_SELECT_XP, BlockGroups.SPECIAL_SELECT_XM,
+                BlockGroups.SPECIAL_SELECT_YP, BlockGroups.SPECIAL_SELECT_YM,
+                BlockGroups.SPECIAL_SELECT_ZP, BlockGroups.SPECIAL_SELECT_ZM,});
         }
         if (mAxis) {
             lower = new Point3i();
@@ -328,12 +329,12 @@ public class AWTRenderPanel extends RenderPanel {
             r = Math.max(r, Math.abs(upper.y));
             r = Math.max(r, Math.abs(upper.z));
             r += 16;
-            addBox(new Point3i(9, 8, 8), new Point3i(r + 8, 8, 8), new short[]{BlockTypes.SPECIAL_SELECT_XP});
-            addBox(new Point3i(8 - r, 8, 8), new Point3i(7, 8, 8), new short[]{BlockTypes.SPECIAL_SELECT_XM});
-            addBox(new Point3i(8, 9, 8), new Point3i(8, r + 8, 8), new short[]{BlockTypes.SPECIAL_SELECT_YP});
-            addBox(new Point3i(8, 8 - r, 8), new Point3i(8, 7, 8), new short[]{BlockTypes.SPECIAL_SELECT_YM});
-            addBox(new Point3i(8, 8, 9), new Point3i(8, 8, r + 8), new short[]{BlockTypes.SPECIAL_SELECT_ZP});
-            addBox(new Point3i(8, 8, 8 - r), new Point3i(8, 8, 7), new short[]{BlockTypes.SPECIAL_SELECT_ZM});
+            addBox(new Point3i(9, 8, 8), new Point3i(r + 8, 8, 8), new short[]{BlockGroups.SPECIAL_SELECT_XP});
+            addBox(new Point3i(8 - r, 8, 8), new Point3i(7, 8, 8), new short[]{BlockGroups.SPECIAL_SELECT_XM});
+            addBox(new Point3i(8, 9, 8), new Point3i(8, r + 8, 8), new short[]{BlockGroups.SPECIAL_SELECT_YP});
+            addBox(new Point3i(8, 8 - r, 8), new Point3i(8, 7, 8), new short[]{BlockGroups.SPECIAL_SELECT_YM});
+            addBox(new Point3i(8, 8, 9), new Point3i(8, 8, r + 8), new short[]{BlockGroups.SPECIAL_SELECT_ZP});
+            addBox(new Point3i(8, 8, 8 - r), new Point3i(8, 8, 7), new short[]{BlockGroups.SPECIAL_SELECT_ZM});
         }
         updateTransform();
     }

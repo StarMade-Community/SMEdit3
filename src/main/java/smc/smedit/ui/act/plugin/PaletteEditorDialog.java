@@ -45,13 +45,14 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
 import smc.smedit.ui.BlockIcons;
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.plugins.ship.imp.HullCatalog;
 import smc.smedit.ui.BlockTypeColors;
 
 /**
  * Modal picker for building a model-import block palette. The left "Available"
- * list is the live install's blocks ({@link BlockTypes#BLOCK_NAMES}), filterable
+ * list is the live install's blocks ({@link BlockGroups#BLOCK_NAMES}), filterable
  * by hull tier ({@link HullCatalog}) and a name search; the right "Chosen" list
  * is the ordered palette. Everything renders with a color swatch so the user can
  * see exactly which colors the import may use.
@@ -117,7 +118,7 @@ public class PaletteEditorDialog extends JDialog {
         // Every obtainable, non-deprecated block the install knows about.
         // (Already-chosen ids still render in the Chosen list even if excluded here.)
         java.util.Set<Short> seen = new java.util.HashSet<>();
-        for (Short id : BlockTypes.BLOCK_NAMES.keySet()) {
+        for (Short id : BlockGroups.BLOCK_NAMES.keySet()) {
             if (id == null || id <= 0 || !seen.add(id)) {
                 continue;
             }

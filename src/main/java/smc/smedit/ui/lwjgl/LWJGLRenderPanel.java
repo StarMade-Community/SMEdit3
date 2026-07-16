@@ -34,7 +34,8 @@ import java.util.List;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.util.glu.GLU;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.RenderPoly;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.data.UndoBuffer;
@@ -93,10 +94,11 @@ public class LWJGLRenderPanel extends RenderPanel {
 
     /** Camera position at the last transparent-mesh depth sort (skip re-sorting when it barely moved). */
     private Point3f mLastSortCam;
-    /** The transparent mesh last sorted, so a rebuilt mesh is always re-sorted even from the same camera. */
-    private JGLObj mLastSortedObj;
     /** GL matrices of the block group, captured each frame for screen->world picking. */
     private final PickMatrices mPickMatrices = new PickMatrices();
+
+    /** True while a model swap is a mere edit-target change (click-to-focus): don't re-frame. */
+    private boolean mSuppressReframe;
 
     public LWJGLRenderPanel() {
         mUndoer = new UndoBuffer();
@@ -144,7 +146,17 @@ public class LWJGLRenderPanel extends RenderPanel {
         mCanvas.addFocusListener(keys);
         // Single-key tool shortcuts (V/B/P/…) via the same canvas key path.
         mCanvas.addKeyListener(new smc.smedit.ui.tool.ToolKeyListener());
-        StarMadeLogic.getInstance().addPropertyChangeListener("model", ev -> setLookAt(new Point3f(0, 0, -1)));
+        // A model swap normally re-frames the camera (open / undo). But when the swap
+        // is just re-targeting which entity we edit (click-to-focus), the world-space
+        // scene is unchanged and re-framing would jarringly snap the view — so only
+        // refresh the geometry in that case.
+        StarMadeLogic.getInstance().addPropertyChangeListener("model", ev -> {
+            if (mSuppressReframe) {
+                updateTiles();
+            } else {
+                setLookAt(new Point3f(0, 0, -1));
+            }
+        });
         // Refresh the viewport highlight whenever the selection changes (and the
         // axis/grid too, when they're anchored to the selection).
         StarMadeLogic.getInstance().getSelection().addListener(this::onSelectionChanged);
@@ -189,26 +201,33 @@ public class LWJGLRenderPanel extends RenderPanel {
      * sort (keeps dragging cheap); the order only needs updating as the view swings.
      */
     private void sortTransparent(Point3f cam) {
-        JGLObj transparent = null;
+        // Each visible object's mesh is a child group of mBlocks now, so the glass
+        // meshes sit one level down. Collect them all and sort each.
+        List<JGLObj> glass = new ArrayList<>();
         for (JGLNode c : mBlocks.getChildren()) {
             if (c instanceof JGLObj && ((JGLObj) c).isTransparent()) {
-                transparent = (JGLObj) c;
-                break;
+                glass.add((JGLObj) c);
+            } else if (c instanceof JGLGroup) {
+                for (JGLNode g : ((JGLGroup) c).getChildren()) {
+                    if (g instanceof JGLObj && ((JGLObj) g).isTransparent()) {
+                        glass.add((JGLObj) g);
+                    }
+                }
             }
         }
-        if (transparent == null) {
+        if (glass.isEmpty()) {
             mLastSortCam = null;
-            mLastSortedObj = null;
             return;
         }
-        if (transparent == mLastSortedObj && mLastSortCam != null) {
+        if (mLastSortCam != null) {
             float mx = cam.x - mLastSortCam.x, my = cam.y - mLastSortCam.y, mz = cam.z - mLastSortCam.z;
             if (mx * mx + my * my + mz * mz < 0.25f) { // moved < 0.5 world units
                 return;
             }
         }
-        LWJGLRenderLogic.sortTransparentQuads(transparent, cam);
-        mLastSortedObj = transparent;
+        for (JGLObj o : glass) {
+            LWJGLRenderLogic.sortTransparentQuads(o, cam);
+        }
         mLastSortCam = new Point3f(cam);
     }
 
@@ -236,104 +255,170 @@ public class LWJGLRenderPanel extends RenderPanel {
         setLookAt(axis);
     }
 
-    /** Average of all block positions; falls back to the bounding-box centre if empty. */
-    private Point3f modelCentroid(Point3i lower, Point3i upper) {
-        SparseMatrix<Block> grid = StarMadeLogic.getModel();
-        double sx = 0, sy = 0, sz = 0;
-        long n = 0;
-        for (java.util.Iterator<Point3i> it = grid.iteratorNonNull(); it.hasNext();) {
-            Point3i p = it.next();
-            sx += p.x;
-            sy += p.y;
-            sz += p.z;
-            n++;
-        }
-        if (n == 0) {
-            return new Point3f((upper.x + lower.x) / 2f, (upper.y + lower.y) / 2f, (upper.z + lower.z) / 2f);
-        }
-        return new Point3f((float) (sx / n), (float) (sy / n), (float) (sz / n));
-    }
-
     public void setLookAt(Point3f axis) {
-        Point3i lower = new Point3i();
-        Point3i upper = new Point3i();
-        StarMadeLogic.getModel().getBounds(lower, upper);
-        // Orbit/look at the ship's CENTROID (average block position), not the
-        // bounding-box centre — a long thin protrusion (nose, antenna) skews the
-        // box centre well off the ship's actual mass, which makes orbit feel
-        // off-centre.
-        Point3f lookAtThis = modelCentroid(lower, upper);
-        mOrbitCenter = new Point3f(lookAtThis);
-        float maxModel = Math.max(Math.max(upper.x - lower.x, upper.y - lower.y), upper.z - lower.z) + 1;
+        // Frame the WHOLE scene in world space (all visible objects at their world
+        // transforms), so the camera stays put when the active object changes — only
+        // the scene's overall bounds drive framing, not which entity is "current".
+        Point3f lo = new Point3f();
+        Point3f hi = new Point3f();
+        Point3f center;
+        float maxModel;
+        if (sceneWorldBounds(lo, hi)) {
+            center = new Point3f((lo.x + hi.x) / 2f, (lo.y + hi.y) / 2f, (lo.z + hi.z) / 2f);
+            maxModel = Math.max(hi.x - lo.x, Math.max(hi.y - lo.y, hi.z - lo.z)) + 1;
+        } else {
+            center = new Point3f(0, 0, 0);
+            maxModel = 16f;
+        }
+        mOrbitCenter = new Point3f(center);
         Point3f standHere = new Point3f(axis);
         standHere.scale(maxModel * 2);
-        standHere.add(lookAtThis);
-        //mUniverse.getCamera().setLocation(lookAtThis);
-        mUniverse.getCamera().lookAt(standHere, lookAtThis);
-        //mUniverse.getCamera().scale(mScale);
-        System.out.println("Standing at " + standHere + ", looking at " + lookAtThis);
-        //mUniverse.setTransformer(new SpinningTransformer(new Point3f(0, 20, 0)));
+        standHere.add(center);
+        mUniverse.getCamera().lookAt(standHere, center);
         updateTiles();
+    }
+
+    /**
+     * World-space AABB over every visible scene object (each grid's local bounds
+     * transformed by its world matrix), or the legacy active grid at the origin when
+     * there is no scene. Returns {@code false} (leaving lo/hi untouched) if empty.
+     */
+    private boolean sceneWorldBounds(Point3f lo, Point3f hi) {
+        boolean[] any = {false};
+        SceneModel sm = StarMadeLogic.getInstance().getSceneModel();
+        Scene scene = sm != null ? sm.getScene() : null;
+        if (scene != null && !scene.getObjects().isEmpty()) {
+            for (SceneObject o : scene.getObjects()) {
+                if (o.isVisible() && o.getGrid() != null && o.getGrid().size() > 0) {
+                    accumulateBounds(o.getGrid(), o.getTransform(), lo, hi, any);
+                }
+            }
+        }
+        if (!any[0]) {
+            SparseMatrix<Block> g = StarMadeLogic.getModel();
+            if (g != null && g.size() > 0) {
+                Matrix4f id = new Matrix4f();
+                id.setIdentity();
+                accumulateBounds(g, id, lo, hi, any);
+            }
+        }
+        return any[0];
+    }
+
+    /** Expands lo/hi to enclose a grid's local AABB transformed into world space. */
+    private static void accumulateBounds(SparseMatrix<Block> grid, Matrix4f world,
+            Point3f lo, Point3f hi, boolean[] any) {
+        Point3i gl = new Point3i();
+        Point3i gh = new Point3i();
+        grid.getBounds(gl, gh);
+        for (int i = 0; i < 8; i++) {
+            Point3f c = new Point3f((i & 1) == 0 ? gl.x : gh.x,
+                    (i & 2) == 0 ? gl.y : gh.y, (i & 4) == 0 ? gl.z : gh.z);
+            world.transform(c);
+            if (!any[0]) {
+                lo.set(c);
+                hi.set(c);
+                any[0] = true;
+            } else {
+                lo.x = Math.min(lo.x, c.x);
+                lo.y = Math.min(lo.y, c.y);
+                lo.z = Math.min(lo.z, c.z);
+                hi.x = Math.max(hi.x, c.x);
+                hi.y = Math.max(hi.y, c.y);
+                hi.z = Math.max(hi.z, c.z);
+            }
+        }
+    }
+
+    /** Applies the view filter + layer visibility to a grid (for the active document). */
+    private SparseMatrix<Block> filtered(SparseMatrix<Block> grid) {
+        if (grid == null) {
+            return new SparseMatrix<>();
+        }
+        SparseMatrix<Block> g = grid;
+        if (StarMadeLogic.getInstance().getViewFilter() != null) {
+            g = StarMadeLogic.getInstance().getViewFilter().modify(g, null, StarMadeLogic.getInstance(), null);
+        }
+        return StarMadeLogic.getInstance().getLayers().applyVisibility(g);
+    }
+
+    /**
+     * The pickable objects, each with its world transform. {@code activeOnly} limits
+     * it to the active object (used by drag continuation / cursor readout so a stroke
+     * stays on the object it started on); otherwise every visible object is included.
+     */
+    private List<RaycastPicker.Target> sceneTargets(boolean activeOnly) {
+        List<RaycastPicker.Target> out = new ArrayList<>();
+        SceneModel sm = StarMadeLogic.getInstance().getSceneModel();
+        Scene scene = sm != null ? sm.getScene() : null;
+        SceneObject active = sm != null ? sm.getActiveObject() : null;
+        if (scene != null && !scene.getObjects().isEmpty()) {
+            for (SceneObject o : scene.getObjects()) {
+                if (activeOnly && o != active) {
+                    continue;
+                }
+                if (!o.isVisible() || o.getGrid() == null) {
+                    continue;
+                }
+                Matrix4f w = new Matrix4f();
+                w.set(o.getTransform());
+                out.add(new RaycastPicker.Target(o, w, o.getGrid()));
+            }
+        } else {
+            SparseMatrix<Block> g = StarMadeLogic.getModel();
+            if (g != null) {
+                Matrix4f id = new Matrix4f();
+                id.setIdentity();
+                out.add(new RaycastPicker.Target(null, id, g));
+            }
+        }
+        return out;
     }
 
     @Override
     public void updateTiles() {
-        if (mDontDraw) {
-            mFilteredGrid = new SparseMatrix<>();
-        } else if (StarMadeLogic.getInstance().getViewFilter() == null) {
-            mFilteredGrid = StarMadeLogic.getModel();
-        } else {
-            mFilteredGrid = StarMadeLogic.getInstance().getViewFilter().modify(StarMadeLogic.getModel(), null, StarMadeLogic.getInstance(), null);
-        }
-        // Drop blocks in hidden layers so face-culling exposes the revealed interior.
-        mFilteredGrid = StarMadeLogic.getInstance().getLayers().applyVisibility(mFilteredGrid);
         updateAxis();
         updateGrid();
         mBlocks.getChildren().clear();
-        LWJGLRenderLogic.addBlocks(mBlocks, mFilteredGrid, mPlainGraphics);
-        System.out.println("Quads:" + mBlocks.getChildren().size());
-        updateContext();
-        updateSelectionBox();
-        // Depth-sort the freshly built glass mesh for the current camera.
-        updateTransform();
-    }
-
-    /**
-     * Rebuilds the read-only geometry for every visible scene object other than the
-     * active one, each positioned in the active object's frame (active⁻¹ · world) so
-     * the whole scene is shown around the object being edited. The active object
-     * itself is drawn by {@link #mBlocks} at the origin (fully editable/pickable).
-     */
-    private void updateContext() {
-        mContext.getChildren().clear();
+        mContext.getChildren().clear(); // retired: every object now renders under mBlocks
+        if (mDontDraw) {
+            mFilteredGrid = new SparseMatrix<>();
+            mLastSortCam = null;
+            updateSelectionBox();
+            updateTransform();
+            return;
+        }
+        // World-space render: every visible object as a child group of mBlocks at its
+        // own world transform. mBlocks stays at identity, so the captured pick matrices
+        // remain world→eye. The active object also gets the view filter / layer masks.
         SceneModel sm = StarMadeLogic.getInstance().getSceneModel();
         Scene scene = sm != null ? sm.getScene() : null;
-        if (scene == null || scene.getObjects().size() < 2) {
-            return; // nothing but the active object to draw
-        }
-        SceneObject active = sm.getActiveObject();
-        Matrix4f invActive = new Matrix4f();
-        invActive.setIdentity();
-        if (active != null) {
-            invActive.set(active.getTransform());
-            try {
-                invActive.invert();
-            } catch (RuntimeException e) {
-                invActive.setIdentity(); // singular transform: fall back to the world frame
+        SceneObject active = sm != null ? sm.getActiveObject() : null;
+        if (scene == null || scene.getObjects().isEmpty()) {
+            mFilteredGrid = filtered(StarMadeLogic.getModel());
+            LWJGLRenderLogic.addBlocks(mBlocks, mFilteredGrid, mPlainGraphics);
+        } else {
+            for (SceneObject o : new ArrayList<>(scene.getObjects())) {
+                if (!o.isVisible() || o.getGrid() == null) {
+                    continue;
+                }
+                boolean isActive = (o == active);
+                SparseMatrix<Block> g = isActive ? filtered(o.getGrid()) : o.getGrid();
+                if (isActive) {
+                    mFilteredGrid = g;
+                }
+                JGLGroup grp = new JGLGroup();
+                Matrix4f m = new Matrix4f();
+                m.set(o.getTransform());
+                grp.setTransform(m);
+                LWJGLRenderLogic.addBlocks(grp, g, mPlainGraphics);
+                mBlocks.getChildren().add(grp);
             }
         }
-        for (SceneObject o : new java.util.ArrayList<>(scene.getObjects())) {
-            if (o == active || !o.isVisible() || o.getGrid() == null) {
-                continue;
-            }
-            Matrix4f m = new Matrix4f();
-            m.set(invActive);
-            m.mul(o.getTransform()); // active⁻¹ · worldₒ
-            JGLGroup g = new JGLGroup();
-            g.setTransform(m);
-            LWJGLRenderLogic.addBlocks(g, o.getGrid(), mPlainGraphics);
-            mContext.getChildren().add(g);
-        }
+        // A freshly rebuilt mesh must be re-sorted even from the same camera.
+        mLastSortCam = null;
+        updateSelectionBox();
+        updateTransform();
     }
 
     public void updateSelectionBox() {
@@ -341,9 +426,9 @@ public class LWJGLRenderPanel extends RenderPanel {
     }
 
     private static final short[] SELECT_FACE_COLORS = {
-        BlockTypes.SPECIAL_SELECT_XP, BlockTypes.SPECIAL_SELECT_XM,
-        BlockTypes.SPECIAL_SELECT_YP, BlockTypes.SPECIAL_SELECT_YM,
-        BlockTypes.SPECIAL_SELECT_ZP, BlockTypes.SPECIAL_SELECT_ZM,
+        BlockGroups.SPECIAL_SELECT_XP, BlockGroups.SPECIAL_SELECT_XM,
+        BlockGroups.SPECIAL_SELECT_YP, BlockGroups.SPECIAL_SELECT_YM,
+        BlockGroups.SPECIAL_SELECT_ZP, BlockGroups.SPECIAL_SELECT_ZM,
     };
 
     /** Rebuilds the wireframe outline tracing the exact selected cells. */
@@ -367,7 +452,19 @@ public class LWJGLRenderPanel extends RenderPanel {
             // (the axis-coloured edges also hint at orientation).
             obj.setWireframe(true);
         }
+        // Selected cells are in the ACTIVE object's local grid space, so the highlight
+        // group carries that object's world transform — otherwise it would draw at the
+        // origin while a translated/rotated entity sits elsewhere.
+        Matrix4f t = new Matrix4f();
+        SceneModel sm = StarMadeLogic.getInstance().getSceneModel();
+        SceneObject active = sm != null ? sm.getActiveObject() : null;
+        if (active != null) {
+            t.set(active.getTransform());
+        } else {
+            t.setIdentity();
+        }
         synchronized (mSelection) {
+            mSelection.setTransform(t);
             mSelection.getChildren().clear();
             if (obj != null) {
                 mSelection.add(obj);
@@ -441,24 +538,20 @@ public class LWJGLRenderPanel extends RenderPanel {
                 return centerOf(sel);
             }
         }
-        SparseMatrix<Block> grid = StarMadeLogic.getModel();
-        if (grid != null && grid.size() > 0) {
-            Point3i lo = new Point3i();
-            Point3i hi = new Point3i();
-            grid.getBounds(lo, hi);
+        Point3f lo = new Point3f();
+        Point3f hi = new Point3f();
+        if (sceneWorldBounds(lo, hi)) {
             return new Point3f((lo.x + hi.x) / 2f, (lo.y + hi.y) / 2f, (lo.z + hi.z) / 2f);
         }
         return new Point3f(0, 0, 0);
     }
 
-    /** Half-length of the axis lines / grid, scaled to the model with sane clamps. */
+    /** Half-length of the axis lines / grid, scaled to the whole scene with sane clamps. */
     private float guideReach() {
-        SparseMatrix<Block> grid = StarMadeLogic.getModel();
-        if (grid != null && grid.size() > 0) {
-            Point3i lo = new Point3i();
-            Point3i hi = new Point3i();
-            grid.getBounds(lo, hi);
-            int extent = Math.max(hi.x - lo.x, Math.max(hi.y - lo.y, hi.z - lo.z));
+        Point3f lo = new Point3f();
+        Point3f hi = new Point3f();
+        if (sceneWorldBounds(lo, hi)) {
+            float extent = Math.max(hi.x - lo.x, Math.max(hi.y - lo.y, hi.z - lo.z));
             return Math.min(512f, Math.max(16f, extent / 2f + 8f));
         }
         return 16f;
@@ -509,9 +602,43 @@ public class LWJGLRenderPanel extends RenderPanel {
     }
 
     public Point3i getPointAt(double x, double y) {
-        // (x, y) are LWJGL window coords (origin bottom-left), matching what the
-        // GL viewport/gluUnProject expect. Ray-cast into the voxel grid.
-        return RaycastPicker.pick((float) x, (float) y, mPickMatrices.snapshot(), StarMadeLogic.getModel());
+        // (x, y) are LWJGL window coords (origin bottom-left). Ray-cast the ACTIVE
+        // object only, in its own local space — this drives drag continuation and the
+        // cursor readout, which must stay on the object a stroke started on. Use
+        // {@link #pickScene} to resolve a click against every entity.
+        PickResult pr = RaycastPicker.pickScene((float) x, (float) y,
+                mPickMatrices.snapshot(), sceneTargets(true));
+        return pr == null ? null : pr.cell;
+    }
+
+    /** Resolves a click against every visible entity: which object + local cell it hit. */
+    public PickResult pickScene(double x, double y) {
+        return RaycastPicker.pickScene((float) x, (float) y,
+                mPickMatrices.snapshot(), sceneTargets(false));
+    }
+
+    /**
+     * Makes the picked object the edit target (active document) if it isn't already.
+     * Until the unified scene-level undo lands, switching entities clears the undo
+     * history so a Ctrl+Z can't restore one object's snapshot onto another.
+     */
+    public void focusPickedObject(PickResult pr) {
+        if (pr == null || pr.object == null) {
+            return;
+        }
+        SceneModel sm = StarMadeLogic.getInstance().getSceneModel();
+        if (sm == null || sm.isActive(pr.object)) {
+            return;
+        }
+        mSuppressReframe = true;
+        try {
+            sm.setActive(pr.object);
+        } finally {
+            mSuppressReframe = false;
+        }
+        if (mUndoer != null) {
+            mUndoer.clear();
+        }
     }
 
     // ------------------------------------------------------------------
@@ -591,9 +718,10 @@ public class LWJGLRenderPanel extends RenderPanel {
 
     @Override
     public Point3i getPlacementAt(double x, double y) {
-        RaycastPicker.Hit hit = RaycastPicker.pickHit((float) x, (float) y,
-                mPickMatrices.snapshot(), StarMadeLogic.getModel());
-        return hit == null ? null : hit.place;
+        // Placement cell for Build, in the ACTIVE object's local space (see getPointAt).
+        PickResult pr = RaycastPicker.pickScene((float) x, (float) y,
+                mPickMatrices.snapshot(), sceneTargets(true));
+        return pr == null ? null : pr.place;
     }
 
     @Override

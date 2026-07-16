@@ -23,7 +23,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.BooleanMatrix3D;
 import smc.smedit.data.CubeIterator;
 import smc.smedit.data.SparseMatrix;
@@ -130,10 +131,10 @@ public class DeckPlugin implements IBlocksPlugin {
         cb.setStatus("Placing stairs");
         cb.startTask(deckYs.size());
         short tred = params.getMaterial();
-        if (BlockTypes.isAnyHull(tred)) {
-            tred = BlockTypes.getColoredBlock(BlockTypes.HULL_COLOR_WEDGE_GREY_ID, BlockTypes.getColor(tred));
+        if (BlockGroups.isAnyHull(tred)) {
+            tred = BlockGroups.getColoredBlock(Blocks.GREY_STANDARD_ARMOR_WEDGE.getId(), BlockGroups.getColor(tred));
         } else {
-            tred = BlockTypes.HULL_COLOR_WEDGE_GREY_ID;
+            tred = Blocks.GREY_STANDARD_ARMOR_WEDGE.getId();
         }
         for (Integer y : deckYs) {
             if (y + sy >= upper.y) {

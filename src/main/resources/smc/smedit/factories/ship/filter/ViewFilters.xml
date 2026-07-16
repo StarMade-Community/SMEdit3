@@ -1,5 +1,0 @@
-<filters>
-    <filter title="All" description="Show all blocks" priority="10">
-        <block id=""/>
-    </filter>
-</filters>

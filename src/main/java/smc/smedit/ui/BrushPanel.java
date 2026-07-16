@@ -51,7 +51,8 @@ import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.ui.tool.EditorTool;
 import smc.smedit.ui.tool.ToolController;
 import smc.smedit.ui.tool.ToolController.BrushShape;
@@ -152,7 +153,7 @@ public class BrushPanel extends JPanel implements ToolController.Listener {
 
         // Paint needs a material out of the box — default to grey hull if unset.
         if (tc.getActiveBlockType() < 0) {
-            tc.setActiveBlockType(BlockTypes.HULL_COLOR_GREY_ID);
+            tc.setActiveBlockType(Blocks.GREY_STANDARD_ARMOR.getId());
         }
         buildTree("");
         updateFormControl(tc.getActiveBlockType());
@@ -168,10 +169,10 @@ public class BrushPanel extends JPanel implements ToolController.Listener {
     private void loadBlocks() {
         // BLOCK_NAMES is filled lazily by loadBlockIcons(); make sure it has run
         // so the palette isn't empty if we're built before the renderer triggers it.
-        if (BlockTypes.BLOCK_NAMES.isEmpty()) {
+        if (BlockGroups.BLOCK_NAMES.isEmpty()) {
             BlockTypeColors.loadBlockIcons();
         }
-        for (Short id : BlockTypes.BLOCK_NAMES.keySet()) {
+        for (Short id : BlockGroups.BLOCK_NAMES.keySet()) {
             if (id == null) {
                 continue;
             }
@@ -188,7 +189,7 @@ public class BrushPanel extends JPanel implements ToolController.Listener {
             ids.add(id);
         }
         ids.sort(Comparator
-                .comparing((Short id) -> BlockTypes.BLOCK_NAMES.getOrDefault(id, "").toLowerCase())
+                .comparing((Short id) -> BlockGroups.BLOCK_NAMES.getOrDefault(id, "").toLowerCase())
                 .thenComparing(id -> id));
         long categorised = ids.stream().filter(BlockTypeColors.BLOCK_CATEGORY::containsKey).count();
         LOG.info("Brush palette: " + ids.size() + " blocks (" + categorised
@@ -267,7 +268,7 @@ public class BrushPanel extends JPanel implements ToolController.Listener {
         Map<String, DefaultMutableTreeNode> categories = new HashMap<>();
         blockNodes.clear();
         for (Short id : ids) {
-            String name = BlockTypes.BLOCK_NAMES.getOrDefault(id, "");
+            String name = BlockGroups.BLOCK_NAMES.getOrDefault(id, "");
             if (!q.isEmpty() && !name.toLowerCase().contains(q)) {
                 continue;
             }

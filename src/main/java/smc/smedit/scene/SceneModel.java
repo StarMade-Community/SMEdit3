@@ -204,6 +204,62 @@ public final class SceneModel {
 
     // ---- structural ops ----
 
+    /**
+     * Opens a freshly-loaded entity (blueprint / file / imported model) as a NEW
+     * scene object and makes it the active editable document — the "add to scene"
+     * counterpart to {@link #loadScene} (which replaces the whole scene). Staggers
+     * the object in space so it doesn't overlap existing ones, points the current
+     * spec at it, and activates it via an internal swap (so this doesn't re-enter
+     * {@link #onExternalModelChanged}). Returns the new object.
+     */
+    public SceneObject openEntity(String name, SparseMatrix<Block> grid, ShipSpec spec) {
+        if (grid == null) {
+            return null;
+        }
+        // Reuse a lone empty placeholder (the startup blank document) rather than
+        // leaving it as a stray beside the new object; otherwise add a fresh object,
+        // staggered so it doesn't overlap the existing ones.
+        SceneObject o = loneEmptyPlaceholder();
+        if (o == null) {
+            o = new SceneObject();
+            o.getTransform().setIdentity();
+            o.getTransform().m03 = IMPORT_SPACING * mScene.getObjects().size();
+            mScene.getObjects().add(o);
+        } else {
+            o.getTransform().setIdentity();
+        }
+        o.setName(name == null || name.isEmpty() ? "Object " + mScene.getObjects().size() : name);
+        o.setGrid(grid);
+        if (spec != null) {
+            mStarMade.setCurrentModel(spec);
+            mLastSpec = spec;
+        }
+        // Make it the editable document via an internal swap (so this doesn't re-enter
+        // onExternalModelChanged). setActive short-circuits if it's already active, so
+        // handle the reused-placeholder case (already active) explicitly.
+        if (o.getId().equals(mActiveId)) {
+            mInternalSwap = true;
+            try {
+                StarMadeLogic.setModel(grid);
+            } finally {
+                mInternalSwap = false;
+            }
+            fireChanged();
+        } else {
+            setActive(o);
+        }
+        return o;
+    }
+
+    /** The sole object when it's an empty placeholder, else {@code null}. */
+    private SceneObject loneEmptyPlaceholder() {
+        if (mScene.getObjects().size() != 1) {
+            return null;
+        }
+        SceneObject only = mScene.getObjects().get(0);
+        return (only.getGrid() == null || only.getGrid().size() == 0) ? only : null;
+    }
+
     /** Adds an imported object, staggered in space, and returns it (does not activate). */
     public SceneObject importObject(String name, SparseMatrix<Block> grid) {
         SceneObject o = new SceneObject();

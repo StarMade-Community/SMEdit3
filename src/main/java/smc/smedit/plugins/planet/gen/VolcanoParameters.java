@@ -17,7 +17,8 @@
  **/
 package smc.smedit.plugins.planet.gen;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.ui.act.plugin.Description;
 
 /**
@@ -42,7 +43,7 @@ public class VolcanoParameters {
         mPlanetHeight = 127;
         mCalderaRadius = 16;
         mCalderaDepth = 32;
-        mFillWith = BlockTypes.TERRAIN_ROCK_ID;
+        mFillWith = Blocks.ROCK.getId();
     }
 
     public int getPlanetRadius() {

@@ -17,7 +17,8 @@
  **/
 package smc.smedit.plugins.planet.gen;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.ui.act.plugin.Description;
 
 /**
@@ -36,7 +37,7 @@ public class UndulatingParameters {
     public UndulatingParameters() {
         mPlanetRadius = 250;
         mPlanetHeight = 32;
-        mFillWith = BlockTypes.TERRAIN_ROCK_ID;
+        mFillWith = Blocks.ROCK.getId();
     }
 
     public int getPlanetRadius() {

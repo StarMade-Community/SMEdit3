@@ -22,7 +22,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 
 /**
  * @Auther Jo Jaquinta for SMEdit Classic - version 1.0
@@ -43,8 +44,8 @@ public class BlockPropertyEditor extends PropertyEditorSupport {
     }
 
     private void copyNames() {
-        for (Short key : BlockTypes.BLOCK_NAMES.keySet()) {
-            mNames.put(key, BlockTypes.BLOCK_NAMES.get(key));
+        for (Short key : BlockGroups.BLOCK_NAMES.keySet()) {
+            mNames.put(key, BlockGroups.BLOCK_NAMES.get(key));
         }
     }
 

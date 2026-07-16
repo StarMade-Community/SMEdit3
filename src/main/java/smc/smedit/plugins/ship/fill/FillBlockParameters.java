@@ -17,7 +17,8 @@
  **/
 package smc.smedit.plugins.ship.fill;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.ui.act.plugin.Description;
 
 /**
@@ -36,7 +37,7 @@ public class FillBlockParameters {
     private int mAxis;
 
     public FillBlockParameters() {
-        mBlockID = BlockTypes.THRUSTER_ID;
+        mBlockID = Blocks.THRUSTER_MODULE.getId();
         mTotal = 200;
         mStrategy = FillStrategy.CENTER;
         mAxis = FillStrategy.Z;

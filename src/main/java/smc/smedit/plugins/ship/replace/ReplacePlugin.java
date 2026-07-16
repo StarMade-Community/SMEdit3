@@ -21,7 +21,8 @@ import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.data.StarMade;
 import smc.smedit.mods.IBlocksPlugin;
@@ -87,7 +88,7 @@ public class ReplacePlugin implements IBlocksPlugin {
             xyz = i.next();
             Block b;
             b = original.get(xyz);
-            if (BlockTypes.isAnyHull(b.getBlockID())) {
+            if (BlockGroups.isAnyHull(b.getBlockID())) {
                 b = modify(xyz, b, params);
             }
             modified.set(xyz, b);
@@ -99,10 +100,10 @@ public class ReplacePlugin implements IBlocksPlugin {
 
     private Block modify(Point3i xyz, Block b, ReplaceParameters params) {
         short oldColor;
-        oldColor = BlockTypes.getColor(b.getBlockID());
+        oldColor = BlockGroups.getColor(b.getBlockID());
         if (oldColor == params.getColor1()) {
             short newColor;
-            newColor = BlockTypes.getColoredBlock(b.getBlockID(), params.getColor2());
+            newColor = BlockGroups.getColoredBlock(b.getBlockID(), params.getColor2());
             if (newColor >= 0) {
                 b.setBlockID(newColor);
             }

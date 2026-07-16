@@ -17,7 +17,8 @@
  **/
 package smc.smedit.plugins.ship.stripes;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.ui.act.plugin.Description;
 
 /**
@@ -39,8 +40,8 @@ public class OmbreParameters {
     private boolean mZAxis;
 
     public OmbreParameters() {
-        mColor1 = BlockTypes.HULL_COLOR_BLACK_ID;
-        mColor2 = BlockTypes.HULL_COLOR_WHITE_ID;
+        mColor1 = Blocks.BLACK_STANDARD_ARMOR.getId();
+        mColor2 = Blocks.WHITE_STANDARD_ARMOR.getId();
         mXAxis = true;
         mYAxis = false;
         mZAxis = false;

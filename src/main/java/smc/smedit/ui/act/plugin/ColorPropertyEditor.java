@@ -19,7 +19,8 @@ package smc.smedit.ui.act.plugin;
 
 import java.beans.PropertyEditorSupport;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 
 /**
  * @Auther Jo Jaquinta for SMEdit Classic - version 1.0
@@ -38,34 +39,34 @@ public class ColorPropertyEditor extends PropertyEditorSupport {
     public String getAsText() {
         Short c = (Short) getValue();
         if (c == null) {
-            c = BlockTypes.HULL_COLOR_GREY_ID;
+            c = Blocks.GREY_STANDARD_ARMOR.getId();
         }
         String txt = "Grey";
-        if (c == BlockTypes.HULL_COLOR_GREY_ID) {
+        if (c == Blocks.GREY_STANDARD_ARMOR.getId()) {
             return "Grey";
         }
-        if (c == BlockTypes.HULL_COLOR_PURPLE_ID) {
+        if (c == Blocks.PURPLE_STANDARD_ARMOR.getId()) {
             return "Purple";
         }
-        if (c == BlockTypes.HULL_COLOR_BROWN_ID) {
+        if (c == Blocks.BROWN_STANDARD_ARMOR.getId()) {
             return "Brown";
         }
-        if (c == BlockTypes.HULL_COLOR_BLACK_ID) {
+        if (c == Blocks.BLACK_STANDARD_ARMOR.getId()) {
             return "Black";
         }
-        if (c == BlockTypes.HULL_COLOR_BLUE_ID) {
+        if (c == Blocks.BLUE_STANDARD_ARMOR.getId()) {
             return "Blue";
         }
-        if (c == BlockTypes.HULL_COLOR_RED_ID) {
+        if (c == Blocks.RED_STANDARD_ARMOR.getId()) {
             return "Red";
         }
-        if (c == BlockTypes.HULL_COLOR_GREEN_ID) {
+        if (c == Blocks.GREEN_STANDARD_ARMOR.getId()) {
             return "Green";
         }
-        if (c == BlockTypes.HULL_COLOR_YELLOW_ID) {
+        if (c == Blocks.YELLOW_STANDARD_ARMOR.getId()) {
             return "Yellow";
         }
-        if (c == BlockTypes.HULL_COLOR_WHITE_ID) {
+        if (c == Blocks.WHITE_STANDARD_ARMOR.getId()) {
             return "White";
         }
         //System.out.println("Getting "+getValue()+" -> "+txt);
@@ -90,34 +91,34 @@ public class ColorPropertyEditor extends PropertyEditorSupport {
     public void setAsText(String text) throws IllegalArgumentException {
         switch (text) {
             case "Grey":
-                setValue(BlockTypes.HULL_COLOR_GREY_ID);
+                setValue(Blocks.GREY_STANDARD_ARMOR.getId());
                 break;
             case "Purple":
-                setValue(BlockTypes.HULL_COLOR_PURPLE_ID);
+                setValue(Blocks.PURPLE_STANDARD_ARMOR.getId());
                 break;
             case "Brown":
-                setValue(BlockTypes.HULL_COLOR_BROWN_ID);
+                setValue(Blocks.BROWN_STANDARD_ARMOR.getId());
                 break;
             case "Black":
-                setValue(BlockTypes.HULL_COLOR_BLACK_ID);
+                setValue(Blocks.BLACK_STANDARD_ARMOR.getId());
                 break;
             case "Red":
-                setValue(BlockTypes.HULL_COLOR_RED_ID);
+                setValue(Blocks.RED_STANDARD_ARMOR.getId());
                 break;
             case "Blue":
-                setValue(BlockTypes.HULL_COLOR_BLUE_ID);
+                setValue(Blocks.BLUE_STANDARD_ARMOR.getId());
                 break;
             case "Green":
-                setValue(BlockTypes.HULL_COLOR_GREEN_ID);
+                setValue(Blocks.GREEN_STANDARD_ARMOR.getId());
                 break;
             case "Yellow":
-                setValue(BlockTypes.HULL_COLOR_YELLOW_ID);
+                setValue(Blocks.YELLOW_STANDARD_ARMOR.getId());
                 break;
             case "White":
-                setValue(BlockTypes.HULL_COLOR_WHITE_ID);
+                setValue(Blocks.WHITE_STANDARD_ARMOR.getId());
                 break;
             default:
-                setValue(BlockTypes.HULL_COLOR_GREY_ID);
+                setValue(Blocks.GREY_STANDARD_ARMOR.getId());
                 break;
         }
     }

@@ -27,7 +27,8 @@ import java.util.Locale;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.data.StarMade;
 import smc.smedit.mods.IBlocksPlugin;
@@ -102,7 +103,7 @@ public class ImportModelPlugin implements IBlocksPlugin {
         ImportModelParameters params = (ImportModelParameters) p;
         short baseColor = sm.getSelectedBlockType();
         if (baseColor <= 0) {
-            baseColor = BlockTypes.HULL_COLOR_GREY_ID;
+            baseColor = Blocks.GREY_STANDARD_ARMOR.getId();
         }
         ColorPalette palette = ColorPalette.fromBlockIds(
                 ConversionPalette.fromText(params.getPalette()).getBlockIds());

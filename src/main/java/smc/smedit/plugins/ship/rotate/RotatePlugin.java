@@ -21,7 +21,8 @@ import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.data.StarMade;
 import smc.smedit.logic.GridLogic;
@@ -74,7 +75,7 @@ public class RotatePlugin implements IBlocksPlugin {
             b = original.get(xyz);
             t.transform(inPoint, outPoint);
             log.log(Level.INFO, "  "+inPoint+" -> "+outPoint);
-            if (BlockTypes.isWedge(b.getBlockID()) || BlockTypes.isPowerWedge(b.getBlockID()) || (b.getBlockID() == BlockTypes.GLASS_WEDGE_ID)) {
+            if (BlockGroups.isWedge(b.getBlockID()) || BlockGroups.isPowerWedge(b.getBlockID()) || (b.getBlockID() == Blocks.GLASS_WEDGE.getId())) {
                 short ori;
                 ori = b.getOrientation();
                 ori = WedgeLogic.rotate(ori, params.getXRotate() / 90, params.getYRotate() / 90, params.getZRotate() / 90);
@@ -84,7 +85,7 @@ public class RotatePlugin implements IBlocksPlugin {
                     log.log(Level.INFO, "Could not rotate wedge ori: " + b.getOrientation());
                 }
             }
-            if (BlockTypes.isCorner(b.getBlockID()) || BlockTypes.isPowerCorner(b.getBlockID()) || (b.getBlockID() == BlockTypes.GLASS_CORNER_ID)) {
+            if (BlockGroups.isCorner(b.getBlockID()) || BlockGroups.isPowerCorner(b.getBlockID()) || (b.getBlockID() == Blocks.GLASS_CORNER.getId())) {
                 short ori;
                 ori = b.getOrientation();
                 ori = CornerLogic.rotate(ori, params.getXRotate() / 90, params.getYRotate() / 90, params.getZRotate() / 90);
@@ -162,7 +163,7 @@ public class RotatePlugin implements IBlocksPlugin {
         for (Iterator<Point3i> i = grid.iteratorNonNull(); i.hasNext();) {
             Point3i xyz;
             xyz = i.next();
-            if (grid.get(xyz).getBlockID() == BlockTypes.CORE_ID) {
+            if (grid.get(xyz).getBlockID() == Blocks.SHIP_CORE.getId()) {
                 return xyz;
             }
         }

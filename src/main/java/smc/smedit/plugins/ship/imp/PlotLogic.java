@@ -31,7 +31,8 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.logic.StarMadeLogic;
 import smc.smedit.logic.utils.IntegerUtils;
@@ -83,7 +84,7 @@ public class PlotLogic {
                 color = mapColor(t.getColor());
                 drawTriangle(modified, iA, iB, iC, color);
             } else {
-                drawTriangle(modified, iA, iB, iC, BlockTypes.HULL_COLOR_GREY_ID);
+                drawTriangle(modified, iA, iB, iC, Blocks.GREY_STANDARD_ARMOR.getId());
             }
             cb.workTask(1);
         }

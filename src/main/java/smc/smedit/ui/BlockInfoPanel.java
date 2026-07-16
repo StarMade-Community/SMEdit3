@@ -38,7 +38,8 @@ import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableRowSorter;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.logic.SelectionModel;
 import smc.smedit.logic.StarMadeLogic;
@@ -243,7 +244,7 @@ public class BlockInfoPanel extends JPanel {
             }
             short id = b.getBlockID();
             String pos = "(" + p.x + ", " + p.y + ", " + p.z + ")";
-            String name = BlockTypes.BLOCK_NAMES.getOrDefault(id, "?");
+            String name = BlockGroups.BLOCK_NAMES.getOrDefault(id, "?");
             if (full) {
                 rows.add(new Object[]{pos, id, name, (int) b.getOrientation(),
                     styleName(BlockTypeColors.getBlockStyle(id)), BlockTypeColors.getBlockSlab(id),

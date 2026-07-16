@@ -20,6 +20,22 @@ tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
 }
 
+// Regenerates smc.smedit.data.Blocks (the typed id<->name block registry) from
+// the vendored block_types.properties snapshot. Run manually after refreshing
+// that snapshot from a newer StarMade release; the output is committed.
+// SMEdit's decoupled equivalent of StarMade's own api.utils.element.BlocksWriter.
+tasks.register('generateBlocks') {
+    description = 'Generates smc.smedit.data.Blocks from block_types.properties.'
+    def props = file('src/main/resources/smc/smedit/data/block_types.properties')
+    def out = file('src/main/java/smc/smedit/data/Blocks.java')
+    inputs.file(props)
+    outputs.file(out)
+    doLast {
+        smc.build.BlocksEnumGenerator.generate(props, out)
+        logger.lifecycle("Generated ${out}")
+    }
+}
+
 // LWJGL 2.9.3 — the same version StarMade ships (previously SMEdit vendored the
 // older 2.9.1). Only the pure-Java jars are pulled from Maven; the *native*
 // libraries are loaded at runtime from the StarMade install's native/<os>

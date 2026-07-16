@@ -17,7 +17,8 @@ import java.util.Collections;
 
 import org.junit.jupiter.api.Test;
 
-import smc.smedit.data.BlockTypes;
+import smc.smedit.data.Blocks;
+import smc.smedit.data.BlockGroups;
 import smc.smedit.ui.BlockTypeColors;
 
 /**
@@ -36,8 +37,8 @@ class ColorPaletteTest {
 
     @Test
     void nearestMatchesTheClosestCandidate() {
-        short red = BlockTypes.HULL_COLOR_RED_ID;
-        short blue = BlockTypes.HULL_COLOR_BLUE_ID;
+        short red = Blocks.RED_STANDARD_ARMOR.getId();
+        short blue = Blocks.BLUE_STANDARD_ARMOR.getId();
         Color redColor = BlockTypeColors.getFillColor(red);
         Color blueColor = BlockTypeColors.getFillColor(blue);
         assumeTrue(!redColor.equals(blueColor), "test needs two distinct block colors");
@@ -49,7 +50,7 @@ class ColorPaletteTest {
 
     @Test
     void duplicateIdsAreCollapsed() {
-        short red = BlockTypes.HULL_COLOR_RED_ID;
+        short red = Blocks.RED_STANDARD_ARMOR.getId();
         ColorPalette palette = ColorPalette.fromBlockIds(Arrays.asList(red, red, red));
         assertEquals(1, palette.size());
     }

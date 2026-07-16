@@ -54,8 +54,8 @@ public class OpenExistingAction1 extends GenericAction {
             public void run(IPluginCallback cb) {
                 SparseMatrix<Block> grid = ShipTreeLogic.loadShip(spec, cb);
                 if (grid != null) {
-                    StarMadeLogic.getInstance().setCurrentModel(spec);
-                    StarMadeLogic.setModel(grid);
+                    // Open an entity ADDS it to the scene as a new object.
+                    StarMadeLogic.getInstance().getSceneModel().openEntity(spec.getName(), grid, spec);
                     mFrame.getClient().getUndoer().clear();
                 }
             }
