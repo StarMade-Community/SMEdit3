@@ -44,6 +44,7 @@ import smc.smedit.ship.data.Block;
 import smc.smedit.ui.RenderPanel;
 import smc.smedit.util.jgl.obj.JGLCamera;
 import smc.smedit.scene.Scene;
+import smc.smedit.logic.SelectionModel;
 import smc.smedit.scene.SceneModel;
 import smc.smedit.scene.SceneObject;
 import smc.smedit.util.jgl.obj.JGLGroup;
@@ -70,6 +71,8 @@ public class LWJGLRenderPanel extends RenderPanel {
     private final JGLGroup mSelection;
     private final JGLGroup mAxis;
     private final JGLGroup mGrid;
+    /** The Move tool's manipulator (axis + plane handles); empty for every other tool. */
+    private final JGLGroup mGizmo;
 
     /** Where the axis/grid guide is centred. */
     private AxisAnchor mAxisAnchor = AxisAnchor.SCENE;
@@ -120,6 +123,9 @@ public class LWJGLRenderPanel extends RenderPanel {
         mUniverse.getChildren().add(mAxis);
         mGrid = new JGLGroup();
         mUniverse.getChildren().add(mGrid);
+        // Drawn last and depth-test-off, so the Move gizmo sits over everything.
+        mGizmo = new JGLGroup();
+        mUniverse.getChildren().add(mGizmo);
         mCanvas = new JGLCanvas();
         mCanvas.setScene(mScene);
         setLayout(new BorderLayout());
@@ -160,6 +166,14 @@ public class LWJGLRenderPanel extends RenderPanel {
         // Refresh the viewport highlight whenever the selection changes (and the
         // axis/grid too, when they're anchored to the selection).
         StarMadeLogic.getInstance().getSelection().addListener(this::onSelectionChanged);
+        // The Move gizmo only shows for the Move tool, so rebuild it when the tool changes.
+        smc.smedit.ui.tool.ToolController.get().addListener(
+                new smc.smedit.ui.tool.ToolController.Listener() {
+                    @Override
+                    public void toolChanged(smc.smedit.ui.tool.EditorTool tool) {
+                        updateGizmo();
+                    }
+                });
     }
 
     @Override
@@ -193,6 +207,7 @@ public class LWJGLRenderPanel extends RenderPanel {
         float dist = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
         mScene.setOrthoHalfHeight((float) (dist * Math.tan(Math.toRadians(mScene.getFieldOfView() / 2.0))));
         sortTransparent(loc);
+        updateGizmo();   // keep the move gizmo screen-sized and centred as the view moves
     }
 
     /**
@@ -425,6 +440,257 @@ public class LWJGLRenderPanel extends RenderPanel {
         updateSelectionHighlight();
     }
 
+    /** Local-cell offset the Move tool is previewing for a block selection (null = none). */
+    private Point3i mMoveCellPreview;
+    /** World-space offset the Move tool is previewing for a whole entity (null = none). */
+    private Vector3f mMoveWorldPreview;
+
+    /**
+     * Previews a pending block-selection move by drawing the selection outline shifted
+     * by {@code offset} (local cells). Null clears the preview. The blocks themselves
+     * don't move until the gesture commits.
+     */
+    public void setBlockMovePreview(Point3i offset) {
+        mMoveCellPreview = offset;
+        mMoveWorldPreview = null;
+        updateSelectionHighlight();
+    }
+
+    /** Previews a pending whole-entity move by shifting its box by {@code worldOffset}. */
+    public void setEntityMovePreview(Vector3f worldOffset) {
+        mMoveWorldPreview = worldOffset;
+        mMoveCellPreview = null;
+        updateSelectionHighlight();
+    }
+
+    /** Clears any in-progress move preview. */
+    public void clearMovePreview() {
+        mMoveCellPreview = null;
+        mMoveWorldPreview = null;
+        updateSelectionHighlight();
+    }
+
+    /** The camera's forward (view) direction in world space — the Move drag plane normal. */
+    public Vector3f cameraForward() {
+        return mUniverse.getCamera().getForward();
+    }
+
+    /**
+     * Intersects the world ray through screen pixel (sx, sy) with the plane defined by
+     * {@code planePt} and unit {@code normal}. Returns the world hit point, or null if
+     * nothing has been rendered yet or the ray runs parallel to the plane.
+     */
+    public Point3f pickPlane(double sx, double sy, Point3f planePt, Vector3f normal) {
+        float[] r = RaycastPicker.worldRay((float) sx, (float) sy, mPickMatrices.snapshot());
+        if (r == null) {
+            return null;
+        }
+        float dx = r[3] - r[0], dy = r[4] - r[1], dz = r[5] - r[2];
+        float denom = dx * normal.x + dy * normal.y + dz * normal.z;
+        if (Math.abs(denom) < 1e-6f) {
+            return null;
+        }
+        float tt = ((planePt.x - r[0]) * normal.x + (planePt.y - r[1]) * normal.y
+                + (planePt.z - r[2]) * normal.z) / denom;
+        return new Point3f(r[0] + tt * dx, r[1] + tt * dy, r[2] + tt * dz);
+    }
+
+    // ------------------------------------------------------------------
+    // Move gizmo (axis / plane manipulator for the Move tool)
+    // ------------------------------------------------------------------
+
+    /** The frame the gizmo was last drawn at, or null when it isn't shown. */
+    private MoveGizmo mGizmoFrame;
+    /** World length of each axis shaft (kept ~constant on screen), and plane-handle offset. */
+    private float mGizmoLen;
+    private float mGizmoPlaneOff;
+    /** The handle under the cursor (hover) and the one being dragged (active); highlighted when drawn. */
+    private MoveGizmo.Handle mGizmoHover;
+    private MoveGizmo.Handle mGizmoActive;
+    /** Fraction of the axis length used as the plane handle's inset and square size. */
+    private static final float GIZMO_PLANE_INSET = 0.32f;
+    private static final float GIZMO_PLANE_SIZE = 0.16f;
+
+    private static final Color3f[] GIZMO_AXIS_COLORS = {AXIS_X, AXIS_Y, AXIS_Z};
+    /** The colour a hovered / grabbed handle is drawn in. */
+    private static final Color3f GIZMO_HIGHLIGHT = new Color3f(1.00f, 0.85f, 0.20f);
+
+    /** The world ray through screen pixel (sx, sy): {nearXYZ, farXYZ}, or null. */
+    public float[] worldRay(double sx, double sy) {
+        return RaycastPicker.worldRay((float) sx, (float) sy, mPickMatrices.snapshot());
+    }
+
+    /** Sets the handle the cursor is hovering (null = none); rebuilds the gizmo if it changed. */
+    public void setGizmoHover(MoveGizmo.Handle hover) {
+        if (hover != mGizmoHover) {
+            mGizmoHover = hover;
+            updateGizmo();
+        }
+    }
+
+    /** Sets the handle currently being dragged (null = none) so it stays highlighted. */
+    public void setGizmoActive(MoveGizmo.Handle active) {
+        if (active != mGizmoActive) {
+            mGizmoActive = active;
+            updateGizmo();
+        }
+    }
+
+    /** The axis colour, or the highlight colour when {@code h} is the hovered/grabbed handle. */
+    private Color3f gizmoColor(MoveGizmo.Handle h, Color3f base) {
+        MoveGizmo.Handle lit = mGizmoActive != null ? mGizmoActive : mGizmoHover;
+        return h == lit ? GIZMO_HIGHLIGHT : base;
+    }
+
+    /** The current gizmo frame (centre + world axes), or null when the gizmo isn't shown. */
+    public MoveGizmo getGizmoFrame() {
+        return mGizmoFrame;
+    }
+
+    /**
+     * Rebuilds the Move gizmo: three colour-coded axis arrows and three plane handles
+     * at the move target's centre, drawn on top of the scene and scaled with camera
+     * distance so it holds a roughly constant on-screen size. Empty for every tool but
+     * Move, or when there's nothing to move.
+     */
+    public void updateGizmo() {
+        MoveGizmo g = smc.smedit.ui.tool.ToolController.get().getActive() == smc.smedit.ui.tool.EditorTool.MOVE
+                ? MoveGizmo.forCurrent() : null;
+        if (g == null) {
+            mGizmoFrame = null;
+            synchronized (mGizmo) {
+                mGizmo.getChildren().clear();
+            }
+            return;
+        }
+        Point3f c = g.center();
+        Point3f cam = mUniverse.getCamera().getLocation();
+        float dist = (float) Math.sqrt((cam.x - c.x) * (cam.x - c.x)
+                + (cam.y - c.y) * (cam.y - c.y) + (cam.z - c.z) * (cam.z - c.z));
+        float len = Math.min(256f, Math.max(2f, dist * 0.14f));
+        mGizmoFrame = g;
+        mGizmoLen = len;
+        mGizmoPlaneOff = len * GIZMO_PLANE_INSET;
+
+        List<Point3f> verts = new ArrayList<>();
+        List<Color3f> cols = new ArrayList<>();
+        float head = len * 0.16f;
+        MoveGizmo.Handle[] axisHandles = {MoveGizmo.Handle.X, MoveGizmo.Handle.Y, MoveGizmo.Handle.Z};
+        MoveGizmo.Handle[] planeHandles = {MoveGizmo.Handle.PLANE_X, MoveGizmo.Handle.PLANE_Y, MoveGizmo.Handle.PLANE_Z};
+        for (int i = 0; i < 3; i++) {
+            Vector3f a = g.axis(i);
+            Color3f col = gizmoColor(axisHandles[i], GIZMO_AXIS_COLORS[i]);
+            Point3f tip = new Point3f(c.x + a.x * len, c.y + a.y * len, c.z + a.z * len);
+            LWJGLRenderLogic.addLine(verts, cols, new Point3f(c), tip, col);
+            // A little arrowhead: two short back-swept lines in the plane of the other axes.
+            Vector3f b = g.axis((i + 1) % 3);
+            Point3f base = new Point3f(tip.x - a.x * head, tip.y - a.y * head, tip.z - a.z * head);
+            LWJGLRenderLogic.addLine(verts, cols, tip,
+                    new Point3f(base.x + b.x * head * 0.5f, base.y + b.y * head * 0.5f, base.z + b.z * head * 0.5f), col);
+            LWJGLRenderLogic.addLine(verts, cols, tip,
+                    new Point3f(base.x - b.x * head * 0.5f, base.y - b.y * head * 0.5f, base.z - b.z * head * 0.5f), col);
+        }
+        // Plane handles: a small square outline in each axis plane, coloured by the
+        // plane's normal axis, inset from the centre along the two in-plane axes.
+        float off = mGizmoPlaneOff;
+        float sz = len * GIZMO_PLANE_SIZE;
+        for (int n = 0; n < 3; n++) {
+            Vector3f u = g.axis((n + 1) % 3);
+            Vector3f v = g.axis((n + 2) % 3);
+            Color3f col = gizmoColor(planeHandles[n], GIZMO_AXIS_COLORS[n]);
+            Point3f p00 = planePoint(c, u, v, off, off);
+            Point3f p10 = planePoint(c, u, v, off + sz, off);
+            Point3f p11 = planePoint(c, u, v, off + sz, off + sz);
+            Point3f p01 = planePoint(c, u, v, off, off + sz);
+            LWJGLRenderLogic.addLine(verts, cols, p00, p10, col);
+            LWJGLRenderLogic.addLine(verts, cols, p10, p11, col);
+            LWJGLRenderLogic.addLine(verts, cols, p11, p01, col);
+            LWJGLRenderLogic.addLine(verts, cols, p01, p00, col);
+        }
+        JGLObj obj = LWJGLRenderLogic.linesToObj(verts, cols);
+        synchronized (mGizmo) {
+            mGizmo.getChildren().clear();
+            if (obj != null) {
+                obj.setOnTop(true);   // never occluded, so handles stay grabbable
+                mGizmo.add(obj);
+            }
+        }
+    }
+
+    private static Point3f planePoint(Point3f c, Vector3f u, Vector3f v, float du, float dv) {
+        return new Point3f(c.x + u.x * du + v.x * dv,
+                c.y + u.y * du + v.y * dv, c.z + u.z * du + v.z * dv);
+    }
+
+    /**
+     * Which gizmo handle the pixel (sx, sy) is over, or null for none. Axis shafts are
+     * tested as screen-space line segments; plane handles as their projected centre.
+     * Planes win ties (they sit near the centre where the axes also cross).
+     */
+    public MoveGizmo.Handle pickMoveHandle(double sx, double sy) {
+        MoveGizmo g = mGizmoFrame;
+        PickMatrices.Snapshot snap = mPickMatrices.snapshot();
+        if (g == null || snap == null) {
+            return null;
+        }
+        Point3f c = g.center();
+        float[] pc = RaycastPicker.project(c.x, c.y, c.z, snap);
+        if (pc == null || pc[2] > 1f) {
+            return null;
+        }
+        // Plane handles first: their projected centre within a small radius.
+        float off = mGizmoPlaneOff + mGizmoLen * GIZMO_PLANE_SIZE * 0.5f;
+        MoveGizmo.Handle bestPlane = null;
+        double bestPlaneD = 14.0;   // px
+        MoveGizmo.Handle[] planes = {MoveGizmo.Handle.PLANE_X, MoveGizmo.Handle.PLANE_Y, MoveGizmo.Handle.PLANE_Z};
+        for (int n = 0; n < 3; n++) {
+            Vector3f u = g.axis((n + 1) % 3);
+            Vector3f v = g.axis((n + 2) % 3);
+            Point3f h = planePoint(c, u, v, off, off);
+            float[] ph = RaycastPicker.project(h.x, h.y, h.z, snap);
+            if (ph == null || ph[2] > 1f) {
+                continue;
+            }
+            double d = Math.hypot(ph[0] - sx, ph[1] - sy);
+            if (d < bestPlaneD) {
+                bestPlaneD = d;
+                bestPlane = planes[n];
+            }
+        }
+        if (bestPlane != null) {
+            return bestPlane;
+        }
+        // Axis shafts: nearest projected segment within the pick threshold.
+        MoveGizmo.Handle[] axes = {MoveGizmo.Handle.X, MoveGizmo.Handle.Y, MoveGizmo.Handle.Z};
+        MoveGizmo.Handle best = null;
+        double bestD = 9.0;   // px
+        for (int i = 0; i < 3; i++) {
+            Vector3f a = g.axis(i);
+            Point3f tip = new Point3f(c.x + a.x * mGizmoLen, c.y + a.y * mGizmoLen, c.z + a.z * mGizmoLen);
+            float[] pt = RaycastPicker.project(tip.x, tip.y, tip.z, snap);
+            if (pt == null || pt[2] > 1f) {
+                continue;
+            }
+            double d = segmentDist(sx, sy, pc[0], pc[1], pt[0], pt[1]);
+            if (d < bestD) {
+                bestD = d;
+                best = axes[i];
+            }
+        }
+        return best;
+    }
+
+    /** Distance from point (px,py) to the segment (ax,ay)-(bx,by), in pixels. */
+    private static double segmentDist(double px, double py, double ax, double ay, double bx, double by) {
+        double vx = bx - ax, vy = by - ay;
+        double wx = px - ax, wy = py - ay;
+        double len2 = vx * vx + vy * vy;
+        double t = len2 <= 1e-9 ? 0 : (wx * vx + wy * vy) / len2;
+        t = Math.max(0, Math.min(1, t));
+        double cx = ax + t * vx, cy = ay + t * vy;
+        return Math.hypot(px - cx, py - cy);
+    }
+
     private static final short[] SELECT_FACE_COLORS = {
         BlockGroups.SPECIAL_SELECT_XP, BlockGroups.SPECIAL_SELECT_XM,
         BlockGroups.SPECIAL_SELECT_YP, BlockGroups.SPECIAL_SELECT_YM,
@@ -433,17 +699,39 @@ public class LWJGLRenderPanel extends RenderPanel {
 
     /** Rebuilds the wireframe outline tracing the exact selected cells. */
     public void updateSelectionHighlight() {
-        java.util.List<Point3i> selected = StarMadeLogic.getInstance().getSelection().getSelected();
+        SelectionModel selection = StarMadeLogic.getInstance().getSelection();
+        java.util.List<Point3i> selected = selection.getSelected();
+        SceneModel sm = StarMadeLogic.getInstance().getSceneModel();
+        SceneObject active = sm != null ? sm.getActiveObject() : null;
         MeshInfo info = new MeshInfo();
         info.verts = new ArrayList<>();
         info.indexes = new ArrayList<>();
         info.colors = new ArrayList<>(); // plain-coloured, not textured
-        if (!selected.isEmpty()) {
+        if (selection.getMode() == SelectionModel.Mode.ENTITY && active != null
+                && active.getGrid().size() > 0) {
+            // Whole entity selected: a single frame around the entity's extent reads
+            // cleaner than tracing every block, so draw one box from the grid bounds.
+            Point3i lo = new Point3i();
+            Point3i hi = new Point3i();
+            active.getGrid().getBounds(lo, hi);
+            LWJGLRenderLogic.addSelectionBox(info, lo, hi, SELECT_FACE_COLORS, 0.03f);
+        } else if (!selected.isEmpty()) {
             // Outline the true shape of the selection: every cell's outward-facing
             // faces (culling shared interior faces), inflated a touch so the edges
             // don't z-fight the enclosed blocks. Irregular selections (flood-fill,
             // scattered multi-pick) now trace exactly, not a min/max bounding box.
-            LWJGLRenderLogic.addSelectionCells(info, selected, SELECT_FACE_COLORS, 0.03f);
+            java.util.Collection<Point3i> cells = selected;
+            if (mMoveCellPreview != null) {
+                // Move tool drag: draw the outline at the destination the blocks would
+                // land on, so the frame previews the move before it commits on release.
+                java.util.List<Point3i> shifted = new ArrayList<>(selected.size());
+                for (Point3i p : selected) {
+                    shifted.add(new Point3i(p.x + mMoveCellPreview.x,
+                            p.y + mMoveCellPreview.y, p.z + mMoveCellPreview.z));
+                }
+                cells = shifted;
+            }
+            LWJGLRenderLogic.addSelectionCells(info, cells, SELECT_FACE_COLORS, 0.03f);
         }
         JGLObj obj = null;
         if (!info.verts.isEmpty()) {
@@ -456,12 +744,17 @@ public class LWJGLRenderPanel extends RenderPanel {
         // group carries that object's world transform — otherwise it would draw at the
         // origin while a translated/rotated entity sits elsewhere.
         Matrix4f t = new Matrix4f();
-        SceneModel sm = StarMadeLogic.getInstance().getSceneModel();
-        SceneObject active = sm != null ? sm.getActiveObject() : null;
         if (active != null) {
             t.set(active.getTransform());
         } else {
             t.setIdentity();
+        }
+        if (mMoveWorldPreview != null) {
+            // Whole-entity move drag: shift the box in world space to preview where the
+            // entity will sit, while its blocks stay put until the move commits.
+            t.m03 += mMoveWorldPreview.x;
+            t.m13 += mMoveWorldPreview.y;
+            t.m23 += mMoveWorldPreview.z;
         }
         synchronized (mSelection) {
             mSelection.setTransform(t);
@@ -570,6 +863,7 @@ public class LWJGLRenderPanel extends RenderPanel {
     /** Selection change: refresh the highlight, and the guide too if it follows the selection. */
     private void onSelectionChanged() {
         updateSelectionHighlight();
+        updateGizmo();   // the move gizmo centres on the selection, so follow it
         if (mAxisAnchor == AxisAnchor.SELECTION) {
             updateAxis();
             updateGrid();

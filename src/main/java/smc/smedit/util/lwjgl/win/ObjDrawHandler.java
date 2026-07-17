@@ -18,6 +18,11 @@ public class ObjDrawHandler extends NodeDrawHandler {
             // writing depth makes transparent surfaces occlude each other and reject
             // coplanar duplicates — without it, overlapping/adjacent transparent
             // faces double-blend and shimmer like z-fighting.
+            // On-top meshes (the move gizmo) draw over everything, so the depth test
+            // is switched off for them and restored afterwards.
+            if (obj.isOnTop()) {
+                GL11.glDisable(GL11.GL_DEPTH_TEST);
+            }
             GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
             if (obj.getNormalBuffer() != null) {
                 GL11.glEnableClientState(GL11.GL_NORMAL_ARRAY);
@@ -99,6 +104,9 @@ public class ObjDrawHandler extends NodeDrawHandler {
                 if (obj.isAnyAlpha()) {
                     GL11.glEnable(GL11.GL_BLEND);
                 }
+            }
+            if (obj.isOnTop()) {
+                GL11.glEnable(GL11.GL_DEPTH_TEST);
             }
             postDraw(tick, node);
         }

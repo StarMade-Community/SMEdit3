@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Palette used when importing coloured images / models: each source pixel colour
+  is matched to the nearest <color> here and placed as that block. Targets the
+  standard-armor cube of each of StarMade's 17 hull colours. "block" is a
+  StarMade type name (resolved against the live install) or a numeric id.
+  Copy to the plugins directory to override.
+-->
+<colors>
+    <color rgb="808080" block="GREY_STANDARD_ARMOR"/>
+    <color rgb="404040" block="DARK_GREY_STANDARD_ARMOR"/>
+    <color rgb="202020" block="BLACK_STANDARD_ARMOR"/>
+    <color rgb="F0F0F0" block="WHITE_STANDARD_ARMOR"/>
+    <color rgb="C81E1E" block="RED_STANDARD_ARMOR"/>
+    <color rgb="2040C8" block="BLUE_STANDARD_ARMOR"/>
+    <color rgb="2E9E2E" block="GREEN_STANDARD_ARMOR"/>
+    <color rgb="E0D020" block="YELLOW_STANDARD_ARMOR"/>
+    <color rgb="8020A0" block="PURPLE_STANDARD_ARMOR"/>
+    <color rgb="6B4A2B" block="BROWN_STANDARD_ARMOR"/>
+    <color rgb="E08020" block="ORANGE_STANDARD_ARMOR"/>
+    <color rgb="E070A0" block="PINK_STANDARD_ARMOR"/>
+    <color rgb="208080" block="TEAL_STANDARD_ARMOR"/>
+    <color rgb="707030" block="OLIVE_STANDARD_ARMOR"/>
+    <color rgb="D8C8A0" block="BEIGE_STANDARD_ARMOR"/>
+    <color rgb="800020" block="BURGUNDY_STANDARD_ARMOR"/>
+    <color rgb="300080" block="INDIGO_STANDARD_ARMOR"/>
+</colors>

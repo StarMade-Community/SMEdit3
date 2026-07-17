@@ -63,18 +63,18 @@ public class VegetationFactory implements IStarMadePluginFactory {
     }
 
     private void loadDefinitions() {
-        File file = new File(Paths.getPluginsDirectory(), "SurfaceVegetation.xml");
+        File file = new File(Paths.getPluginsDirectory(), "surface_vegetation.xml");
         Document xml = null;
         if (file.exists()) {
             xml = XMLUtils.readFile(file);
         } else {
-            InputStream is = ResourceUtils.loadSystemResourceStream("SurfaceVegetation.xml", VegetationFactory.class);
+            InputStream is = ResourceUtils.loadSystemResourceStream("surface_vegetation.xml", VegetationFactory.class);
             if (is != null) {
                 xml = XMLUtils.readStream(is);
             }
         }
         if (xml == null) {
-            log.log(Level.WARNING, "SurfaceVegetation.xml not found; no vegetation plugins loaded");
+            log.log(Level.WARNING, "surface_vegetation.xml not found; no vegetation plugins loaded");
             return;
         }
         loadDefinitions(xml);
@@ -89,7 +89,7 @@ public class VegetationFactory implements IStarMadePluginFactory {
             if (StringUtils.isTrivial(title)) {
                 continue;
             }
-            String desc = XMLUtils.getAttribute(f, "descriptions");
+            String desc = XMLUtils.getAttribute(f, "description");
             String author = XMLUtils.getAttribute(f, "author");
             int priority = IntegerUtils.parseInt(XMLUtils.getAttribute(f, "priority"));
             if (StringUtils.isTrivial(author)) {

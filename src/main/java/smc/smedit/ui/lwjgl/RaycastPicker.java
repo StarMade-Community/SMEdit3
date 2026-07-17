@@ -147,6 +147,49 @@ public final class RaycastPicker {
         return walk(near, far, grid);
     }
 
+    /**
+     * The world-space ray through screen pixel (sx, sy), as
+     * {@code {nearX, nearY, nearZ, farX, farY, farZ}} — the unprojection of the
+     * pixel at the near and far clip planes. Null if nothing has been rendered
+     * yet or the unprojection fails. Used by the Move tool to drag on a plane.
+     */
+    public static float[] worldRay(float sx, float sy, PickMatrices.Snapshot snap) {
+        if (snap == null) {
+            return null;
+        }
+        FloatBuffer mv = wrap16(snap.modelview);
+        FloatBuffer proj = wrap16(snap.projection);
+        IntBuffer vp = BufferUtils.createIntBuffer(16);
+        vp.put(snap.viewport).flip();
+        float[] near = unproject(sx, sy, 0f, mv, proj, vp);
+        float[] far = unproject(sx, sy, 1f, mv, proj, vp);
+        if (near == null || far == null) {
+            return null;
+        }
+        return new float[]{near[0], near[1], near[2], far[0], far[1], far[2]};
+    }
+
+    /**
+     * Projects a world point to window coordinates as {@code {winX, winY, winZ}}
+     * (origin bottom-left, matching {@link #worldRay} and the synthesized mouse
+     * events). {@code winZ > 1} means the point is behind the camera. Null if nothing
+     * has been rendered yet or the projection fails. Used to hit-test gizmo handles.
+     */
+    public static float[] project(float wx, float wy, float wz, PickMatrices.Snapshot snap) {
+        if (snap == null) {
+            return null;
+        }
+        FloatBuffer mv = wrap16(snap.modelview);
+        FloatBuffer proj = wrap16(snap.projection);
+        IntBuffer vp = BufferUtils.createIntBuffer(16);
+        vp.put(snap.viewport).flip();
+        FloatBuffer out = BufferUtils.createFloatBuffer(3);
+        if (!GLU.gluProject(wx, wy, wz, mv, proj, vp, out)) {
+            return null;
+        }
+        return new float[]{out.get(0), out.get(1), out.get(2)};
+    }
+
     private static FloatBuffer wrap16(float[] a) {
         FloatBuffer b = BufferUtils.createFloatBuffer(16);
         b.put(a).flip();

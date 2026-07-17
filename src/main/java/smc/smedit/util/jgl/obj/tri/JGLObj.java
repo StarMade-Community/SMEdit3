@@ -46,6 +46,7 @@ public class JGLObj extends JGLNode {
     protected Color3f mWireColor;
     private boolean mAnyAlpha;
     private boolean mTransparent;
+    private boolean mOnTop;
     protected int mVertices;
     protected int mIndices;
     protected int mColors;
@@ -453,6 +454,19 @@ public class JGLObj extends JGLNode {
 
     public void setTransparent(boolean transparent) {
         mTransparent = transparent;
+    }
+
+    /**
+     * Whether this mesh draws with depth testing OFF, so it's never occluded by the
+     * scene (used for the move gizmo, whose handles must stay visible and grabbable
+     * even when the entity's blocks are in front of them).
+     */
+    public boolean isOnTop() {
+        return mOnTop;
+    }
+
+    public void setOnTop(boolean onTop) {
+        mOnTop = onTop;
     }
 
     /** Indices per primitive for the current mode: 3 (triangles), 2 (lines), else 4 (quads). */

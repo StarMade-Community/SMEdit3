@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Default view filters. Each <filter> becomes a "View" operation that hides
+  everything except the blocks it selects; the "All" filter (no members) clears
+  the view filter.
+
+  A filter's members can be given two ways:
+    <category name="Hulls"/>  - every block whose StarMade config category path
+                                contains that segment (Hulls, Weapons, Power,
+                                Shields, Logic, Light, Doors, Docking, Terrain,
+                                Flora, Glass, Effect, Manufacturing, Factory,
+                                Medical, Resources, NonCubic, ...). Preferred:
+                                stays correct as the install's block set changes.
+    <block type="SHIP_CORE"/> - a single block by StarMade type name (or id).
+
+  Copy this file to the plugins directory and edit it to override these defaults.
+-->
+<filters author="SMEdit">
+    <filter title="All" description="Show all blocks" priority="100"/>
+
+    <filter title="Hull &amp; Armor" description="Hull, armor and their shaped variants" priority="90">
+        <category name="Hulls"/>
+    </filter>
+
+    <filter title="Glass" description="Glass and glass shapes" priority="85">
+        <category name="Glass"/>
+    </filter>
+
+    <filter title="Weapons" description="Weapon systems and combat effects" priority="80">
+        <category name="Weapons"/>
+        <category name="Effect"/>
+    </filter>
+
+    <filter title="Power" description="Reactors, capacitors and power systems" priority="75">
+        <category name="Power"/>
+    </filter>
+
+    <filter title="Shields" description="Shield capacitors and rechargers" priority="70">
+        <category name="Shields"/>
+    </filter>
+
+    <filter title="Logic" description="Logic blocks and wiring" priority="65">
+        <category name="Logic"/>
+    </filter>
+
+    <filter title="Lighting" description="Lights, beacons and rods" priority="60">
+        <category name="Light"/>
+    </filter>
+
+    <filter title="Doors &amp; Rails" description="Doors, plex doors, rails and docking" priority="55">
+        <category name="Doors"/>
+        <category name="Docking"/>
+    </filter>
+
+    <filter title="Terrain &amp; Flora" description="Planet terrain, rocks and vegetation" priority="50">
+        <category name="Terrain"/>
+        <category name="Flora"/>
+    </filter>
+
+    <filter title="Decorative" description="Non-cubic and decorative blocks" priority="45">
+        <category name="NonCubic"/>
+    </filter>
+
+    <filter title="Systems (support)" description="Support tools, scanners, factories and medical" priority="40">
+        <category name="SupportTools"/>
+        <category name="Factory"/>
+        <category name="Manufacturing"/>
+        <category name="Medical"/>
+    </filter>
+</filters>

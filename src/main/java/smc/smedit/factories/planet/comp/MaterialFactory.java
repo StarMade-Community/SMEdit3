@@ -64,18 +64,18 @@ public class MaterialFactory implements IStarMadePluginFactory {
     }
 
     private void loadDefinitions() {
-        File file = new File(Paths.getPluginsDirectory(), "MaterialComposition.xml");
+        File file = new File(Paths.getPluginsDirectory(), "material_composition.xml");
         Document xml = null;
         if (file.exists()) {
             xml = XMLUtils.readFile(file);
         } else {
-            InputStream is = ResourceUtils.loadSystemResourceStream("MaterialComposition.xml", MaterialFactory.class);
+            InputStream is = ResourceUtils.loadSystemResourceStream("material_composition.xml", MaterialFactory.class);
             if (is != null) {
                 xml = XMLUtils.readStream(is);
             }
         }
         if (xml == null) {
-            log.log(Level.WARNING, "MaterialComposition.xml not found; no material-composition plugins loaded");
+            log.log(Level.WARNING, "material_composition.xml not found; no material-composition plugins loaded");
             return;
         }
         loadDefinitions(xml);
@@ -87,7 +87,7 @@ public class MaterialFactory implements IStarMadePluginFactory {
         String baseAuthor = XMLUtils.getAttribute(fs, "author");
         for (Node f : XMLUtils.findNodes(fs, "composition")) {
             String title = XMLUtils.getAttribute(f, "title");
-            String desc = XMLUtils.getAttribute(f, "descriptions");
+            String desc = XMLUtils.getAttribute(f, "description");
             String author = XMLUtils.getAttribute(f, "author");
             int priority = IntegerUtils.parseInt(XMLUtils.getAttribute(f, "priority"));
             if (StringUtils.isTrivial(author)) {

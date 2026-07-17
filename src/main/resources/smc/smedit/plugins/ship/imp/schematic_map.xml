@@ -1,0 +1,451 @@
+<blockMap default="GREY_STANDARD_ARMOR">
+    <block mcBlock="Air" smBlock="-1"/>
+    <block mcBlock="Stone" mcData="0" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Stone" mcData="1" smBlock="RED_STANDARD_ARMOR"/>
+    <block mcBlock="Stone" mcData="2" smBlock="RED_STANDARD_ARMOR"/>
+    <block mcBlock="Stone" mcData="3" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Stone" mcData="4" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Stone" mcData="5" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Stone" mcData="6" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Grass" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Dirt" mcData="0" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Dirt" mcData="1" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Dirt" mcData="1" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Cobblestone" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="WoodenPlank" mcData="0" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="WoodenPlank" mcData="1" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="WoodenPlank" mcData="2" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="WoodenPlank" mcData="3" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="WoodenPlank" mcData="4" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="WoodenPlank" mcData="5" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Sapling" mcData="0" smBlock="-1"/>
+    <block mcBlock="Sapling" mcData="1" smBlock="-1"/>
+    <block mcBlock="Sapling" mcData="2" smBlock="-1"/>
+    <block mcBlock="Sapling" mcData="3" smBlock="-1"/>
+    <block mcBlock="Sapling" mcData="4" smBlock="-1"/>
+    <block mcBlock="Sapling" mcData="5" smBlock="-1"/>
+    <block mcBlock="Bedrock" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="FlowingWater" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Water" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="FlowingLava" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Lava" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Sand" mcData="0" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Sand" mcData="1" smBlock="RED_STANDARD_ARMOR"/>
+    <block mcBlock="Gravel" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="GoldOre" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="IronOre" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="CoalOre" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Wood" mcData="0" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Wood" mcData="1" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Wood" mcData="2" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Wood" mcData="3" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Leaves" mcData="0" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Leaves" mcData="1" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Leaves" mcData="2" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Leaves" mcData="3" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Sponge" mcData="0" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Sponge" mcData="1" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Glass" smBlock="GLASS"/>
+    <block mcBlock="LapisLazuliOre" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="LapisLazuliBlock" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Dispenser" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Sandstone" mcData="0" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Sandstone" mcData="1" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Sandstone" mcData="2" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="NoteBlock" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="BedBlock" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="PoweredRail" smBlock="-1"/>
+    <block mcBlock="DetectorRail" smBlock="-1"/>
+    <block mcBlock="StickyPiston" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Cobweb" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="DeadShrub" mcData="0" smBlock="-1"/>
+    <block mcBlock="DeadShrub" mcData="1" smBlock="-1"/>
+    <block mcBlock="DeadShrub" mcData="2" smBlock="-1"/>
+    <block mcBlock="DeadShrub" smBlock="-1"/>
+    <block mcBlock="Piston" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="PistonHead" smBlock="-1"/>
+    <block mcBlock="Wool" mcData="0" smBlock="WHITE_STANDARD_ARMOR"/>
+    <block mcBlock="Wool" mcData="1" smBlock="YELLOW_STANDARD_ARMOR"/>
+    <block mcBlock="Wool" mcData="2" smBlock="RED_STANDARD_ARMOR"/>
+    <block mcBlock="Wool" mcData="3" smBlock="BLUE_STANDARD_ARMOR"/>
+    <block mcBlock="Wool" mcData="4" smBlock="YELLOW_STANDARD_ARMOR"/>
+    <block mcBlock="Wool" mcData="5" smBlock="GREEN_STANDARD_ARMOR"/>
+    <block mcBlock="Wool" mcData="6" smBlock="RED_STANDARD_ARMOR"/>
+    <block mcBlock="Wool" mcData="7" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Wool" mcData="8" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Wool" mcData="9" smBlock="BLUE_STANDARD_ARMOR"/>
+    <block mcBlock="Wool" mcData="10" smBlock="PURPLE_STANDARD_ARMOR"/>
+    <block mcBlock="Wool" mcData="11" smBlock="BLUE_STANDARD_ARMOR"/>
+    <block mcBlock="Wool" mcData="12" smBlock="BROWN_STANDARD_ARMOR"/>
+    <block mcBlock="Wool" mcData="13" smBlock="GREEN_STANDARD_ARMOR"/>
+    <block mcBlock="Wool" mcData="14" smBlock="RED_STANDARD_ARMOR"/>
+    <block mcBlock="Wool" mcData="15" smBlock="BLACK_STANDARD_ARMOR"/>
+    <block mcBlock="PistonMoving" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Dandelion" smBlock="-1"/>
+    <block mcBlock="Rose" mcData="0" smBlock="-1"/>
+    <block mcBlock="Rose" mcData="1" smBlock="-1"/>
+    <block mcBlock="Rose" mcData="2" smBlock="-1"/>
+    <block mcBlock="Rose" mcData="3" smBlock="-1"/>
+    <block mcBlock="Rose" mcData="4" smBlock="-1"/>
+    <block mcBlock="Rose" mcData="5" smBlock="-1"/>
+    <block mcBlock="Rose" mcData="6" smBlock="-1"/>
+    <block mcBlock="Rose" mcData="7" smBlock="-1"/>
+    <block mcBlock="Rose" mcData="8" smBlock="-1"/>
+    <block mcBlock="BrownMushroom" smBlock="-1"/>
+    <block mcBlock="RedMushroom" smBlock="-1"/>
+    <block mcBlock="BlockOfGold" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="BlockOfIron" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="DoubleSlab" mcData="0" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="DoubleSlab" mcData="1" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="DoubleSlab" mcData="2" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="DoubleSlab" mcData="3" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="DoubleSlab" mcData="4" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="DoubleSlab" mcData="5" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="DoubleSlab" mcData="6" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="DoubleSlab" mcData="7" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Slab" mcData="0" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Slab" mcData="1" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Slab" mcData="2" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Slab" mcData="3" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Slab" mcData="4" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Slab" mcData="5" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Slab" mcData="6" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Slab" mcData="7" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Bricks" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="TNT" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Bookshelf" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="MossStone" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Obsidian" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Torch" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Fire" smBlock="-1"/>
+    <block mcBlock="MonsterSpawner" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="OakWoodStairs" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Chest" smBlock="-1"/>
+    <block mcBlock="RedstoneWire" smBlock="-1"/>
+    <block mcBlock="DiamondOre" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="BlockOfDiamond" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="CraftingTable" smBlock="-1"/>
+    <block mcBlock="WheatBlock" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Farmland" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Furnace" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="BurningFurnace" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="SignPost" smBlock="-1"/>
+    <block mcBlock="WoodenDoorBlock" smBlock="-1"/>
+    <block mcBlock="Ladders" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Rails" smBlock="-1"/>
+    <block mcBlock="CobblestoneStairs" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="WallSign" smBlock="-1"/>
+    <block mcBlock="Lever" smBlock="-1"/>
+    <block mcBlock="StonePressurePlate" smBlock="-1"/>
+    <block mcBlock="IronDoorBlock" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="WoodenPressurePlate" smBlock="-1"/>
+    <block mcBlock="RestoneOre" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="GlowingRedstoneOre" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="RedstoneTorchOff" smBlock="-1"/>
+    <block mcBlock="RedstoneTorch" smBlock="-1"/>
+    <block mcBlock="Button" smBlock="-1"/>
+    <block mcBlock="Snow" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Ice" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="SnowBlock" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Cactus" smBlock="-1"/>
+    <block mcBlock="ClayBlock" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="SugarCaneBlock" smBlock="-1"/>
+    <block mcBlock="Jukebox" smBlock="-1"/>
+    <block mcBlock="Fence" smBlock="-1"/>
+    <block mcBlock="Pumpkin" smBlock="-1"/>
+    <block mcBlock="Netherrack" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="SoulSand" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="GlowstoneBlock" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Portal" smBlock="-1"/>
+    <block mcBlock="JackOLantern" smBlock="-1"/>
+    <block mcBlock="CakeBlock" smBlock="-1"/>
+    <block mcBlock="RedstoneRepeaterOff" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="RedstoneRepeaterOn" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StainedGlass" mcData="0" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StainedGlass" mcData="1" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StainedGlass" mcData="2" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StainedGlass" mcData="3" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StainedGlass" mcData="4" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StainedGlass" mcData="5" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StainedGlass" mcData="6" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StainedGlass" mcData="7" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StainedGlass" mcData="8" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StainedGlass" mcData="9" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StainedGlass" mcData="10" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StainedGlass" mcData="11" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StainedGlass" mcData="12" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StainedGlass" mcData="13" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StainedGlass" mcData="14" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StainedGlass" mcData="15" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Trapdoor" smBlock="-1"/>
+    <block mcBlock="MonsterEgg" mcData="0" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="MonsterEgg" mcData="1" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="MonsterEgg" mcData="2" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="MonsterEgg" mcData="3" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="MonsterEgg" mcData="4" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="MonsterEgg" mcData="5" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StoneBricks" mcData="0" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StoneBricks" mcData="1" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StoneBricks" mcData="2" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StoneBricks" mcData="3" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="HugeBrownMushroom" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="HugeRedMushroom" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="IronBars" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="GlassPane" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="MelonBlock" smBlock="-1"/>
+    <block mcBlock="PumpkinStem" smBlock="-1"/>
+    <block mcBlock="MelonStem" smBlock="-1"/>
+    <block mcBlock="Vines" smBlock="-1"/>
+    <block mcBlock="FenceGate" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="BrickStairs" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StoneBrickStairs" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Mycelium" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="LilyPad" smBlock="-1"/>
+    <block mcBlock="NetherBrick" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="NetherBrickFence" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="NetherBrickStairs" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="NetherWartStalk" smBlock="-1"/>
+    <block mcBlock="EnchantmentTable" smBlock="-1"/>
+    <block mcBlock="BrewingStandBlock" smBlock="-1"/>
+    <block mcBlock="CauldronBlock" smBlock="-1"/>
+    <block mcBlock="EndPortal" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="EndPortalFrame" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="EndStone" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="DragonEgg" smBlock="-1"/>
+    <block mcBlock="RedstoneLamp" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="RedstoneLampOn" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="WoodenDoubleSlab" mcData="0" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="WoodenDoubleSlab" mcData="1" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="WoodenDoubleSlab" mcData="2" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="WoodenDoubleSlab" mcData="3" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="WoodenDoubleSlab" mcData="4" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="WoodenDoubleSlab" mcData="5" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="WoodenSlab" mcData="0" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="WoodenSlab" mcData="1" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="WoodenSlab" mcData="2" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="WoodenSlab" mcData="3" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="WoodenSlab" mcData="4" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="WoodenSlab" mcData="5" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="CocoaPlant" smBlock="-1"/>
+    <block mcBlock="SandstoneStairs" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="EmeraldOre" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="EnderChest" smBlock="-1"/>
+    <block mcBlock="TripwireHook" smBlock="-1"/>
+    <block mcBlock="Tripwire" smBlock="-1"/>
+    <block mcBlock="BlockOfEmerald" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="SpruceWoodStairs" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="BirchWoodStairs" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="JungleWoodStairs" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="CommandBlock" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Beacon" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="CobblestoneWall" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="FlowerPot" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Carrots" smBlock="-1"/>
+    <block mcBlock="Potatoes" smBlock="-1"/>
+    <block mcBlock="WoodenButton" smBlock="-1"/>
+    <block mcBlock="MobHead" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Anvil" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="TrappedChest" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="WeightedPressurePlateLight" smBlock="-1"/>
+    <block mcBlock="WeightedPressurePlateHeavy" smBlock="-1"/>
+    <block mcBlock="RedstoneComparatorInactive" smBlock="-1"/>
+    <block mcBlock="RedstoneComparatorActive" smBlock="-1"/>
+    <block mcBlock="DaylightSensor" smBlock="-1"/>
+    <block mcBlock="RedstoneBlock" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="NetherQuartzOre" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Hopper" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="QuartzBlock" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="QuartzStairs" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="ActivatorRail" smBlock="-1"/>
+    <block mcBlock="Dropper" smBlock="-1"/>
+    <block mcBlock="StainedClay" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="StainedGlassPane" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="AcaciaLeaves" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="AcaciaWood" smBlock="GREY_STANDARD_ARMOR"/>;
+    <block mcBlock="AcaciaWoodStairs" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="DarkOakWoodStairs" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="SlimeBlock" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Barrier" smBlock="-1"/>
+    <block mcBlock="IronTrapdoor" smBlock="-1"/>
+    <block mcBlock="Prismarine" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="SeaLantern" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="HayBale" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Carpet" smBlock="-1"/>
+    <block mcBlock="HardenedClay" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="BlockofCoal" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="PackedIce" smBlock="GREY_STANDARD_ARMOR"/>
+    <block mcBlock="Sunflower" smBlock="-1"/>
+    <block mcBlock="IronShovel" smBlock="-1"/>
+    <block mcBlock="IronPickaxe" smBlock="-1"/>
+    <block mcBlock="IronAxe" smBlock="-1"/>
+    <block mcBlock="FlintAndSteel" smBlock="-1"/>
+    <block mcBlock="RedApple" smBlock="-1"/>
+    <block mcBlock="Bow" smBlock="-1"/>
+    <block mcBlock="Arrow" smBlock="-1"/>
+    <block mcBlock="Coal" smBlock="-1"/>
+    <block mcBlock="Diamond" smBlock="-1"/>
+    <block mcBlock="IronIngot" smBlock="-1"/>
+    <block mcBlock="GoldIngot" smBlock="-1"/>
+    <block mcBlock="IronSword" smBlock="-1"/>
+    <block mcBlock="WoodenSword" smBlock="-1"/>
+    <block mcBlock="WoodenShovel" smBlock="-1"/>
+    <block mcBlock="WoodenPickaxe" smBlock="-1"/>
+    <block mcBlock="WoodenAxe" smBlock="-1"/>
+    <block mcBlock="StoneSword" smBlock="-1"/>
+    <block mcBlock="StoneShovel" smBlock="-1"/>
+    <block mcBlock="StonePickaxe" smBlock="-1"/>
+    <block mcBlock="StoneAxe" smBlock="-1"/>
+    <block mcBlock="DiamondSword" smBlock="-1"/>
+    <block mcBlock="DiamondShovel" smBlock="-1"/>
+    <block mcBlock="DiamondPickaxe" smBlock="-1"/>
+    <block mcBlock="DiamondAxe" smBlock="-1"/>
+    <block mcBlock="Stick" smBlock="-1"/>
+    <block mcBlock="Bowl" smBlock="-1"/>
+    <block mcBlock="MushroomStew" smBlock="-1"/>
+    <block mcBlock="GoldenSword" smBlock="-1"/>
+    <block mcBlock="GoldenShovel" smBlock="-1"/>
+    <block mcBlock="GoldenPickaxe" smBlock="-1"/>
+    <block mcBlock="GoldenAxe" smBlock="-1"/>
+    <block mcBlock="String" smBlock="-1"/>
+    <block mcBlock="Feather" smBlock="-1"/>
+    <block mcBlock="Gunpowder" smBlock="-1"/>
+    <block mcBlock="WoodenHoe" smBlock="-1"/>
+    <block mcBlock="StoneHoe" smBlock="-1"/>
+    <block mcBlock="IronHoe" smBlock="-1"/>
+    <block mcBlock="DiamondHode" smBlock="-1"/>
+    <block mcBlock="GoldHoe" smBlock="-1"/>
+    <block mcBlock="WheatSeeds" smBlock="-1"/>
+    <block mcBlock="Wheat" smBlock="-1"/>
+    <block mcBlock="Bread" smBlock="-1"/>
+    <block mcBlock="LeatherCap" smBlock="-1"/>
+    <block mcBlock="LeatherTunic" smBlock="-1"/>
+    <block mcBlock="LeatherPants" smBlock="-1"/>
+    <block mcBlock="LeatherBoots" smBlock="-1"/>
+    <block mcBlock="ChainHelmet" smBlock="-1"/>
+    <block mcBlock="ChainChestplate" smBlock="-1"/>
+    <block mcBlock="ChainLeggings" smBlock="-1"/>
+    <block mcBlock="ChainBoots" smBlock="-1"/>
+    <block mcBlock="IronHelmet" smBlock="-1"/>
+    <block mcBlock="IronChestplate" smBlock="-1"/>
+    <block mcBlock="IronLeggings" smBlock="-1"/>
+    <block mcBlock="IronBoots" smBlock="-1"/>
+    <block mcBlock="DiamondHelmet" smBlock="-1"/>
+    <block mcBlock="DiamondChestplate" smBlock="-1"/>
+    <block mcBlock="DiamondLeggings" smBlock="-1"/>
+    <block mcBlock="DiamondBoots" smBlock="-1"/>
+    <block mcBlock="GoldenHelmet" smBlock="-1"/>
+    <block mcBlock="GoldenChestplate" smBlock="-1"/>
+    <block mcBlock="GoldenLeggings" smBlock="-1"/>
+    <block mcBlock="GoldenBoots" smBlock="-1"/>
+    <block mcBlock="Flint" smBlock="-1"/>
+    <block mcBlock="RawPorkchop" smBlock="-1"/>
+    <block mcBlock="CookedPorkchop" smBlock="-1"/>
+    <block mcBlock="Painting" smBlock="-1"/>
+    <block mcBlock="GoldenApple" smBlock="-1"/>
+    <block mcBlock="Sign" smBlock="-1"/>
+    <block mcBlock="WoodenDoor" smBlock="-1"/>
+    <block mcBlock="Bucket" smBlock="-1"/>
+    <block mcBlock="WaterBucket" smBlock="-1"/>
+    <block mcBlock="LavaBucket" smBlock="-1"/>
+    <block mcBlock="Minecart" smBlock="-1"/>
+    <block mcBlock="Saddle" smBlock="-1"/>
+    <block mcBlock="IronDoor" smBlock="-1"/>
+    <block mcBlock="RedstoneDust" smBlock="-1"/>
+    <block mcBlock="Snowball" smBlock="-1"/>
+    <block mcBlock="Boat" smBlock="-1"/>
+    <block mcBlock="Leather" smBlock="-1"/>
+    <block mcBlock="MilkBucket" smBlock="-1"/>
+    <block mcBlock="ClayBrick" smBlock="-1"/>
+    <block mcBlock="Clay" smBlock="-1"/>
+    <block mcBlock="SugarCane" smBlock="-1"/>
+    <block mcBlock="Paper" smBlock="-1"/>
+    <block mcBlock="Book" smBlock="-1"/>
+    <block mcBlock="Slimeball" smBlock="-1"/>
+    <block mcBlock="StorageMinecart" smBlock="-1"/>
+    <block mcBlock="PoweredMinecart" smBlock="-1"/>
+    <block mcBlock="ChickenEgg" smBlock="-1"/>
+    <block mcBlock="Compass" smBlock="-1"/>
+    <block mcBlock="FishingRod" smBlock="-1"/>
+    <block mcBlock="Clock" smBlock="-1"/>
+    <block mcBlock="GlowstoneDust" smBlock="-1"/>
+    <block mcBlock="RawFish" smBlock="-1"/>
+    <block mcBlock="CookedFish" smBlock="-1"/>
+    <block mcBlock="Dye" smBlock="-1"/>
+    <block mcBlock="Bone" smBlock="-1"/>
+    <block mcBlock="Sugar" smBlock="-1"/>
+    <block mcBlock="Cake" smBlock="-1"/>
+    <block mcBlock="Bed" smBlock="-1"/>
+    <block mcBlock="RedstoneRepeater" smBlock="-1"/>
+    <block mcBlock="Cookie" smBlock="-1"/>
+    <block mcBlock="Map" smBlock="-1"/>
+    <block mcBlock="Shears" smBlock="-1"/>
+    <block mcBlock="MelonSlice" smBlock="-1"/>
+    <block mcBlock="PumpkinSeeds" smBlock="-1"/>
+    <block mcBlock="MelonSeeds" smBlock="-1"/>
+    <block mcBlock="RawBeef" smBlock="-1"/>
+    <block mcBlock="Steak" smBlock="-1"/>
+    <block mcBlock="RawChicken" smBlock="-1"/>
+    <block mcBlock="CookedChicken" smBlock="-1"/>
+    <block mcBlock="RottenFlesh" smBlock="-1"/>
+    <block mcBlock="EnderPearl" smBlock="-1"/>
+    <block mcBlock="BlazeRod" smBlock="-1"/>
+    <block mcBlock="GhastTear" smBlock="-1"/>
+    <block mcBlock="GoldNugget" smBlock="-1"/>
+    <block mcBlock="NetherWart" smBlock="-1"/>
+    <block mcBlock="Potion" smBlock="-1"/>
+    <block mcBlock="GlassBottle" smBlock="-1"/>
+    <block mcBlock="SpiderEye" smBlock="-1"/>
+    <block mcBlock="FermentedSpiderEye" smBlock="-1"/>
+    <block mcBlock="BlazePowder" smBlock="-1"/>
+    <block mcBlock="MagmaCream" smBlock="-1"/>
+    <block mcBlock="BrewingStand" smBlock="-1"/>
+    <block mcBlock="Cauldron" smBlock="-1"/>
+    <block mcBlock="EyeOfEnder" smBlock="-1"/>
+    <block mcBlock="GlisteringMelon" smBlock="-1"/>
+    <block mcBlock="SpawnEgg" smBlock="-1"/>
+    <block mcBlock="BottleOEnchanting" smBlock="-1"/>
+    <block mcBlock="FireCharge" smBlock="-1"/>
+    <block mcBlock="BookAndQuill" smBlock="-1"/>
+    <block mcBlock="WrittenBook" smBlock="-1"/>
+    <block mcBlock="Emerald" smBlock="-1"/>
+    <block mcBlock="ItemFrame" smBlock="-1"/>
+    <block mcBlock="FlowerPot" smBlock="-1"/>
+    <block mcBlock="Carrot" smBlock="-1"/>
+    <block mcBlock="Potato" smBlock="-1"/>
+    <block mcBlock="BakedPotato" smBlock="-1"/>
+    <block mcBlock="PoisonousPotato" smBlock="-1"/>
+    <block mcBlock="EmptyMap" smBlock="-1"/>
+    <block mcBlock="GoldenCarrot" smBlock="-1"/>
+    <block mcBlock="MobHead" smBlock="-1"/>
+    <block mcBlock="CarrotonaStick" smBlock="-1"/>
+    <block mcBlock="NetherStar" smBlock="-1"/>
+    <block mcBlock="PumpkinPie" smBlock="-1"/>
+    <block mcBlock="FireworkRocket" smBlock="-1"/>
+    <block mcBlock="FireworkStar" smBlock="-1"/>
+    <block mcBlock="EnchantedBook" smBlock="-1"/>
+    <block mcBlock="RedstoneComparator" smBlock="-1"/>
+    <block mcBlock="NetherBrick" smBlock="-1"/>
+    <block mcBlock="NetherQuartz" smBlock="-1"/>
+    <block mcBlock="MinecartwithTNT" smBlock="-1"/>
+    <block mcBlock="MinecartwithHopper" smBlock="-1"/>
+    <block mcBlock="PrismarineShard" smBlock="-1"/>
+    <block mcBlock="PrismarineCrystals" smBlock="-1"/>
+    <block mcBlock="IronHorseArmor" smBlock="-1"/>
+    <block mcBlock="GoldenHorseArmor" smBlock="-1"/>
+    <block mcBlock="DiamondHorseArmor" smBlock="-1"/>
+    <block mcBlock="Lead" smBlock="-1"/>
+    <block mcBlock="NameTag" smBlock="-1"/>
+    <block mcBlock="MinecartwithCommandBlock" smBlock="-1"/>
+    <block mcBlock="13Disc" smBlock="-1"/>
+    <block mcBlock="CatDisc" smBlock="-1"/>
+    <block mcBlock="BlocksDisc" smBlock="-1"/>
+    <block mcBlock="ChirpDisc" smBlock="-1"/>
+    <block mcBlock="FarDisc" smBlock="-1"/>
+    <block mcBlock="MallDisc" smBlock="-1"/>
+    <block mcBlock="MellohiDisc" smBlock="-1"/>
+    <block mcBlock="StalDisc" smBlock="-1"/>
+    <block mcBlock="StradDisc" smBlock="-1"/>
+    <block mcBlock="WardDisc" smBlock="-1"/>
+    <block mcBlock="11Disc" smBlock="-1"/>
+    <block mcBlock="WaitDisc" smBlock="-1"/>
+</blockMap>

@@ -685,6 +685,27 @@ public class LWJGLRenderLogic {
     }
 
     /**
+     * Outlines a single axis-aligned box spanning the inclusive cell range
+     * {@code lo..hi} — the six outward faces of the whole volume, inflated by
+     * {@code e}. Used for whole-entity selection, where a single frame around the
+     * entity reads better than tracing every block's silhouette.
+     */
+    public static void addSelectionBox(MeshInfo group, Point3i lo, Point3i hi,
+            short[] colors, float e) {
+        if (lo == null || hi == null) {
+            return;
+        }
+        float lox = lo.x - .5f - e, loy = lo.y - .5f - e, loz = lo.z - .5f - e;
+        float hix = hi.x + .5f + e, hiy = hi.y + .5f + e, hiz = hi.z + .5f + e;
+        addSelectFace(group, hix, loy, loz, hix, hiy, hiz, RenderPoly.XP, colors[0 % colors.length]);
+        addSelectFace(group, lox, loy, loz, lox, hiy, hiz, RenderPoly.XM, colors[1 % colors.length]);
+        addSelectFace(group, lox, hiy, loz, hix, hiy, hiz, RenderPoly.YP, colors[2 % colors.length]);
+        addSelectFace(group, lox, loy, loz, hix, loy, hiz, RenderPoly.YM, colors[3 % colors.length]);
+        addSelectFace(group, lox, loy, hiz, hix, hiy, hiz, RenderPoly.ZP, colors[4 % colors.length]);
+        addSelectFace(group, lox, loy, loz, hix, hiy, loz, RenderPoly.ZM, colors[5 % colors.length]);
+    }
+
+    /**
      *
      * @param group
      * @param x1

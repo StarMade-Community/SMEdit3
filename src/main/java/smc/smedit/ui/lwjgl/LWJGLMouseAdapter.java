@@ -50,6 +50,7 @@ public class LWJGLMouseAdapter extends MouseAdapter {
     private static final int MOUSE_MODE_PAN = 3;
     private static final int MOUSE_MODE_TOOL = 4;  // left-drag drives the active tool
     private static final int MOUSE_MODE_MARQUEE = 5; // left-drag box-selects blocks
+    private static final int MOUSE_MODE_MOVE = 6;  // left-drag slides the selection / entity
 
     /** Pixels the cursor must travel before a Select left-drag becomes a marquee. */
     private static final int MARQUEE_THRESHOLD = 3;
@@ -87,11 +88,15 @@ public class LWJGLMouseAdapter extends MouseAdapter {
         // Live status-bar readout: report the grid cell under the cursor (same pick
         // the tools use). Only fires with no button down, so it never fights a stroke.
         smc.smedit.ui.CursorStatus.get().report(mPanel.getPointAt(ev.getX(), ev.getY()));
+        // Highlight the Move gizmo handle under the cursor (nothing for other tools).
+        mPanel.setGizmoHover(ToolController.get().getActive() == EditorTool.MOVE
+                ? mPanel.pickMoveHandle(ev.getX(), ev.getY()) : null);
     }
 
     @Override
     public void mouseExited(MouseEvent ev) {
         smc.smedit.ui.CursorStatus.get().report(null);
+        mPanel.setGizmoHover(null);
     }
 
     @Override
@@ -115,7 +120,14 @@ public class LWJGLMouseAdapter extends MouseAdapter {
             // not just one privileged entity. The pick's cell/place are already local
             // to that object (now the active grid).
             PickResult pr = mPanel.pickScene(p.x, p.y);
-            mPanel.focusPickedObject(pr);
+            // Grabbing the Move gizmo's handle acts on the CURRENT active object, so
+            // don't let a handle floating over another entity re-target the edit.
+            boolean grabbingGizmo = ToolController.get().getActive() == EditorTool.MOVE
+                    && (modifiers & InputEvent.ALT_MASK) == 0
+                    && mPanel.pickMoveHandle(p.x, p.y) != null;
+            if (!grabbingGizmo) {
+                mPanel.focusPickedObject(pr);
+            }
             Point3i hit = pr == null ? null : pr.cell;
             if (isMarqueeStart(modifiers, clickCount)) {
                 // Select tool, Blocks mode, single left-press with no Alt: arm a drag-box
@@ -135,6 +147,12 @@ public class LWJGLMouseAdapter extends MouseAdapter {
                     // Double-click = flood-select the contiguous same-type region (Select
                     // tool). Shift adds the region to the selection, Ctrl removes it.
                     ToolController.get().onDoubleClick(hit, modifiers);
+                } else if (ToolController.get().getActive() == EditorTool.MOVE
+                        && (modifiers & InputEvent.ALT_MASK) == 0) {
+                    // Move tool: left-drag slides the selection (or the whole entity) on a
+                    // plane facing the camera. Alt still falls through to the eyedropper.
+                    mMouseMode = MOUSE_MODE_MOVE;
+                    ToolController.get().beginMove(mPanel, p.x, p.y, hit);
                 } else {
                     Point3i place = pr == null ? null : pr.place;
                     ToolController.get().onPress(hit, place, mPanel, modifiers);
@@ -190,6 +208,10 @@ public class LWJGLMouseAdapter extends MouseAdapter {
             Point3i hit = mPanel.getPointAt(p.x, p.y);
             Point3i place = mPanel.getPlacementAt(p.x, p.y);
             ToolController.get().onDrag(hit, place, mPanel);
+        } else if (mMouseMode == MOUSE_MODE_MOVE) {
+            // Slide the selection / entity: project the absolute cursor onto the drag
+            // plane (anchor stays at the press point, so we don't consume mMouseDownAt).
+            ToolController.get().updateMove(mPanel, p.x, p.y);
         } else if (mMouseMode == MOUSE_MODE_MARQUEE) {
             // Anchor stays put (mMouseDownAt); grow the box to the cursor once it's
             // travelled far enough to be a drag rather than a click.
@@ -207,6 +229,8 @@ public class LWJGLMouseAdapter extends MouseAdapter {
             doMouseMove(p, modifiers);
         } else if (mMouseMode == MOUSE_MODE_TOOL) {
             ToolController.get().onRelease();
+        } else if (mMouseMode == MOUSE_MODE_MOVE) {
+            ToolController.get().endMove(mPanel);
         } else if (mMouseMode == MOUSE_MODE_MARQUEE) {
             if (mMarqueeMoved) {
                 mPanel.updateMarquee(mMouseDownAt.x, mMouseDownAt.y, p.x, p.y);

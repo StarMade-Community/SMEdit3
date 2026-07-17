@@ -27,15 +27,23 @@ import java.util.List;
 import java.util.Set;
 import java.util.logging.Logger;
 
+import smc.smedit.data.Blocks;
 import smc.smedit.data.SparseMatrix;
 import smc.smedit.ui.BlockShapes;
 import smc.smedit.ui.BlockSlabs;
 import smc.smedit.ui.BlockTypeColors;
 import smc.smedit.logic.SelectionModel;
 import smc.smedit.logic.StarMadeLogic;
+import smc.smedit.scene.SceneModel;
+import smc.smedit.scene.SceneObject;
 import smc.smedit.ship.data.Block;
 import smc.smedit.ui.RenderPanel;
+import smc.smedit.ui.lwjgl.LWJGLRenderPanel;
+import smc.smedit.ui.lwjgl.MoveGizmo;
+import smc.smedit.vecmath.Matrix4f;
+import smc.smedit.vecmath.Point3f;
 import smc.smedit.vecmath.Point3i;
+import smc.smedit.vecmath.Vector3f;
 
 /**
  * Owns the single <em>active tool</em> and the brush settings, and routes
@@ -132,6 +140,23 @@ public final class ToolController {
     private boolean symZ;
     private boolean floodDiagonals = true;         // double-click flood spreads through edge/corner touches too
     private boolean stroking;               // between press and release of an edit stroke
+
+    // --- Move gesture (Move tool drag) ----------------------------------
+    private boolean moving;                  // between beginMove and endMove
+    private SelectionModel.Mode moveMode;    // whether we're sliding blocks or the whole entity
+    private SceneObject moveObject;          // the entity being moved / whose blocks move
+    private Point3f moveAnchorWorld;         // the world point grabbed at press
+    private Vector3f movePlaneNormal;        // camera forward at press — the drag plane's normal
+    private Point3f moveLocalAnchor;         // the anchor in the object's local grid space (blocks)
+    private List<Point3i> moveCells;         // the selected cells captured at press (blocks)
+    private Point3i moveOffset;              // last previewed integer cell offset (blocks)
+    private Vector3f moveWorldOffset;        // last previewed snapped world offset (entity)
+    // Gizmo constraint for the drag (null = free camera-plane drag).
+    private MoveGizmo.Handle moveHandle;
+    private Point3f moveCenterWorld;         // gizmo centre (world) for constrained drags
+    private Vector3f[] moveAxes;             // gizmo world axes for constrained drags
+    private double moveGrabParam;            // grabbed distance along the axis (AXIS_*)
+    private Point3f moveGrabPlanePt;         // grabbed point on the plane (PLANE_*)
 
     private final List<Listener> listeners = new ArrayList<>();
 
@@ -420,6 +445,363 @@ public final class ToolController {
         for (Listener l : new ArrayList<>(listeners)) {
             l.modelEdited();
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Move tool — drag the whole entity, or the block selection within it
+    // ------------------------------------------------------------------
+
+    /**
+     * Begins a Move drag. {@code hit} is the cell grabbed under the cursor (the pick
+     * has already made its object the active edit target). The drag slides on a plane
+     * through the grab point facing the camera, so orbiting first lets you push along
+     * different axes; the result snaps to whole cells. In {@link SelectionModel.Mode#ENTITY}
+     * the whole entity translates; in {@code BLOCKS} the current selection relocates.
+     */
+    public void beginMove(LWJGLRenderPanel panel, double sx, double sy, Point3i hit) {
+        moving = false;
+        moveHandle = null;
+        SceneModel sm = StarMadeLogic.getInstance().getSceneModel();
+        SceneObject obj = sm != null ? sm.getActiveObject() : null;
+        if (panel == null || obj == null) {
+            return;
+        }
+        SelectionModel sel = StarMadeLogic.getInstance().getSelection();
+        SelectionModel.Mode mode = sel.getMode();
+        Matrix4f world = new Matrix4f();
+        world.set(obj.getTransform());
+        if (mode != SelectionModel.Mode.ENTITY) {
+            List<Point3i> cells = sel.getSelected();
+            if (cells.isEmpty()) {
+                return;   // nothing selected to move
+            }
+            moveCells = cells;
+        }
+        moveMode = mode;
+        moveObject = obj;
+        moveOffset = new Point3i(0, 0, 0);
+        moveWorldOffset = new Vector3f();
+
+        // Prefer a gizmo handle under the cursor: it constrains the drag to one axis
+        // or plane. Falling through to a free camera-plane drag when nothing's grabbed
+        // keeps "grab the body and slide" working.
+        MoveGizmo frame = panel.getGizmoFrame();
+        MoveGizmo.Handle handle = panel.pickMoveHandle(sx, sy);
+        if (handle != null && frame != null) {
+            float[] ray = panel.worldRay(sx, sy);
+            if (ray == null) {
+                return;
+            }
+            moveHandle = handle;
+            moveCenterWorld = frame.center();
+            moveAxes = new Vector3f[]{frame.axis(0), frame.axis(1), frame.axis(2)};
+            if (handle.isPlane()) {
+                moveGrabPlanePt = planeIntersect(ray, moveCenterWorld, moveAxes[planeNormalIndex(handle)]);
+                if (moveGrabPlanePt == null) {
+                    return;   // ray parallel to the handle plane — can't start
+                }
+            } else {
+                moveGrabParam = closestParam(ray, moveCenterWorld, moveAxes[axisIndex(handle)]);
+            }
+            panel.setGizmoActive(handle);   // keep the grabbed handle highlighted during the drag
+            moving = true;
+            return;
+        }
+
+        // Free drag: a plane through the grab point facing the camera.
+        Point3f anchorWorld;
+        if (mode == SelectionModel.Mode.ENTITY) {
+            anchorWorld = hit != null ? localToWorld(world, hit.x, hit.y, hit.z)
+                    : new Point3f(world.m03, world.m13, world.m23);
+        } else {
+            List<Point3i> cells = moveCells;
+            if (hit != null && cells.contains(hit)) {
+                anchorWorld = localToWorld(world, hit.x, hit.y, hit.z);
+            } else {
+                double cx = 0, cy = 0, cz = 0;
+                for (Point3i p : cells) {
+                    cx += p.x;
+                    cy += p.y;
+                    cz += p.z;
+                }
+                int n = cells.size();
+                anchorWorld = localToWorld(world, cx / n, cy / n, cz / n);
+            }
+            Matrix4f inv = new Matrix4f();
+            inv.set(world);
+            try {
+                inv.invert();
+            } catch (RuntimeException e) {
+                return;   // singular transform — can't map back to local space
+            }
+            moveLocalAnchor = new Point3f(anchorWorld);
+            inv.transform(moveLocalAnchor);
+        }
+        Vector3f normal = panel.cameraForward();
+        normal.normalize();
+        moveAnchorWorld = anchorWorld;
+        movePlaneNormal = normal;
+        moving = true;
+    }
+
+    /** Continues a Move drag: turns the cursor into a world delta and previews the result. */
+    public void updateMove(LWJGLRenderPanel panel, double sx, double sy) {
+        if (!moving) {
+            return;
+        }
+        Vector3f raw = dragWorldDelta(panel, sx, sy);
+        if (raw == null) {
+            return;   // ray parallel / nothing rendered yet — keep the last preview
+        }
+        if (moveMode == SelectionModel.Mode.ENTITY) {
+            Vector3f off = snapEntityDelta(raw);
+            if (!off.equals(moveWorldOffset)) {
+                moveWorldOffset = off;
+                panel.setEntityMovePreview(off);
+            }
+        } else {
+            Point3i off = blockOffset(raw);
+            if (off != null && !off.equals(moveOffset)) {
+                moveOffset = off;
+                panel.setBlockMovePreview(off);
+            }
+        }
+    }
+
+    /**
+     * The raw (unsnapped) world-space translation the current cursor implies, per the
+     * active constraint: along one axis, within one plane, or on the free camera plane.
+     * Null when the cursor ray can't resolve a point (parallel / no frame yet).
+     */
+    private Vector3f dragWorldDelta(LWJGLRenderPanel panel, double sx, double sy) {
+        if (moveHandle == null) {
+            Point3f world = panel.pickPlane(sx, sy, moveAnchorWorld, movePlaneNormal);
+            if (world == null) {
+                return null;
+            }
+            return new Vector3f(world.x - moveAnchorWorld.x,
+                    world.y - moveAnchorWorld.y, world.z - moveAnchorWorld.z);
+        }
+        float[] ray = panel.worldRay(sx, sy);
+        if (ray == null) {
+            return null;
+        }
+        if (moveHandle.isPlane()) {
+            Point3f p = planeIntersect(ray, moveCenterWorld, moveAxes[planeNormalIndex(moveHandle)]);
+            if (p == null) {
+                return null;
+            }
+            return new Vector3f(p.x - moveGrabPlanePt.x,
+                    p.y - moveGrabPlanePt.y, p.z - moveGrabPlanePt.z);
+        }
+        Vector3f a = moveAxes[axisIndex(moveHandle)];
+        double d = closestParam(ray, moveCenterWorld, a) - moveGrabParam;
+        return new Vector3f((float) (a.x * d), (float) (a.y * d), (float) (a.z * d));
+    }
+
+    /** Snaps a world delta to whole cells along whichever axes the constraint allows. */
+    private Vector3f snapEntityDelta(Vector3f raw) {
+        if (moveHandle == null) {
+            return new Vector3f(Math.round(raw.x), Math.round(raw.y), Math.round(raw.z));
+        }
+        if (moveHandle.isPlane()) {
+            int n = planeNormalIndex(moveHandle);
+            Vector3f u = moveAxes[(n + 1) % 3];
+            Vector3f v = moveAxes[(n + 2) % 3];
+            float cu = Math.round(dot(raw, u));
+            float cv = Math.round(dot(raw, v));
+            return new Vector3f(u.x * cu + v.x * cv, u.y * cu + v.y * cv, u.z * cu + v.z * cv);
+        }
+        Vector3f a = moveAxes[axisIndex(moveHandle)];
+        float s = Math.round(dot(raw, a));
+        return new Vector3f(a.x * s, a.y * s, a.z * s);
+    }
+
+    /** Converts a world delta into an integer local-cell offset for the active object. */
+    private Point3i blockOffset(Vector3f raw) {
+        Matrix4f inv = new Matrix4f();
+        inv.set(moveObject.getTransform());
+        try {
+            inv.invert();
+        } catch (RuntimeException e) {
+            return null;
+        }
+        Vector3f local = new Vector3f(raw);
+        inv.transform(local);   // rotate the delta into local space (3x3 part only)
+        return new Point3i(Math.round(local.x), Math.round(local.y), Math.round(local.z));
+    }
+
+    private static float dot(Vector3f a, Vector3f b) {
+        return a.x * b.x + a.y * b.y + a.z * b.z;
+    }
+
+    private static int axisIndex(MoveGizmo.Handle h) {
+        switch (h) {
+            case X: return 0;
+            case Y: return 1;
+            default: return 2;
+        }
+    }
+
+    private static int planeNormalIndex(MoveGizmo.Handle h) {
+        switch (h) {
+            case PLANE_X: return 0;
+            case PLANE_Y: return 1;
+            default: return 2;
+        }
+    }
+
+    /** Distance along unit axis {@code a} (from {@code c}) of the point on it nearest the ray. */
+    private static double closestParam(float[] ray, Point3f c, Vector3f a) {
+        double ux = ray[3] - ray[0], uy = ray[4] - ray[1], uz = ray[5] - ray[2]; // ray dir
+        double wx = ray[0] - c.x, wy = ray[1] - c.y, wz = ray[2] - c.z;          // near - c
+        double uu = ux * ux + uy * uy + uz * uz;
+        double uv = ux * a.x + uy * a.y + uz * a.z;
+        double uw = ux * wx + uy * wy + uz * wz;
+        double vw = a.x * wx + a.y * wy + a.z * wz;   // a is unit, so v·v = 1
+        double denom = uu - uv * uv;
+        if (Math.abs(denom) < 1e-9) {
+            return -vw;   // ray parallel to axis — fall back to plain projection
+        }
+        return (uu * vw - uv * uw) / denom;
+    }
+
+    /** Intersection of the ray with the plane (point {@code c}, unit {@code normal}), or null. */
+    private static Point3f planeIntersect(float[] ray, Point3f c, Vector3f normal) {
+        double dx = ray[3] - ray[0], dy = ray[4] - ray[1], dz = ray[5] - ray[2];
+        double denom = dx * normal.x + dy * normal.y + dz * normal.z;
+        if (Math.abs(denom) < 1e-9) {
+            return null;
+        }
+        double t = ((c.x - ray[0]) * normal.x + (c.y - ray[1]) * normal.y
+                + (c.z - ray[2]) * normal.z) / denom;
+        return new Point3f((float) (ray[0] + t * dx),
+                (float) (ray[1] + t * dy), (float) (ray[2] + t * dz));
+    }
+
+    /** Ends a Move drag: commits the whole-entity translation or the block relocation. */
+    public void endMove(LWJGLRenderPanel panel) {
+        panel.setGizmoActive(null);   // drop the grabbed-handle highlight
+        if (!moving) {
+            return;
+        }
+        moving = false;
+        if (moveMode == SelectionModel.Mode.ENTITY) {
+            Vector3f off = moveWorldOffset;
+            boolean changed = off != null && (off.x != 0 || off.y != 0 || off.z != 0);
+            if (changed) {
+                Matrix4f tr = moveObject.getTransform();
+                tr.m03 += off.x;
+                tr.m13 += off.y;
+                tr.m23 += off.z;
+            }
+            panel.clearMovePreview();
+            if (changed) {
+                panel.updateTiles();
+                fireEdited();
+            }
+        } else {
+            commitBlockMove(panel);
+        }
+        moveObject = null;
+        moveCells = null;
+        moveHandle = null;
+        moveAxes = null;
+    }
+
+    /**
+     * Relocates the selected blocks by {@link #moveOffset}. Blocks that would land on
+     * cells occupied by <em>other</em> (non-moving) blocks are a collision: the user is
+     * asked to Replace them or Cancel — clipping two blocks into one cell is never
+     * allowed. On commit the move is a single undoable edit and the selection follows.
+     */
+    private void commitBlockMove(LWJGLRenderPanel panel) {
+        Point3i off = moveOffset;
+        SparseMatrix<Block> grid = moveObject != null ? moveObject.getGrid() : null;
+        if (grid == null || off == null || (off.x == 0 && off.y == 0 && off.z == 0)
+                || moveCells == null || moveCells.isEmpty()) {
+            panel.clearMovePreview();
+            return;
+        }
+        // A selection can include empty cells; only cells that actually hold a block move.
+        java.util.LinkedHashMap<Point3i, Block> lifted = new java.util.LinkedHashMap<>();
+        for (Point3i c : moveCells) {
+            Block b = grid.get(c);
+            if (b != null) {
+                lifted.put(c, b);
+            }
+        }
+        if (lifted.isEmpty()) {
+            panel.clearMovePreview();
+            return;
+        }
+        Set<Point3i> movingSet = lifted.keySet();
+        int overlaps = 0;
+        int coreOverlaps = 0;
+        for (Point3i c : movingSet) {
+            Point3i dest = new Point3i(c.x + off.x, c.y + off.y, c.z + off.z);
+            if (!movingSet.contains(dest)) {
+                Block d = grid.get(dest);
+                if (d != null) {
+                    if (isProtectedCore(d)) {
+                        coreOverlaps++;
+                    } else {
+                        overlaps++;
+                    }
+                }
+            }
+        }
+        if (coreOverlaps > 0) {
+            // A ship core is never replaceable — refuse the whole move rather than
+            // destroy it (partially skipping cells would clip or lose blocks).
+            javax.swing.JOptionPane.showMessageDialog(panel,
+                    "That move would land on the ship core, which can't be replaced.\n"
+                            + "Reposition the selection so it clears the core.",
+                    "Ship core protected", javax.swing.JOptionPane.WARNING_MESSAGE);
+            panel.clearMovePreview();
+            return;
+        }
+        if (overlaps > 0) {
+            int choice = javax.swing.JOptionPane.showOptionDialog(panel,
+                    "Moving the selection would overlap " + overlaps
+                            + " existing block(s).\nReplace them, or cancel the move?",
+                    "Blocks overlap", javax.swing.JOptionPane.YES_NO_OPTION,
+                    javax.swing.JOptionPane.WARNING_MESSAGE, null,
+                    new Object[]{"Replace", "Cancel"}, "Cancel");
+            if (choice != 0) {   // Cancel, or dialog closed
+                panel.clearMovePreview();
+                return;
+            }
+        }
+        panel.getUndoer().checkpoint(grid);
+        // Lift every moving block out first (so the source cells are free), then drop
+        // them at the destination — overwriting any non-moving block there (Replace).
+        for (Point3i c : movingSet) {
+            grid.set(c, null);
+        }
+        List<Point3i> moved = new ArrayList<>(lifted.size());
+        for (java.util.Map.Entry<Point3i, Block> e : lifted.entrySet()) {
+            Point3i c = e.getKey();
+            Point3i dest = new Point3i(c.x + off.x, c.y + off.y, c.z + off.z);
+            grid.set(dest, e.getValue());
+            moved.add(dest);
+        }
+        StarMadeLogic.getInstance().getSelection().select(moved);
+        panel.clearMovePreview();
+        panel.updateTiles();
+        fireEdited();
+    }
+
+    /** The ship core is load-bearing for the whole entity, so it's never overwritten. */
+    private static boolean isProtectedCore(Block b) {
+        return b != null && b.getBlockID() == Blocks.SHIP_CORE.getId();
+    }
+
+    /** A local grid point transformed into world space by {@code world}. */
+    private static Point3f localToWorld(Matrix4f world, double x, double y, double z) {
+        Point3f p = new Point3f((float) x, (float) y, (float) z);
+        world.transform(p);
+        return p;
     }
 
     // ------------------------------------------------------------------

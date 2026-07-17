@@ -69,18 +69,19 @@ public class ViewFilterFactory implements IStarMadePluginFactory {
     }
 
     private void loadDefinitions() {
-        File file = new File(Paths.getPluginsDirectory(), "ViewFilters.xml");
+        // User override in the plugins dir wins; otherwise the bundled default.
+        File file = new File(Paths.getPluginsDirectory(), "view_filters.xml");
         Document xml = null;
         if (file.exists()) {
             xml = XMLUtils.readFile(file);
         } else {
-            InputStream is = ResourceUtils.loadSystemResourceStream("ViewFilters.xml", ViewFilterFactory.class);
+            InputStream is = ResourceUtils.loadSystemResourceStream("view_filters.xml", ViewFilterFactory.class);
             if (is != null) {
                 xml = XMLUtils.readStream(is);
             }
         }
         if (xml == null) {
-            log.log(Level.WARNING, "ViewFilters.xml not found; no view-filter plugins loaded");
+            log.log(Level.WARNING, "view_filters.xml not found; no view-filter plugins loaded");
             return;
         }
         loadDefinitions(xml);
@@ -92,13 +93,14 @@ public class ViewFilterFactory implements IStarMadePluginFactory {
         String baseAuthor = XMLUtils.getAttribute(fs, "author");
         for (Node f : XMLUtils.findNodes(fs, "filter")) {
             String title = XMLUtils.getAttribute(f, "title");
-            String desc = XMLUtils.getAttribute(f, "descriptions");
+            String desc = XMLUtils.getAttribute(f, "description");
             String author = XMLUtils.getAttribute(f, "author");
             int priority = IntegerUtils.parseInt(XMLUtils.getAttribute(f, "priority"));
             if (StringUtils.isTrivial(author)) {
                 author = baseAuthor;
             }
             Set<Short> ids = new HashSet<>();
+            // <block type="NAME"/> — an explicit block by StarMade type name (or numeric id).
             for (Node b : XMLUtils.findNodes(f, "block")) {
                 String id = XMLUtils.getAttribute(b, "type");
                 if (BlockTypeColors.mBlockTypes.containsKey(id)) {
@@ -107,6 +109,23 @@ public class ViewFilterFactory implements IStarMadePluginFactory {
                     short val = ShortUtils.parseShort(id);
                     if (val > 0) {
                         ids.add(val);
+                    }
+                }
+            }
+            // <category name="NAME"/> — every block whose config category path contains
+            // that segment (e.g. "Hulls", "Weapons"), so filters stay concise and never
+            // drift as the install's block set changes.
+            for (Node c : XMLUtils.findNodes(f, "category")) {
+                String cat = XMLUtils.getAttribute(c, "name");
+                if (StringUtils.isTrivial(cat)) {
+                    continue;
+                }
+                for (java.util.Map.Entry<Short, String[]> e : BlockTypeColors.BLOCK_CATEGORY.entrySet()) {
+                    for (String seg : e.getValue()) {
+                        if (seg.equalsIgnoreCase(cat)) {
+                            ids.add(e.getKey());
+                            break;
+                        }
                     }
                 }
             }

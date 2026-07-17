@@ -52,8 +52,11 @@ public final class SelectionModel {
     }
 
     public void setMode(Mode mode) {
-        if (mode != null) {
+        if (mode != null && mode != mMode) {
             mMode = mode;
+            // The highlight (entity box vs. per-cell outline) and the move gizmo both
+            // depend on the mode, so refresh listeners when it actually changes.
+            fireChanged();
         }
     }
 
